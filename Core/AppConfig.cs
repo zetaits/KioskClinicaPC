@@ -12,5 +12,8 @@
         public string Storage { get; set; }
         public string Screen { get; set; }
         public string Os { get; set; }
+        public string Motherboard { get; set; }
+        public string PowerSupply { get; set; }
+        public string Case { get; set; }
     }
 }

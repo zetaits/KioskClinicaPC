@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.ComponentModel;
 using System.Reflection;
 using KioskClinicaPC.Core;
@@ -10,6 +10,7 @@ using Microsoft.Win32;
 using System.IO;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
+using System.Windows.Media.Imaging;
 
 namespace KioskClinicaPC
 {
@@ -131,19 +132,80 @@ namespace KioskClinicaPC
                 DisplayPriceText.Text = savedConfig.Price ?? "N/A";
             }
 
-            CpuNameText.Text = !string.IsNullOrWhiteSpace(savedConfig.Cpu) ? savedConfig.Cpu : _detectedSpecs.Cpu;
-            CpuCoresText.Text = !string.IsNullOrWhiteSpace(savedConfig.Cores) ? savedConfig.Cores : _detectedSpecs.Cores;
-            RamText.Text = !string.IsNullOrWhiteSpace(savedConfig.Ram) ? savedConfig.Ram : _detectedSpecs.Ram;
-            GpuText.Text = !string.IsNullOrWhiteSpace(savedConfig.Gpu) ? savedConfig.Gpu : _detectedSpecs.Gpu;
-            StorageText.Text = !string.IsNullOrWhiteSpace(savedConfig.Storage) ? savedConfig.Storage : _detectedSpecs.Storage;
-            ScreenText.Text = !string.IsNullOrWhiteSpace(savedConfig.Screen) ? savedConfig.Screen : _detectedSpecs.Screen;
-            OsText.Text = !string.IsNullOrWhiteSpace(savedConfig.Os) ? savedConfig.Os : _detectedSpecs.Os.Split('(')[0].Trim();
-
-            if (FindName("LoadingText") is TextBlock loadingText)
-                loadingText.Visibility = Visibility.Collapsed;
-            if (FindName("SpecsGrid") is FrameworkElement specsGrid)
-                specsGrid.Visibility = Visibility.Visible;
+            PopulateSpecsPanel(savedConfig, _detectedSpecs);
         }
+
+        private void PopulateSpecsPanel(AppConfig savedConfig, AppConfig detectedSpecs)
+        {
+            SpecsPanel.Children.Clear();
+
+            // CPU Tile (Corrected)
+            string cpuValue = !string.IsNullOrWhiteSpace(savedConfig.Cpu) ? savedConfig.Cpu : detectedSpecs.Cpu;
+            string coresValue = !string.IsNullOrWhiteSpace(savedConfig.Cores) ? savedConfig.Cores : detectedSpecs.Cores;
+            CreateSpecTile("PROCESADOR",
+                $"{cpuValue} ({coresValue})",
+                "El cerebro ultrarrápido para gaming y creación de contenido.",
+                "POTENTE", "cpu_icon.png");
+
+            // RAM Tile
+            CreateSpecTile("MEMORIA RAM",
+                !string.IsNullOrWhiteSpace(savedConfig.Ram) ? savedConfig.Ram : detectedSpecs.Ram,
+                "Ideal para multitarea y juegos fluidos.",
+                "RÁPIDA", "ram_icon.png");
+
+            // GPU Tile
+            CreateSpecTile("TARJETA GRÁFICA",
+                !string.IsNullOrWhiteSpace(savedConfig.Gpu) ? savedConfig.Gpu : detectedSpecs.Gpu,
+                "Gráficos impresionantes y alto rendimiento en juegos.",
+                "GAMING", "gpu_icon.png");
+
+            // Storage Tile
+            CreateSpecTile("ALMACENAMIENTO",
+                !string.IsNullOrWhiteSpace(savedConfig.Storage) ? savedConfig.Storage : detectedSpecs.Storage,
+                "Arranque y carga de aplicaciones en segundos.",
+                "VELOZ", "storage_icon.png");
+
+            // Motherboard, PSU, Case Tiles (Now configurable)
+            CreateSpecTile("PLACA BASE",
+                !string.IsNullOrWhiteSpace(savedConfig.Motherboard) ? savedConfig.Motherboard : "No especificado",
+                "La base estable para todos tus componentes.",
+                "CONFIABLE", "motherboard_icon.png");
+
+            CreateSpecTile("FUENTE DE PODER",
+                !string.IsNullOrWhiteSpace(savedConfig.PowerSupply) ? savedConfig.PowerSupply : "No especificado",
+                "Energía eficiente y segura para tu equipo.",
+                "EFICIENTE", "psu_icon.png");
+
+            CreateSpecTile("GABINETE",
+                !string.IsNullOrWhiteSpace(savedConfig.Case) ? savedConfig.Case : "No especificado",
+                "Diseño elegante con excelente flujo de aire.",
+                "ESTILO", "case_icon.png");
+
+            // Screen and OS Tiles (Re-integrated)
+            CreateSpecTile("PANTALLA",
+                !string.IsNullOrWhiteSpace(savedConfig.Screen) ? savedConfig.Screen : detectedSpecs.Screen,
+                "Claridad y colores vibrantes para una inmersión total.",
+                "NÍTIDA", "screen_icon.png");
+
+            CreateSpecTile("SISTEMA OPERATIVO",
+                !string.IsNullOrWhiteSpace(savedConfig.Os) ? savedConfig.Os : detectedSpecs.Os.Split('(')[0].Trim(),
+                "Windows: El estándar para compatibilidad y rendimiento.",
+                "MODERNO", "os_icon.png");
+        }
+
+        private void CreateSpecTile(string label, string value, string benefit, string tag, string iconName)
+        {
+            var tile = new SpecTile
+            {
+                Label = label,
+                Value = value,
+                Benefit = benefit,
+                Tag = tag,
+                IconSource = new BitmapImage(new Uri($"pack://application:,,,/KioskClinicaPC;component/Assets/{iconName}", UriKind.Absolute))
+            };
+            SpecsPanel.Children.Add(tile);
+        }
+
 
         private void Window_Closing(object sender, CancelEventArgs e)
         {

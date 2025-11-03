@@ -3,10 +3,11 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:KioskClinicaPC.Windows"
         mc:Ignorable="d"
         Title="Especificaciones del Equipo"
         Foreground="White"
-        FontFamily="Segoe UI Light"
+        FontFamily="Segoe UI"
         WindowStyle="None" 
         ResizeMode="NoResize"
         WindowState="Maximized" 
@@ -14,7 +15,7 @@
         Loaded="Window_Loaded"
         Closing="Window_Closing"
         KeyDown="Window_KeyDown">
-    
+
     <Window.Background>
         <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
             <GradientStop Color="#FF121212" Offset="0"/>
@@ -33,130 +34,70 @@
         </EventTrigger>
     </Window.Triggers>
 
-    <Grid Margin="100">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" /> <RowDefinition Height="Auto" /> <RowDefinition Height="*" />    <RowDefinition Height="Auto" /> </Grid.RowDefinitions>
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="0.35*" />
+            <ColumnDefinition Width="0.65*" />
+        </Grid.ColumnDefinitions>
 
-        <StackPanel Grid.Row="0" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,0,0,30">
-            <Image Source="pack://application:,,,/KioskClinicaPC;component/Assets/clinicapc-logo.png"
-                   Height="120"
-                   Width="Auto"
-                   Margin="0,0,0,20"/>
-            <TextBlock Text="ESPECIFICACIONES DEL EQUIPO"
-                       FontSize="48"
-                       FontWeight="Bold"
-                       Foreground="#FFCCCCCC"
-                       HorizontalAlignment="Center"
-                       Margin="0,0,0,10"/>
-            <StackPanel Grid.Row="1" 
-                        Orientation="Horizontal"
-                        HorizontalAlignment="Center" 
-                        VerticalAlignment="Center" 
-                        Margin="0,0,0,40">
-            
-                <TextBlock x:Name="OriginalPriceText"
-                           Text="...€"
-                           FontSize="48"
-                           FontWeight="Light"
-                           Foreground="#FF999999"
-                           TextDecorations="Strikethrough"
-                           Margin="0,0,20,0"
-                           VerticalAlignment="Center"
-                           Visibility="Collapsed" />
-            
-                <TextBlock x:Name="DisplayPriceText"
-                           Text="...€"
-                           FontSize="64"
-                           FontWeight="Bold"
-                           Foreground="#FF007ACC"
-                           VerticalAlignment="Center"/>
-            </StackPanel>
-        </StackPanel>
-
-        <Grid Grid.Row="2" VerticalAlignment="Center" HorizontalAlignment="Center">
-            
-            <TextBlock x:Name="LoadingText"
-                       Text="Cargando especificaciones..."
-                       FontSize="32"
-                       HorizontalAlignment="Center"
-                       VerticalAlignment="Center"
-                       Foreground="#FF888888" />
-
-            <Grid x:Name="SpecsGrid" Visibility="Collapsed">
-                
-                <Grid.Resources>
-                    <Style TargetType="TextBlock" x:Key="LabelStyle">
-                        <Setter Property="FontSize" Value="28" />
-                        <Setter Property="FontWeight" Value="SemiBold" />
-                        <Setter Property="Foreground" Value="#FF999999" />
-                        <Setter Property="Margin" Value="0,10,40,10" />
-                    </Style>
-
-                    <Style TargetType="TextBlock" x:Key="ValueStyle">
-                        <Setter Property="FontSize" Value="28" />
-                        <Setter Property="FontWeight" Value="Normal" />
-                        <Setter Property="Foreground" Value="White" />
-                        <Setter Property="Margin" Value="0,10,0,10" />
-                        <Setter Property="TextWrapping" Value="Wrap" /> 
-                        <Setter Property="MaxWidth" Value="700" /> 
-                    </Style>
-                </Grid.Resources>
-
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="*" />
-                </Grid.ColumnDefinitions>
-                
+        <!-- COLUMNA IZQUIERDA: EL GANCHO -->
+        <Border Grid.Column="0" Background="#18181A" Padding="40">
+            <Grid>
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
 
-                <TextBlock Grid.Row="0" Grid.Column="0" Text="Procesador" Style="{StaticResource LabelStyle}" />
-                <TextBlock Grid.Row="0" Grid.Column="1" x:Name="CpuNameText" Text="..." Style="{StaticResource ValueStyle}" />
-                <TextBlock Grid.Row="1" Grid.Column="0" Text="Rendimiento" Style="{StaticResource LabelStyle}" />
-                <TextBlock Grid.Row="1" Grid.Column="1" x:Name="CpuCoresText" Text="..." Style="{StaticResource ValueStyle}" />
-                <Border Grid.Row="2" Grid.ColumnSpan="2" Height="1" Background="#FF333333" Margin="0,15" />
-                <TextBlock Grid.Row="3" Grid.Column="0" Text="Memoria RAM" Style="{StaticResource LabelStyle}" />
-                <TextBlock Grid.Row="3" Grid.Column="1" x:Name="RamText" Text="..." Style="{StaticResource ValueStyle}" />
-                <TextBlock Grid.Row="4" Grid.Column="0" Text="Gráficos" Style="{StaticResource LabelStyle}" />
-                <TextBlock Grid.Row="4" Grid.Column="1" x:Name="GpuText" Text="..." Style="{StaticResource ValueStyle}" />
-                <Border Grid.Row="5" Grid.ColumnSpan="2" Height="1" Background="#FF333333" Margin="0,15" />
-                <TextBlock Grid.Row="6" Grid.Column="0" Text="Almacenamiento" Style="{StaticResource LabelStyle}" />
-                <TextBlock Grid.Row="6" Grid.Column="1" x:Name="StorageText" Text="..." Style="{StaticResource ValueStyle}" />
-                <Border Grid.Row="7" Grid.ColumnSpan="2" Height="1" Background="#FF333333" Margin="0,15" />
-                <TextBlock Grid.Row="8" Grid.Column="0" Text="Pantalla" Style="{StaticResource LabelStyle}" />
-                <TextBlock Grid.Row="8" Grid.Column="1" x:Name="ScreenText" Text="..." Style="{StaticResource ValueStyle}" />
-                <TextBlock Grid.Row="9" Grid.Column="0" Text="Sistema" Style="{StaticResource LabelStyle}" />
-                <TextBlock Grid.Row="9" Grid.Column="1" x:Name="OsText" Text="..." Style="{StaticResource ValueStyle}" />
-            </Grid>
-        </Grid>
+                <Image Source="pack://application:,,,/KioskClinicaPC;component/Assets/clinicapc-logo.png"
+                       Grid.Row="0"
+                       Height="100"
+                       Width="Auto"
+                       HorizontalAlignment="Left"
+                       Margin="0,0,0,30"/>
 
-        <TextBlock Grid.Row="3" 
-                   Text="Equipo de demostración — No interactuar. Consulte al personal para más información."
-                   FontSize="18"
-                   Foreground="#FF777777"
-                   HorizontalAlignment="Center"
-                   VerticalAlignment="Bottom"/>
+                <StackPanel Grid.Row="1" VerticalAlignment="Center">
+                    <TextBlock x:Name="OriginalPriceText"
+                               Text="1999€"
+                               FontSize="48"
+                               FontWeight="Light"
+                               Foreground="#FF999999"
+                               TextDecorations="Strikethrough"
+                               Margin="0,0,0,10"
+                               Visibility="Collapsed" />
+
+                    <TextBlock x:Name="DisplayPriceText"
+                               Text="1499€"
+                               FontSize="110"
+                               FontWeight="Bold"
+                               Foreground="#FF007ACC"
+                               LineHeight="100"
+                               VerticalAlignment="Center"/>
+                </StackPanel>
+
+                <TextBlock Grid.Row="2"
+                           Text="Equipo de demostración. Consulte al personal para más información."
+                           FontSize="16"
+                           Foreground="#FF777777"
+                           TextWrapping="Wrap"
+                           VerticalAlignment="Bottom"/>
+            </Grid>
+        </Border>
         
+        <!-- COLUMNA DERECHA: EL ASISTENTE -->
+        <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto">
+             <StackPanel x:Name="SpecsPanel" Margin="40" VerticalAlignment="Center"/>
+        </ScrollViewer>
+
+        <!-- Área de Clic Oculta para Ajustes -->
         <Border x:Name="SettingsClickArea"
-                Grid.Row="0"
-                Grid.RowSpan="2" 
+                Grid.Column="0"
                 HorizontalAlignment="Right"
                 VerticalAlignment="Top"
                 Width="150"
                 Height="250"
                 Background="Transparent"
                 MouseLeftButtonDown="SettingsClickArea_MouseLeftButtonDown"
-                Cursor="Arrow" /> 
-        
+                Cursor="Arrow" />
     </Grid>
 </Window>
