@@ -145,55 +145,55 @@ namespace KioskClinicaPC
             CreateSpecTile("PROCESADOR",
                 $"{cpuValue} ({coresValue})",
                 "El cerebro ultrarrápido para gaming y creación de contenido.",
-                "POTENTE", "cpu_icon.png");
+                "POTENTE");
 
             // RAM Tile
             CreateSpecTile("MEMORIA RAM",
                 !string.IsNullOrWhiteSpace(savedConfig.Ram) ? savedConfig.Ram : detectedSpecs.Ram,
                 "Ideal para multitarea y juegos fluidos.",
-                "RÁPIDA", "ram_icon.png");
+                "RÁPIDA");
 
             // GPU Tile
             CreateSpecTile("TARJETA GRÁFICA",
                 !string.IsNullOrWhiteSpace(savedConfig.Gpu) ? savedConfig.Gpu : detectedSpecs.Gpu,
                 "Gráficos impresionantes y alto rendimiento en juegos.",
-                "GAMING", "gpu_icon.png");
+                "GAMING");
 
             // Storage Tile
             CreateSpecTile("ALMACENAMIENTO",
                 !string.IsNullOrWhiteSpace(savedConfig.Storage) ? savedConfig.Storage : detectedSpecs.Storage,
                 "Arranque y carga de aplicaciones en segundos.",
-                "VELOZ", "storage_icon.png");
+                "VELOZ");
 
             // Motherboard, PSU, Case Tiles (Now configurable)
             CreateSpecTile("PLACA BASE",
                 !string.IsNullOrWhiteSpace(savedConfig.Motherboard) ? savedConfig.Motherboard : "No especificado",
                 "La base estable para todos tus componentes.",
-                "CONFIABLE", "motherboard_icon.png");
+                "CONFIABLE");
 
             CreateSpecTile("FUENTE DE PODER",
                 !string.IsNullOrWhiteSpace(savedConfig.PowerSupply) ? savedConfig.PowerSupply : "No especificado",
                 "Energía eficiente y segura para tu equipo.",
-                "EFICIENTE", "psu_icon.png");
+                "EFICIENTE");
 
             CreateSpecTile("GABINETE",
                 !string.IsNullOrWhiteSpace(savedConfig.Case) ? savedConfig.Case : "No especificado",
                 "Diseño elegante con excelente flujo de aire.",
-                "ESTILO", "case_icon.png");
+                "ESTILO");
 
             // Screen and OS Tiles (Re-integrated)
             CreateSpecTile("PANTALLA",
                 !string.IsNullOrWhiteSpace(savedConfig.Screen) ? savedConfig.Screen : detectedSpecs.Screen,
                 "Claridad y colores vibrantes para una inmersión total.",
-                "NÍTIDA", "screen_icon.png");
+                "NÍTIDA");
 
             CreateSpecTile("SISTEMA OPERATIVO",
                 !string.IsNullOrWhiteSpace(savedConfig.Os) ? savedConfig.Os : detectedSpecs.Os.Split('(')[0].Trim(),
                 "Windows: El estándar para compatibilidad y rendimiento.",
-                "MODERNO", "os_icon.png");
+                "MODERNO");
         }
 
-        private void CreateSpecTile(string label, string value, string benefit, string tag, string iconName)
+        private void CreateSpecTile(string label, string value, string benefit, string tag)
         {
             var tile = new SpecTile
             {
@@ -201,7 +201,7 @@ namespace KioskClinicaPC
                 Value = value,
                 Benefit = benefit,
                 Tag = tag,
-                IconSource = new BitmapImage(new Uri($"pack://application:,,,/KioskClinicaPC;component/Assets/{iconName}", UriKind.Absolute))
+                IconSource = new BitmapImage(new Uri($"pack://application:,,,/KioskClinicaPC;component/Assets/clinicapc-logo.png", UriKind.Absolute))
             };
             SpecsPanel.Children.Add(tile);
         }
