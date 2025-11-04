@@ -60,7 +60,25 @@ namespace KioskClinicaPC.Windows
             set { SetValue(BenefitProperty, value); }
         }
 
-        // Let's bind the UI elements directly in XAML to the properties
-        // We need to update the SpecTile.xaml to use bindings.
+        public static readonly DependencyProperty DefinitionTextProperty =
+            DependencyProperty.Register("DefinitionText", typeof(string), typeof(SpecTile), new PropertyMetadata(string.Empty));
+
+        public string DefinitionText
+        {
+            get { return (string)GetValue(DefinitionTextProperty); }
+            set { SetValue(DefinitionTextProperty, value); }
+        }
+
+        private void InfoButton_Click(object sender, System.Windows.RoutedEventArgs e)
+        {
+            if (!string.IsNullOrEmpty(DefinitionText))
+            {
+                var modal = new InfoModal(this.Label, this.DefinitionText)
+                {
+                    Owner = Window.GetWindow(this)
+                };
+                modal.ShowDialog();
+            }
+        }
     }
 }

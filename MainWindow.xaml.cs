@@ -185,18 +185,18 @@ namespace KioskClinicaPC
 
             string cpuValue = !string.IsNullOrWhiteSpace(savedConfig.Cpu) ? savedConfig.Cpu : detectedSpecs.Cpu;
             string coresValue = !string.IsNullOrWhiteSpace(savedConfig.Cores) ? savedConfig.Cores : detectedSpecs.Cores;
-            CreateSpecTile("PROCESADOR", $"{cpuValue} ({coresValue})", "El cerebro ultrarrápido para gaming y creación de contenido.", "POTENTE");
-            CreateSpecTile("MEMORIA RAM", !string.IsNullOrWhiteSpace(savedConfig.Ram) ? savedConfig.Ram : detectedSpecs.Ram, "Ideal para multitarea y juegos fluidos.", "RÁPIDA");
-            CreateSpecTile("TARJETA GRÁFICA", !string.IsNullOrWhiteSpace(savedConfig.Gpu) ? savedConfig.Gpu : detectedSpecs.Gpu, "Gráficos impresionantes y alto rendimiento en juegos.", "GAMING");
-            CreateSpecTile("ALMACENAMIENTO", !string.IsNullOrWhiteSpace(savedConfig.Storage) ? savedConfig.Storage : detectedSpecs.Storage, "Arranque y carga de aplicaciones en segundos.", "VELOZ");
-            CreateSpecTile("PLACA BASE", !string.IsNullOrWhiteSpace(savedConfig.Motherboard) ? savedConfig.Motherboard : "No especificado", "La base estable para todos tus componentes.", "CONFIABLE");
-            CreateSpecTile("FUENTE DE PODER", !string.IsNullOrWhiteSpace(savedConfig.PowerSupply) ? savedConfig.PowerSupply : "No especificado", "Energía eficiente y segura para tu equipo.", "EFICIENTE");
-            CreateSpecTile("GABINETE", !string.IsNullOrWhiteSpace(savedConfig.Case) ? savedConfig.Case : "No especificado", "Diseño elegante con excelente flujo de aire.", "ESTILO");
-            CreateSpecTile("PANTALLA", !string.IsNullOrWhiteSpace(savedConfig.Screen) ? savedConfig.Screen : detectedSpecs.Screen, "Claridad y colores vibrantes para una inmersión total.", "NÍTIDA");
-            CreateSpecTile("SISTEMA OPERATIVO", !string.IsNullOrWhiteSpace(savedConfig.Os) ? savedConfig.Os : detectedSpecs.Os.Split('(')[0].Trim(), "Windows: El estándar para compatibilidad y rendimiento.", "MODERNO");
+            CreateSpecTile("PROCESADOR", $"{cpuValue} ({coresValue})", "El cerebro ultrarrápido para gaming y creación de contenido.", "POTENTE", savedConfig.CpuDefinition);
+            CreateSpecTile("MEMORIA RAM", !string.IsNullOrWhiteSpace(savedConfig.Ram) ? savedConfig.Ram : detectedSpecs.Ram, "Ideal para multitarea y juegos fluidos.", "RÁPIDA", savedConfig.RamDefinition);
+            CreateSpecTile("TARJETA GRÁFICA", !string.IsNullOrWhiteSpace(savedConfig.Gpu) ? savedConfig.Gpu : detectedSpecs.Gpu, "Gráficos impresionantes y alto rendimiento en juegos.", "GAMING", savedConfig.GpuDefinition);
+            CreateSpecTile("ALMACENAMIENTO", !string.IsNullOrWhiteSpace(savedConfig.Storage) ? savedConfig.Storage : detectedSpecs.Storage, "Arranque y carga de aplicaciones en segundos.", "VELOZ", savedConfig.StorageDefinition);
+            CreateSpecTile("PLACA BASE", !string.IsNullOrWhiteSpace(savedConfig.Motherboard) ? savedConfig.Motherboard : "No especificado", "La base estable para todos tus componentes.", "CONFIABLE", savedConfig.MotherboardDefinition);
+            CreateSpecTile("FUENTE DE PODER", !string.IsNullOrWhiteSpace(savedConfig.PowerSupply) ? savedConfig.PowerSupply : "No especificado", "Energía eficiente y segura para tu equipo.", "EFICIENTE", savedConfig.PowerSupplyDefinition);
+            CreateSpecTile("GABINETE", !string.IsNullOrWhiteSpace(savedConfig.Case) ? savedConfig.Case : "No especificado", "Diseño elegante con excelente flujo de aire.", "ESTILO", savedConfig.CaseDefinition);
+            CreateSpecTile("PANTALLA", !string.IsNullOrWhiteSpace(savedConfig.Screen) ? savedConfig.Screen : detectedSpecs.Screen, "Claridad y colores vibrantes para una inmersión total.", "NÍTIDA", savedConfig.ScreenDefinition);
+            CreateSpecTile("SISTEMA OPERATIVO", !string.IsNullOrWhiteSpace(savedConfig.Os) ? savedConfig.Os : detectedSpecs.Os.Split('(')[0].Trim(), "Windows: El estándar para compatibilidad y rendimiento.", "MODERNO", savedConfig.OsDefinition);
         }
 
-        private void CreateSpecTile(string label, string value, string benefit, string tag)
+        private void CreateSpecTile(string label, string value, string benefit, string tag, string definitionText)
         {
             var tile = new SpecTile
             {
@@ -204,6 +204,7 @@ namespace KioskClinicaPC
                 Value = value,
                 Benefit = benefit,
                 Tag = tag,
+                DefinitionText = definitionText,
                 IconSource = new BitmapImage(new Uri("pack://application:,,,/KioskClinicaPC;component/Assets/clinicapc-logo.png", UriKind.Absolute))
             };
             SpecsPanel.Children.Add(tile);

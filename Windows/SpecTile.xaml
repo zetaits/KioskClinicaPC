@@ -18,16 +18,15 @@
         <Image Source="{Binding ElementName=root, Path=IconSource}" Width="60" Height="60" Margin="10,0,10,0" VerticalAlignment="Center"/>
 
         <StackPanel Grid.Column="1" VerticalAlignment="Center">
-            <TextBlock Text="{Binding ElementName=root, Path=Label}" Foreground="#A2A2A7" FontSize="12" FontWeight="SemiBold"/>
+            <TextBlock x:Name="LabelText" Text="{Binding ElementName=root, Path=Label}" Foreground="#A2A2A7" FontSize="12" FontWeight="SemiBold"/>
             <TextBlock Text="{Binding ElementName=root, Path=Value}" Foreground="White" FontSize="18" FontWeight="Bold" TextWrapping="Wrap"/>
             <TextBlock Text="{Binding ElementName=root, Path=Benefit}" Foreground="#A2A2A7" FontSize="14" TextWrapping="Wrap"/>
         </StackPanel>
 
-        <!-- Columna 2: Contiene Tag y Botón, organizados para no solaparse -->
         <Grid Grid.Column="2" Margin="10">
             <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/> <!-- Para la etiqueta/Tag -->
-                <RowDefinition Height="*"/>    <!-- Espacio flexible -->
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
 
             <TextBlock Grid.Row="0"
@@ -40,11 +39,26 @@
                        HorizontalAlignment="Right"
                        VerticalAlignment="Top"/>
 
-            <Button Grid.Row="1"
+            <Button x:Name="InfoButton"
+                    Grid.Row="1"
                     Content="?"
                     Style="{StaticResource InfoButtonStyle}"
                     HorizontalAlignment="Right"
-                    VerticalAlignment="Bottom"/>
+                    VerticalAlignment="Bottom"
+                    Click="InfoButton_Click">
+                <Button.Resources>
+                    <Style TargetType="Button" BasedOn="{StaticResource InfoButtonStyle}">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding ElementName=root, Path=DefinitionText}" Value="{x:Null}">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding ElementName=root, Path=DefinitionText}" Value="">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Resources>
+            </Button>
         </Grid>
     </Grid>
 </UserControl>
