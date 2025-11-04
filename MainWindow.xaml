@@ -23,81 +23,87 @@
         </LinearGradientBrush>
     </Window.Background>
 
+    <Window.Resources>
+        <!-- ANIMACIONES PARA MODO AMBIENTE -->
+        <Storyboard x:Key="FadeOutUI">
+            <DoubleAnimation Storyboard.TargetName="MainContentGrid" Storyboard.TargetProperty="Opacity" To="0" Duration="0:0:0.5"/>
+        </Storyboard>
+        <Storyboard x:Key="FadeInUI">
+            <DoubleAnimation Storyboard.TargetName="MainContentGrid" Storyboard.TargetProperty="Opacity" To="1" Duration="0:0:0.5"/>
+        </Storyboard>
+
+        <Storyboard x:Key="FadeInAmbient">
+            <ObjectAnimationUsingKeyFrames Storyboard.TargetName="AmbientText" Storyboard.TargetProperty="Visibility">
+                <DiscreteObjectKeyFrame KeyTime="0:0:0" Value="{x:Static Visibility.Visible}"/>
+            </ObjectAnimationUsingKeyFrames>
+            <DoubleAnimation Storyboard.TargetName="AmbientText" Storyboard.TargetProperty="Opacity" From="0" To="1" Duration="0:0:1"/>
+        </Storyboard>
+        <Storyboard x:Key="FadeOutAmbient">
+            <DoubleAnimation Storyboard.TargetName="AmbientText" Storyboard.TargetProperty="Opacity" To="0" Duration="0:0:0.5"/>
+            <ObjectAnimationUsingKeyFrames Storyboard.TargetName="AmbientText" Storyboard.TargetProperty="Visibility" BeginTime="0:0:0.5">
+                <DiscreteObjectKeyFrame KeyTime="0" Value="{x:Static Visibility.Collapsed}"/>
+            </ObjectAnimationUsingKeyFrames>
+        </Storyboard>
+
+        <Storyboard x:Key="PulseAmbient" RepeatBehavior="Forever" AutoReverse="True">
+            <DoubleAnimation Storyboard.TargetName="AmbientText" Storyboard.TargetProperty="Opacity" From="1.0" To="0.6" Duration="0:0:2"/>
+        </Storyboard>
+    </Window.Resources>
+
     <Window.Triggers>
         <EventTrigger RoutedEvent="Loaded">
             <BeginStoryboard>
                 <Storyboard>
-                    <DoubleAnimation Storyboard.TargetProperty="Opacity" 
-                                     From="0.0" To="1.0" Duration="0:0:1.5" />
+                    <DoubleAnimation Storyboard.TargetProperty="Opacity" From="0.0" To="1.0" Duration="0:0:1.5" />
                 </Storyboard>
             </BeginStoryboard>
         </EventTrigger>
     </Window.Triggers>
 
-    <Grid>
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="0.35*" />
-            <ColumnDefinition Width="0.65*" />
-        </Grid.ColumnDefinitions>
+    <!-- Grid Exterior: Captura eventos de ratón para reiniciar el temporizador -->
+    <Grid PreviewMouseMove="ResetInactivityTimer" PreviewMouseLeftButtonDown="ResetInactivityTimer">
 
-        <!-- COLUMNA IZQUIERDA: EL GANCHO -->
-        <Border Grid.Column="0" Background="#18181A" Padding="40">
-            <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="*"/>
-                    <RowDefinition Height="Auto"/>
-                </Grid.RowDefinitions>
+        <!-- Grid Interior: Contenido principal de la UI -->
+        <Grid x:Name="MainContentGrid">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="0.35*" />
+                <ColumnDefinition Width="0.65*" />
+            </Grid.ColumnDefinitions>
 
-                <Image Source="pack://application:,,,/KioskClinicaPC;component/Assets/clinicapc-logo.png"
-                       Grid.Row="0"
-                       Height="100"
-                       Width="Auto"
-                       HorizontalAlignment="Left"
-                       Margin="0,0,0,30"/>
+            <!-- COLUMNA IZQUIERDA: EL GANCHO -->
+            <Border Grid.Column="0" Background="#18181A" Padding="40">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <Image Source="pack://application:,,,/KioskClinicaPC;component/Assets/clinicapc-logo.png" Grid.Row="0" Height="100" Width="Auto" HorizontalAlignment="Left" Margin="0,0,0,30"/>
+                    <StackPanel Grid.Row="1" VerticalAlignment="Center">
+                        <TextBlock x:Name="OriginalPriceText" Text="1999€" FontSize="48" FontWeight="Light" Foreground="#FF999999" TextDecorations="Strikethrough" Margin="0,0,0,10" Visibility="Collapsed" />
+                        <TextBlock x:Name="DisplayPriceText" Text="1499€" FontSize="110" FontWeight="Bold" Foreground="#FF007ACC" LineHeight="100" VerticalAlignment="Center"/>
+                    </StackPanel>
+                    <TextBlock Grid.Row="2" Text="Equipo de demostración. Consulte al personal para más información." FontSize="16" Foreground="#FF777777" TextWrapping="Wrap" VerticalAlignment="Bottom"/>
+                </Grid>
+            </Border>
 
-                <StackPanel Grid.Row="1" VerticalAlignment="Center">
-                    <TextBlock x:Name="OriginalPriceText"
-                               Text="1999€"
-                               FontSize="48"
-                               FontWeight="Light"
-                               Foreground="#FF999999"
-                               TextDecorations="Strikethrough"
-                               Margin="0,0,0,10"
-                               Visibility="Collapsed" />
+            <!-- COLUMNA DERECHA: EL ASISTENTE -->
+            <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto">
+                 <StackPanel x:Name="SpecsPanel" Margin="40" VerticalAlignment="Center"/>
+            </ScrollViewer>
 
-                    <TextBlock x:Name="DisplayPriceText"
-                               Text="1499€"
-                               FontSize="110"
-                               FontWeight="Bold"
-                               Foreground="#FF007ACC"
-                               LineHeight="100"
-                               VerticalAlignment="Center"/>
-                </StackPanel>
+            <!-- Área de Clic Oculta para Ajustes -->
+            <Border x:Name="SettingsClickArea" Grid.Column="0" HorizontalAlignment="Right" VerticalAlignment="Top" Width="150" Height="250" Background="Transparent" MouseLeftButtonDown="SettingsClickArea_MouseLeftButtonDown" Cursor="Arrow" />
+        </Grid>
 
-                <TextBlock Grid.Row="2"
-                           Text="Equipo de demostración. Consulte al personal para más información."
-                           FontSize="16"
-                           Foreground="#FF777777"
-                           TextWrapping="Wrap"
-                           VerticalAlignment="Bottom"/>
-            </Grid>
-        </Border>
-        
-        <!-- COLUMNA DERECHA: EL ASISTENTE -->
-        <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto">
-             <StackPanel x:Name="SpecsPanel" Margin="40" VerticalAlignment="Center"/>
-        </ScrollViewer>
-
-        <!-- Área de Clic Oculta para Ajustes -->
-        <Border x:Name="SettingsClickArea"
-                Grid.Column="0"
-                HorizontalAlignment="Right"
-                VerticalAlignment="Top"
-                Width="150"
-                Height="250"
-                Background="Transparent"
-                MouseLeftButtonDown="SettingsClickArea_MouseLeftButtonDown"
-                Cursor="Arrow" />
+        <!-- MODO AMBIENTE: Texto de salvapantallas -->
+        <TextBlock x:Name="AmbientText"
+                   Text="Toca para descubrir tu próximo PC"
+                   HorizontalAlignment="Center"
+                   VerticalAlignment="Center"
+                   FontSize="32"
+                   Foreground="White"
+                   Visibility="Collapsed"
+                   Opacity="0"/>
     </Grid>
 </Window>
