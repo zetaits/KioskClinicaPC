@@ -23,11 +23,28 @@
             <TextBlock Text="{Binding ElementName=root, Path=Benefit}" Foreground="#A2A2A7" FontSize="14" TextWrapping="Wrap"/>
         </StackPanel>
 
-        <StackPanel Grid.Column="2" VerticalAlignment="Top" HorizontalAlignment="Right" Margin="10">
-            <TextBlock Text="{Binding ElementName=root, Path=Tag}" Background="#FF007ACC" Foreground="White" Padding="8,4" FontSize="10" FontWeight="Bold"/>
-        </StackPanel>
+        <!-- Columna 2: Contiene Tag y Botón, organizados para no solaparse -->
+        <Grid Grid.Column="2" Margin="10">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/> <!-- Para la etiqueta/Tag -->
+                <RowDefinition Height="*"/>    <!-- Espacio flexible -->
+            </Grid.RowDefinitions>
 
-        <Button Grid.Column="2" VerticalAlignment="Bottom" HorizontalAlignment="Right"
-                Content="?" Style="{StaticResource InfoButtonStyle}" Margin="5"/>
+            <TextBlock Grid.Row="0"
+                       Text="{Binding ElementName=root, Path=Tag}"
+                       Background="#FF007ACC"
+                       Foreground="White"
+                       Padding="8,4"
+                       FontSize="10"
+                       FontWeight="Bold"
+                       HorizontalAlignment="Right"
+                       VerticalAlignment="Top"/>
+
+            <Button Grid.Row="1"
+                    Content="?"
+                    Style="{StaticResource InfoButtonStyle}"
+                    HorizontalAlignment="Right"
+                    VerticalAlignment="Bottom"/>
+        </Grid>
     </Grid>
 </UserControl>
