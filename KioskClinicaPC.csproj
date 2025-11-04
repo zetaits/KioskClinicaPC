@@ -33,4 +33,16 @@
       <Resource Include="Assets\clinicapc-logo.png" />
     </ItemGroup>
 
+    <ItemGroup>
+      <Resource Include="Assets\case_icon.png" />
+      <Resource Include="Assets\cpu_icon.png" />
+      <Resource Include="Assets\gpu_icon.png" />
+      <Resource Include="Assets\motherboard_icon.png" />
+      <Resource Include="Assets\os_icon.png" />
+      <Resource Include="Assets\psu_icon.png" />
+      <Resource Include="Assets\ram_icon.png" />
+      <Resource Include="Assets\screen_icon.png" />
+      <Resource Include="Assets\storage_icon.png" />
+    </ItemGroup>
+
 </Project>
