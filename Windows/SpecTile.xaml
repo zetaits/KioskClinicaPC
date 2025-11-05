@@ -8,6 +8,19 @@
              d:DesignHeight="100" d:DesignWidth="400"
              Background="#1C1C1E" Margin="5"
              x:Name="root">
+    <UserControl.Resources>
+        <Style x:Key="ConditionalInfoButtonStyle" TargetType="Button" BasedOn="{StaticResource InfoButtonStyle}">
+            <Setter Property="Visibility" Value="Visible"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding ElementName=root, Path=DefinitionText}" Value="{x:Null}">
+                    <Setter Property="Visibility" Value="Collapsed"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding ElementName=root, Path=DefinitionText}" Value="">
+                    <Setter Property="Visibility" Value="Collapsed"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+    </UserControl.Resources>
     <Grid>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="Auto"/>
@@ -42,23 +55,10 @@
             <Button x:Name="InfoButton"
                     Grid.Row="1"
                     Content="?"
-                    Style="{StaticResource InfoButtonStyle}"
+                    Style="{StaticResource ConditionalInfoButtonStyle}"
                     HorizontalAlignment="Right"
                     VerticalAlignment="Bottom"
-                    Click="InfoButton_Click">
-                <Button.Resources>
-                    <Style TargetType="Button" BasedOn="{StaticResource InfoButtonStyle}">
-                        <Style.Triggers>
-                            <DataTrigger Binding="{Binding ElementName=root, Path=DefinitionText}" Value="{x:Null}">
-                                <Setter Property="Visibility" Value="Collapsed"/>
-                            </DataTrigger>
-                            <DataTrigger Binding="{Binding ElementName=root, Path=DefinitionText}" Value="">
-                                <Setter Property="Visibility" Value="Collapsed"/>
-                            </DataTrigger>
-                        </Style.Triggers>
-                    </Style>
-                </Button.Resources>
-            </Button>
+                    Click="InfoButton_Click"/>
         </Grid>
     </Grid>
 </UserControl>
