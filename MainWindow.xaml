@@ -3,10 +3,11 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:KioskClinicaPC.Windows"
         mc:Ignorable="d"
         Title="Especificaciones del Equipo"
         Foreground="White"
-        FontFamily="Segoe UI Light"
+        FontFamily="Segoe UI"
         WindowStyle="None" 
         ResizeMode="NoResize"
         WindowState="Maximized" 
@@ -14,7 +15,7 @@
         Loaded="Window_Loaded"
         Closing="Window_Closing"
         KeyDown="Window_KeyDown">
-    
+
     <Window.Background>
         <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
             <GradientStop Color="#FF121212" Offset="0"/>
@@ -22,141 +23,87 @@
         </LinearGradientBrush>
     </Window.Background>
 
+    <Window.Resources>
+        <!-- ANIMACIONES PARA MODO AMBIENTE -->
+        <Storyboard x:Key="FadeOutUI">
+            <DoubleAnimation Storyboard.TargetName="MainContentGrid" Storyboard.TargetProperty="Opacity" To="0" Duration="0:0:0.5"/>
+        </Storyboard>
+        <Storyboard x:Key="FadeInUI">
+            <DoubleAnimation Storyboard.TargetName="MainContentGrid" Storyboard.TargetProperty="Opacity" To="1" Duration="0:0:0.5"/>
+        </Storyboard>
+
+        <Storyboard x:Key="FadeInAmbient">
+            <ObjectAnimationUsingKeyFrames Storyboard.TargetName="AmbientText" Storyboard.TargetProperty="Visibility">
+                <DiscreteObjectKeyFrame KeyTime="0:0:0" Value="{x:Static Visibility.Visible}"/>
+            </ObjectAnimationUsingKeyFrames>
+            <DoubleAnimation Storyboard.TargetName="AmbientText" Storyboard.TargetProperty="Opacity" From="0" To="1" Duration="0:0:1"/>
+        </Storyboard>
+        <Storyboard x:Key="FadeOutAmbient">
+            <DoubleAnimation Storyboard.TargetName="AmbientText" Storyboard.TargetProperty="Opacity" To="0" Duration="0:0:0.5"/>
+            <ObjectAnimationUsingKeyFrames Storyboard.TargetName="AmbientText" Storyboard.TargetProperty="Visibility" BeginTime="0:0:0.5">
+                <DiscreteObjectKeyFrame KeyTime="0" Value="{x:Static Visibility.Collapsed}"/>
+            </ObjectAnimationUsingKeyFrames>
+        </Storyboard>
+
+        <Storyboard x:Key="PulseAmbient" RepeatBehavior="Forever" AutoReverse="True">
+            <DoubleAnimation Storyboard.TargetName="AmbientText" Storyboard.TargetProperty="Opacity" From="1.0" To="0.6" Duration="0:0:2"/>
+        </Storyboard>
+    </Window.Resources>
+
     <Window.Triggers>
         <EventTrigger RoutedEvent="Loaded">
             <BeginStoryboard>
                 <Storyboard>
-                    <DoubleAnimation Storyboard.TargetProperty="Opacity" 
-                                     From="0.0" To="1.0" Duration="0:0:1.5" />
+                    <DoubleAnimation Storyboard.TargetProperty="Opacity" From="0.0" To="1.0" Duration="0:0:1.5" />
                 </Storyboard>
             </BeginStoryboard>
         </EventTrigger>
     </Window.Triggers>
 
-    <Grid Margin="100">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" /> <RowDefinition Height="Auto" /> <RowDefinition Height="*" />    <RowDefinition Height="Auto" /> </Grid.RowDefinitions>
+    <!-- Grid Exterior: Captura eventos de ratón para reiniciar el temporizador -->
+    <Grid PreviewMouseMove="ResetInactivityTimer" PreviewMouseLeftButtonDown="ResetInactivityTimer">
 
-        <StackPanel Grid.Row="0" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,0,0,30">
-            <Image Source="pack://application:,,,/KioskClinicaPC;component/Assets/clinicapc-logo.png"
-                   Height="120"
-                   Width="Auto"
-                   Margin="0,0,0,20"/>
-            <TextBlock Text="ESPECIFICACIONES DEL EQUIPO"
-                       FontSize="48"
-                       FontWeight="Bold"
-                       Foreground="#FFCCCCCC"
-                       HorizontalAlignment="Center"
-                       Margin="0,0,0,10"/>
-            <StackPanel Grid.Row="1" 
-                        Orientation="Horizontal"
-                        HorizontalAlignment="Center" 
-                        VerticalAlignment="Center" 
-                        Margin="0,0,0,40">
-            
-                <TextBlock x:Name="OriginalPriceText"
-                           Text="...€"
-                           FontSize="48"
-                           FontWeight="Light"
-                           Foreground="#FF999999"
-                           TextDecorations="Strikethrough"
-                           Margin="0,0,20,0"
-                           VerticalAlignment="Center"
-                           Visibility="Collapsed" />
-            
-                <TextBlock x:Name="DisplayPriceText"
-                           Text="...€"
-                           FontSize="64"
-                           FontWeight="Bold"
-                           Foreground="#FF007ACC"
-                           VerticalAlignment="Center"/>
-            </StackPanel>
-        </StackPanel>
+        <!-- Grid Interior: Contenido principal de la UI -->
+        <Grid x:Name="MainContentGrid">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="0.35*" />
+                <ColumnDefinition Width="0.65*" />
+            </Grid.ColumnDefinitions>
 
-        <Grid Grid.Row="2" VerticalAlignment="Center" HorizontalAlignment="Center">
-            
-            <TextBlock x:Name="LoadingText"
-                       Text="Cargando especificaciones..."
-                       FontSize="32"
-                       HorizontalAlignment="Center"
-                       VerticalAlignment="Center"
-                       Foreground="#FF888888" />
+            <!-- COLUMNA IZQUIERDA: EL GANCHO -->
+            <Border Grid.Column="0" Background="#18181A" Padding="40">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <Image Source="pack://application:,,,/KioskClinicaPC;component/Assets/clinicapc-logo.png" Grid.Row="0" Height="100" Width="Auto" HorizontalAlignment="Left" Margin="0,0,0,30"/>
+                    <StackPanel Grid.Row="1" VerticalAlignment="Center">
+                        <TextBlock x:Name="OriginalPriceText" Text="1999€" FontSize="48" FontWeight="Light" Foreground="#FF999999" TextDecorations="Strikethrough" Margin="0,0,0,10" Visibility="Collapsed" />
+                        <TextBlock x:Name="DisplayPriceText" Text="1499€" FontSize="110" FontWeight="Bold" Foreground="#FF007ACC" LineHeight="100" VerticalAlignment="Center"/>
+                    </StackPanel>
+                    <TextBlock Grid.Row="2" Text="Equipo de demostración. Consulte al personal para más información." FontSize="16" Foreground="#FF777777" TextWrapping="Wrap" VerticalAlignment="Bottom"/>
+                </Grid>
+            </Border>
 
-            <Grid x:Name="SpecsGrid" Visibility="Collapsed">
-                
-                <Grid.Resources>
-                    <Style TargetType="TextBlock" x:Key="LabelStyle">
-                        <Setter Property="FontSize" Value="28" />
-                        <Setter Property="FontWeight" Value="SemiBold" />
-                        <Setter Property="Foreground" Value="#FF999999" />
-                        <Setter Property="Margin" Value="0,10,40,10" />
-                    </Style>
+            <!-- COLUMNA DERECHA: EL ASISTENTE -->
+            <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto">
+                 <StackPanel x:Name="SpecsPanel" Margin="40" VerticalAlignment="Center"/>
+            </ScrollViewer>
 
-                    <Style TargetType="TextBlock" x:Key="ValueStyle">
-                        <Setter Property="FontSize" Value="28" />
-                        <Setter Property="FontWeight" Value="Normal" />
-                        <Setter Property="Foreground" Value="White" />
-                        <Setter Property="Margin" Value="0,10,0,10" />
-                        <Setter Property="TextWrapping" Value="Wrap" /> 
-                        <Setter Property="MaxWidth" Value="700" /> 
-                    </Style>
-                </Grid.Resources>
-
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="*" />
-                </Grid.ColumnDefinitions>
-                
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                </Grid.RowDefinitions>
-
-                <TextBlock Grid.Row="0" Grid.Column="0" Text="Procesador" Style="{StaticResource LabelStyle}" />
-                <TextBlock Grid.Row="0" Grid.Column="1" x:Name="CpuNameText" Text="..." Style="{StaticResource ValueStyle}" />
-                <TextBlock Grid.Row="1" Grid.Column="0" Text="Rendimiento" Style="{StaticResource LabelStyle}" />
-                <TextBlock Grid.Row="1" Grid.Column="1" x:Name="CpuCoresText" Text="..." Style="{StaticResource ValueStyle}" />
-                <Border Grid.Row="2" Grid.ColumnSpan="2" Height="1" Background="#FF333333" Margin="0,15" />
-                <TextBlock Grid.Row="3" Grid.Column="0" Text="Memoria RAM" Style="{StaticResource LabelStyle}" />
-                <TextBlock Grid.Row="3" Grid.Column="1" x:Name="RamText" Text="..." Style="{StaticResource ValueStyle}" />
-                <TextBlock Grid.Row="4" Grid.Column="0" Text="Gráficos" Style="{StaticResource LabelStyle}" />
-                <TextBlock Grid.Row="4" Grid.Column="1" x:Name="GpuText" Text="..." Style="{StaticResource ValueStyle}" />
-                <Border Grid.Row="5" Grid.ColumnSpan="2" Height="1" Background="#FF333333" Margin="0,15" />
-                <TextBlock Grid.Row="6" Grid.Column="0" Text="Almacenamiento" Style="{StaticResource LabelStyle}" />
-                <TextBlock Grid.Row="6" Grid.Column="1" x:Name="StorageText" Text="..." Style="{StaticResource ValueStyle}" />
-                <Border Grid.Row="7" Grid.ColumnSpan="2" Height="1" Background="#FF333333" Margin="0,15" />
-                <TextBlock Grid.Row="8" Grid.Column="0" Text="Pantalla" Style="{StaticResource LabelStyle}" />
-                <TextBlock Grid.Row="8" Grid.Column="1" x:Name="ScreenText" Text="..." Style="{StaticResource ValueStyle}" />
-                <TextBlock Grid.Row="9" Grid.Column="0" Text="Sistema" Style="{StaticResource LabelStyle}" />
-                <TextBlock Grid.Row="9" Grid.Column="1" x:Name="OsText" Text="..." Style="{StaticResource ValueStyle}" />
-            </Grid>
+            <!-- Área de Clic Oculta para Ajustes -->
+            <Border x:Name="SettingsClickArea" Grid.Column="0" HorizontalAlignment="Right" VerticalAlignment="Top" Width="150" Height="250" Background="Transparent" MouseLeftButtonDown="SettingsClickArea_MouseLeftButtonDown" Cursor="Arrow" />
         </Grid>
 
-        <TextBlock Grid.Row="3" 
-                   Text="Equipo de demostración — No interactuar. Consulte al personal para más información."
-                   FontSize="18"
-                   Foreground="#FF777777"
+        <!-- MODO AMBIENTE: Texto de salvapantallas -->
+        <TextBlock x:Name="AmbientText"
+                   Text="Toca para descubrir tu próximo PC"
                    HorizontalAlignment="Center"
-                   VerticalAlignment="Bottom"/>
-        
-        <Border x:Name="SettingsClickArea"
-                Grid.Row="0"
-                Grid.RowSpan="2" 
-                HorizontalAlignment="Right"
-                VerticalAlignment="Top"
-                Width="150"
-                Height="250"
-                Background="Transparent"
-                MouseLeftButtonDown="SettingsClickArea_MouseLeftButtonDown"
-                Cursor="Arrow" /> 
-        
+                   VerticalAlignment="Center"
+                   FontSize="32"
+                   Foreground="White"
+                   Visibility="Collapsed"
+                   Opacity="0"/>
     </Grid>
 </Window>

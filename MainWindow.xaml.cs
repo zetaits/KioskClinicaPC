@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.ComponentModel;
 using System.Reflection;
 using KioskClinicaPC.Core;
@@ -6,10 +6,13 @@ using KioskClinicaPC.Windows;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Threading;
+using System.Windows.Media.Animation;
 using Microsoft.Win32;
 using System.IO;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
+using System.Windows.Media.Imaging;
 
 namespace KioskClinicaPC
 {
@@ -17,13 +20,21 @@ namespace KioskClinicaPC
     {
         private bool _isExitingSafely = false;
         private readonly KeyboardHook _hook;
-        private AppConfig _detectedSpecs; 
+        private AppConfig _detectedSpecs;
+        private readonly DispatcherTimer _inactivityTimer;
+        private bool _isAmbientModeActive = false;
 
         public MainWindow()
         {
             InitializeComponent();
             _hook = new KeyboardHook();
             _detectedSpecs = new AppConfig();
+
+            _inactivityTimer = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromSeconds(60)
+            };
+            _inactivityTimer.Tick += InactivityTimer_Tick;
         }
 
         private async void Window_Loaded(object sender, RoutedEventArgs e)
@@ -33,6 +44,40 @@ namespace KioskClinicaPC
             RegisterInStartup();
 #endif
             await LoadHardwareAndConfigAsync();
+            _inactivityTimer.Start();
+        }
+
+        private void InactivityTimer_Tick(object sender, EventArgs e)
+        {
+            _inactivityTimer.Stop();
+            _isAmbientModeActive = true;
+
+            var fadeOutUI = (Storyboard)FindResource("FadeOutUI");
+            var fadeInAmbient = (Storyboard)FindResource("FadeInAmbient");
+            var pulseAmbient = (Storyboard)FindResource("PulseAmbient");
+
+            fadeOutUI.Begin();
+            fadeInAmbient.Begin();
+            pulseAmbient.Begin();
+        }
+
+        private void ResetInactivityTimer(object sender, InputEventArgs e)
+        {
+            _inactivityTimer.Stop();
+            _inactivityTimer.Start();
+
+            if (_isAmbientModeActive)
+            {
+                _isAmbientModeActive = false;
+
+                var fadeInUI = (Storyboard)FindResource("FadeInUI");
+                var fadeOutAmbient = (Storyboard)FindResource("FadeOutAmbient");
+                var pulseAmbient = (Storyboard)FindResource("PulseAmbient");
+
+                pulseAmbient.Stop();
+                fadeOutAmbient.Begin();
+                fadeInUI.Begin();
+            }
         }
 
         private async Task LoadHardwareAndConfigAsync()
@@ -131,30 +176,44 @@ namespace KioskClinicaPC
                 DisplayPriceText.Text = savedConfig.Price ?? "N/A";
             }
 
-            CpuNameText.Text = !string.IsNullOrWhiteSpace(savedConfig.Cpu) ? savedConfig.Cpu : _detectedSpecs.Cpu;
-            CpuCoresText.Text = !string.IsNullOrWhiteSpace(savedConfig.Cores) ? savedConfig.Cores : _detectedSpecs.Cores;
-            RamText.Text = !string.IsNullOrWhiteSpace(savedConfig.Ram) ? savedConfig.Ram : _detectedSpecs.Ram;
-            GpuText.Text = !string.IsNullOrWhiteSpace(savedConfig.Gpu) ? savedConfig.Gpu : _detectedSpecs.Gpu;
-            StorageText.Text = !string.IsNullOrWhiteSpace(savedConfig.Storage) ? savedConfig.Storage : _detectedSpecs.Storage;
-            ScreenText.Text = !string.IsNullOrWhiteSpace(savedConfig.Screen) ? savedConfig.Screen : _detectedSpecs.Screen;
-            OsText.Text = !string.IsNullOrWhiteSpace(savedConfig.Os) ? savedConfig.Os : _detectedSpecs.Os.Split('(')[0].Trim();
+            PopulateSpecsPanel(savedConfig, _detectedSpecs);
+        }
 
-            if (FindName("LoadingText") is TextBlock loadingText)
-                loadingText.Visibility = Visibility.Collapsed;
-            if (FindName("SpecsGrid") is FrameworkElement specsGrid)
-                specsGrid.Visibility = Visibility.Visible;
+        private void PopulateSpecsPanel(AppConfig savedConfig, AppConfig detectedSpecs)
+        {
+            SpecsPanel.Children.Clear();
+
+            string cpuValue = !string.IsNullOrWhiteSpace(savedConfig.Cpu) ? savedConfig.Cpu : detectedSpecs.Cpu;
+            string coresValue = !string.IsNullOrWhiteSpace(savedConfig.Cores) ? savedConfig.Cores : detectedSpecs.Cores;
+            CreateSpecTile("PROCESADOR", $"{cpuValue} ({coresValue})", "El cerebro ultrarrápido para gaming y creación de contenido.", "POTENTE", savedConfig.CpuDefinition);
+            CreateSpecTile("MEMORIA RAM", !string.IsNullOrWhiteSpace(savedConfig.Ram) ? savedConfig.Ram : detectedSpecs.Ram, "Ideal para multitarea y juegos fluidos.", "RÁPIDA", savedConfig.RamDefinition);
+            CreateSpecTile("TARJETA GRÁFICA", !string.IsNullOrWhiteSpace(savedConfig.Gpu) ? savedConfig.Gpu : detectedSpecs.Gpu, "Gráficos impresionantes y alto rendimiento en juegos.", "GAMING", savedConfig.GpuDefinition);
+            CreateSpecTile("ALMACENAMIENTO", !string.IsNullOrWhiteSpace(savedConfig.Storage) ? savedConfig.Storage : detectedSpecs.Storage, "Arranque y carga de aplicaciones en segundos.", "VELOZ", savedConfig.StorageDefinition);
+            CreateSpecTile("PLACA BASE", !string.IsNullOrWhiteSpace(savedConfig.Motherboard) ? savedConfig.Motherboard : "No especificado", "La base estable para todos tus componentes.", "CONFIABLE", savedConfig.MotherboardDefinition);
+            CreateSpecTile("FUENTE DE PODER", !string.IsNullOrWhiteSpace(savedConfig.PowerSupply) ? savedConfig.PowerSupply : "No especificado", "Energía eficiente y segura para tu equipo.", "EFICIENTE", savedConfig.PowerSupplyDefinition);
+            CreateSpecTile("GABINETE", !string.IsNullOrWhiteSpace(savedConfig.Case) ? savedConfig.Case : "No especificado", "Diseño elegante con excelente flujo de aire.", "ESTILO", savedConfig.CaseDefinition);
+            CreateSpecTile("PANTALLA", !string.IsNullOrWhiteSpace(savedConfig.Screen) ? savedConfig.Screen : detectedSpecs.Screen, "Claridad y colores vibrantes para una inmersión total.", "NÍTIDA", savedConfig.ScreenDefinition);
+            CreateSpecTile("SISTEMA OPERATIVO", !string.IsNullOrWhiteSpace(savedConfig.Os) ? savedConfig.Os : detectedSpecs.Os.Split('(')[0].Trim(), "Windows: El estándar para compatibilidad y rendimiento.", "MODERNO", savedConfig.OsDefinition);
+        }
+
+        private void CreateSpecTile(string label, string value, string benefit, string tag, string definitionText)
+        {
+            var tile = new SpecTile
+            {
+                Label = label,
+                Value = value,
+                Benefit = benefit,
+                Tag = tag,
+                DefinitionText = definitionText,
+                IconSource = new BitmapImage(new Uri("pack://application:,,,/KioskClinicaPC;component/Assets/clinicapc-logo.png", UriKind.Absolute))
+            };
+            SpecsPanel.Children.Add(tile);
         }
 
         private void Window_Closing(object sender, CancelEventArgs e)
         {
-            if (!_isExitingSafely)
-            {
-                e.Cancel = true;
-            }
-            else
-            {
-                _hook.Stop();
-            }
+            if (!_isExitingSafely) e.Cancel = true;
+            else _hook.Stop();
         }
 
         public void ShutdownKiosk()
@@ -165,28 +224,13 @@ namespace KioskClinicaPC
 
         private void Window_KeyDown(object sender, KeyEventArgs e)
         {
-            bool ctrlPressed = Keyboard.IsKeyDown(Key.LeftCtrl) || Keyboard.IsKeyDown(Key.RightCtrl);
-            bool shiftPressed = Keyboard.IsKeyDown(Key.LeftShift) || Keyboard.IsKeyDown(Key.RightShift);
-
-            bool kPressed = e.Key == Key.K;
-            if (ctrlPressed && shiftPressed && kPressed)
-            {
-                ShutdownKiosk();
-            }
-
-            bool sPressed = e.Key == Key.S;
-            if (ctrlPressed && shiftPressed && sPressed)
-            {
-                OpenSettingsDialog(); 
-            }
+            if (Keyboard.IsKeyDown(Key.LeftCtrl) && Keyboard.IsKeyDown(Key.LeftShift) && e.Key == Key.K) ShutdownKiosk();
+            if (Keyboard.IsKeyDown(Key.LeftCtrl) && Keyboard.IsKeyDown(Key.LeftShift) && e.Key == Key.S) OpenSettingsDialog();
         }
 
         private void SettingsClickArea_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
-            if (e.ClickCount == 3)
-            {
-                OpenSettingsDialog();
-            }
+            if (e.ClickCount == 3) OpenSettingsDialog();
         }
 
         private void RegisterInStartup()
@@ -197,34 +241,22 @@ namespace KioskClinicaPC
                 const string registryKeyPath = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Run";
                 string exePath = Assembly.GetExecutingAssembly().Location;
                 if (string.IsNullOrEmpty(exePath)) return;
-
                 using (RegistryKey key = Registry.CurrentUser.OpenSubKey(registryKeyPath, true))
                 {
                     if (key == null) return;
-                    object currentValue = key.GetValue(appName);
-                    if (currentValue == null || currentValue.ToString() != $"\"{exePath}\"")
-                        key.SetValue(appName, $"\"{exePath}\"");
+                    key.SetValue(appName, $"\"{exePath}\"");
                 }
             }
-            catch (Exception)
-            {
-            }
+            catch (Exception) {}
         }
 
         private async void OpenSettingsDialog()
         {
-
-            PasswordDialog dialog = new PasswordDialog();
-            dialog.Owner = this;
-            bool? result = dialog.ShowDialog();
-
-            if (result == true)
+            var dialog = new PasswordDialog { Owner = this };
+            if (dialog.ShowDialog() == true)
             {
-                SettingsWindow settings = new SettingsWindow(_detectedSpecs);
-                settings.Owner = this;
-                bool? saveResult = settings.ShowDialog();
-                
-                if (saveResult == true)
+                var settings = new SettingsWindow(_detectedSpecs) { Owner = this };
+                if (settings.ShowDialog() == true)
                 {
                     await LoadHardwareAndConfigAsync();
                 }
