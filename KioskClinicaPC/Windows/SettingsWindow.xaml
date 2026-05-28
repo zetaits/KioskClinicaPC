@@ -1,0 +1,227 @@
+﻿<Window x:Class="KioskClinicaPC.Windows.SettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Panel de Configuración"
+        Height="900" Width="850"
+        WindowStartupLocation="CenterScreen"
+        Background="#FF0A0A1A"
+        Foreground="White"
+        FontFamily="{StaticResource SpaceGrotesk}"
+        Loaded="Window_Loaded"
+        WindowStyle="None"
+        ResizeMode="NoResize"
+        BorderBrush="#FF3713EC" 
+        BorderThickness="1">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />   
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        
+        <!-- Header -->
+        <Border Grid.Row="0" Padding="0,24,0,16">
+            <Border.Background>
+                <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                    <GradientStop Color="#FF0A0A1A" Offset="0"/>
+                    <GradientStop Color="#FF12122A" Offset="1"/>
+                </LinearGradientBrush>
+            </Border.Background>
+            <TextBlock Text="⚙ PANEL DE CONFIGURACIÓN"
+                       FontSize="22" FontWeight="Bold"
+                       Foreground="White"
+                       HorizontalAlignment="Center"/>
+        </Border>
+
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Margin="30,10,30,10">
+            <StackPanel>
+                
+                <!-- Prices Section -->
+                <TextBlock FontSize="16" FontWeight="Bold" Margin="0,0,0,12">
+                    <TextBlock.Foreground>
+                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                            <GradientStop Color="#FF3713EC" Offset="0"/>
+                            <GradientStop Color="#FF00F0FF" Offset="1"/>
+                        </LinearGradientBrush>
+                    </TextBlock.Foreground>
+                    <Run Text="💰 Precios"/>
+                </TextBlock>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Precio Principal:" 
+                               VerticalAlignment="Center" Margin="0,0,15,0" Foreground="#FF8888AA" />
+                    <TextBox Grid.Row="0" Grid.Column="1" x:Name="PriceTextBox" 
+                             Style="{StaticResource ConfigTextBox}" />
+                    
+                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Precio Descuento:" 
+                               VerticalAlignment="Center" Margin="0,10,15,0" Foreground="#FF8888AA" />
+                    <TextBox Grid.Row="1" Grid.Column="1" x:Name="DiscountedPriceTextBox" 
+                             Style="{StaticResource ConfigTextBox}" Margin="0,10,0,0" />
+                </Grid>
+
+                <Border Height="1" Background="#FF1E1E3E" Margin="0,20" />
+
+                <!-- Hardware Override Section -->
+                <TextBlock FontSize="16" FontWeight="Bold" Margin="0,0,0,8">
+                    <TextBlock.Foreground>
+                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                            <GradientStop Color="#FF3713EC" Offset="0"/>
+                            <GradientStop Color="#FF00F0FF" Offset="1"/>
+                        </LinearGradientBrush>
+                    </TextBlock.Foreground>
+                    <Run Text="🔧 Anulación Manual de Hardware"/>
+                </TextBlock>
+                <TextBlock Text="Dejar en blanco para usar la detección automática." 
+                           FontSize="12" Foreground="#FF555577" Margin="0,-2,0,15"/>
+                
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Procesador:"
+                               VerticalAlignment="Center" Margin="0,0,15,0" Foreground="#FF8888AA" />
+                    <TextBox Grid.Row="0" Grid.Column="1" x:Name="CpuTextBox"
+                             Style="{StaticResource ConfigTextBox}" />
+
+                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Rendimiento:"
+                               VerticalAlignment="Center" Margin="0,10,15,0" Foreground="#FF8888AA" />
+                    <TextBox Grid.Row="1" Grid.Column="1" x:Name="CoresTextBox"
+                             Style="{StaticResource ConfigTextBox}" Margin="0,10,0,0" />
+
+                    <TextBlock Grid.Row="2" Grid.Column="0" Text="Memoria RAM:"
+                               VerticalAlignment="Center" Margin="0,10,15,0" Foreground="#FF8888AA" />
+                    <TextBox Grid.Row="2" Grid.Column="1" x:Name="RamTextBox"
+                             Style="{StaticResource ConfigTextBox}" Margin="0,10,0,0" />
+
+                    <TextBlock Grid.Row="3" Grid.Column="0" Text="Gráficos:"
+                               VerticalAlignment="Center" Margin="0,10,15,0" Foreground="#FF8888AA" />
+                    <TextBox Grid.Row="3" Grid.Column="1" x:Name="GpuTextBox"
+                             Style="{StaticResource ConfigTextBox}" Margin="0,10,0,0" />
+
+                    <TextBlock Grid.Row="4" Grid.Column="0" Text="Almacenamiento:"
+                               VerticalAlignment="Center" Margin="0,10,15,0" Foreground="#FF8888AA" />
+                    <TextBox Grid.Row="4" Grid.Column="1" x:Name="StorageTextBox"
+                             Style="{StaticResource ConfigTextBox}" Margin="0,10,0,0" />
+
+                    <TextBlock Grid.Row="5" Grid.Column="0" Text="Pantalla:"
+                               VerticalAlignment="Center" Margin="0,10,15,0" Foreground="#FF8888AA" />
+                    <TextBox Grid.Row="5" Grid.Column="1" x:Name="ScreenTextBox"
+                             Style="{StaticResource ConfigTextBox}" Margin="0,10,0,0" />
+
+                    <TextBlock Grid.Row="6" Grid.Column="0" Text="Sistema:"
+                               VerticalAlignment="Center" Margin="0,10,15,0" Foreground="#FF8888AA" />
+                    <TextBox Grid.Row="6" Grid.Column="1" x:Name="OsTextBox"
+                             Style="{StaticResource ConfigTextBox}" Margin="0,10,0,0" />
+
+                    <TextBlock Grid.Row="7" Grid.Column="0" Text="Batería:"
+                               VerticalAlignment="Center" Margin="0,10,15,0" Foreground="#FF8888AA" />
+                    <TextBox Grid.Row="7" Grid.Column="1" x:Name="BatteryTextBox"
+                             Style="{StaticResource ConfigTextBox}" Margin="0,10,0,0" />
+
+                    <TextBlock Grid.Row="8" Grid.Column="0" Text="Conectividad:"
+                               VerticalAlignment="Center" Margin="0,10,15,0" Foreground="#FF8888AA" />
+                    <TextBox Grid.Row="8" Grid.Column="1" x:Name="WifiTextBox"
+                             Style="{StaticResource ConfigTextBox}" Margin="0,10,0,0" />
+
+                    <TextBlock Grid.Row="9" Grid.Column="0" Text="Cámara:"
+                               VerticalAlignment="Center" Margin="0,10,15,0" Foreground="#FF8888AA" />
+                    <TextBox Grid.Row="9" Grid.Column="1" x:Name="CameraTextBox"
+                             Style="{StaticResource ConfigTextBox}" Margin="0,10,0,0" />
+
+                    <TextBlock Grid.Row="10" Grid.Column="0" Text="Puertos:"
+                               VerticalAlignment="Center" Margin="0,10,15,0" Foreground="#FF8888AA" />
+                    <TextBox Grid.Row="10" Grid.Column="1" x:Name="PortsTextBox"
+                             Style="{StaticResource ConfigTextBox}" Margin="0,10,0,0" />
+
+                    <TextBlock Grid.Row="11" Grid.Column="0" Text="SKU:"
+                               VerticalAlignment="Center" Margin="0,10,15,0" Foreground="#FF8888AA" />
+                    <TextBox Grid.Row="11" Grid.Column="1" x:Name="SkuTextBox"
+                             Style="{StaticResource ConfigTextBox}" Margin="0,10,0,0" />
+
+                </Grid>
+
+                <Border Height="1" Background="#FF1E1E3E" Margin="0,20" />
+
+                <TextBlock FontSize="16" FontWeight="Bold" Margin="0,0,0,8">
+                    <TextBlock.Foreground>
+                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                            <GradientStop Color="#FF3713EC" Offset="0"/>
+                            <GradientStop Color="#FF00F0FF" Offset="1"/>
+                        </LinearGradientBrush>
+                    </TextBlock.Foreground>
+                    <Run Text="🏬 Tienda"/>
+                </TextBlock>
+
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Dirección:"
+                               VerticalAlignment="Center" Margin="0,0,15,0" Foreground="#FF8888AA" />
+                    <TextBox Grid.Row="0" Grid.Column="1" x:Name="ShopAddressTextBox"
+                             Style="{StaticResource ConfigTextBox}" />
+
+                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Servicios:"
+                               VerticalAlignment="Center" Margin="0,10,15,0" Foreground="#FF8888AA" />
+                    <TextBox Grid.Row="1" Grid.Column="1" x:Name="ShopServicesTextBox"
+                             Style="{StaticResource ConfigTextBox}" Margin="0,10,0,0" />
+                </Grid>
+            </StackPanel>
+        </ScrollViewer>
+        
+        <!-- Bottom action bar -->
+        <Border Grid.Row="2" Background="#FF12122A" Padding="20,14">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <Button Grid.Column="0" x:Name="UninstallButton" Content="🗑 Desinstalar" 
+                        Style="{StaticResource DangerButton}"
+                        Click="UninstallButton_Click" />
+                
+                <Button Grid.Column="2" x:Name="CancelButton" Content="Cancelar" 
+                        Style="{StaticResource SecondaryButton}"
+                        Click="CloseButton_Click" IsCancel="True" Margin="0,0,10,0" />
+                <Button Grid.Column="3" x:Name="SaveButton" Content="Guardar" 
+                        Style="{StaticResource PrimaryButton}"
+                        Click="SaveButton_Click" IsDefault="True" />
+            </Grid>
+        </Border>
+    </Grid>
+
+</Window>

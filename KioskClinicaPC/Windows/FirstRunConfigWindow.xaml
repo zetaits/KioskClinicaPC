@@ -1,0 +1,58 @@
+﻿<Window x:Class="KioskClinicaPC.Windows.FirstRunConfigWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Configuración Inicial" 
+        Height="380" Width="500"
+        WindowStartupLocation="CenterScreen"
+        Background="#FF0A0A1A"
+        Foreground="White"
+        FontFamily="{StaticResource SpaceGrotesk}"
+        WindowStyle="None"
+        ResizeMode="NoResize"
+        BorderBrush="#FF3713EC" 
+        BorderThickness="1">
+    
+    <Grid Margin="30">
+        <StackPanel VerticalAlignment="Center">
+            <TextBlock Text="⚡ Configuración Inicial"
+                       FontSize="24" FontWeight="Bold"
+                       Margin="0,0,0,6">
+                <TextBlock.Foreground>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                        <GradientStop Color="White" Offset="0"/>
+                        <GradientStop Color="#FF00F0FF" Offset="1"/>
+                    </LinearGradientBrush>
+                </TextBlock.Foreground>
+            </TextBlock>
+            <TextBlock Text="Configura los datos iniciales del kiosco."
+                       FontSize="13" Foreground="#FF8888AA" Margin="0,0,0,20"/>
+            
+            <TextBlock Text="Precio del Equipo (ej: 1.299 €):"
+                       FontSize="14" Foreground="#FF8888AA" Margin="0,0,0,6"/>
+            
+            <TextBox x:Name="PriceTextBox"
+                     Style="{StaticResource ConfigTextBox}"
+                     FontSize="18"/>
+
+            <TextBlock Text="Precio con Descuento (Opcional):"
+                       FontSize="14" Foreground="#FF8888AA" Margin="0,16,0,6"/>
+            
+            <TextBox x:Name="DiscountedPriceTextBox"
+                     Style="{StaticResource ConfigTextBox}"
+                     FontSize="18"/>
+            
+            <TextBlock x:Name="ErrorText"
+                       Text="El precio principal es obligatorio."
+                       FontSize="13"
+                       Foreground="#FFFF5252"
+                       Margin="0,14,0,0"
+                       Visibility="Collapsed"/>
+            
+            <Button x:Name="SaveButton" Content="Guardar y Continuar →"
+                    Style="{StaticResource PrimaryButton}"
+                    HorizontalAlignment="Right"
+                    Margin="0,20,0,0"
+                    Click="SaveButton_Click" IsDefault="True"/>
+        </StackPanel>
+    </Grid>
+</Window>
