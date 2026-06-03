@@ -66,3 +66,5 @@ memory/
 # Artefactos accidentales de shell (archivos basura en la raíz)
 /0
 /new
+# Artefacto basura recurrente
+/GoToScreenInEdit(2)
