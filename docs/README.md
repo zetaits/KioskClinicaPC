@@ -43,6 +43,7 @@ Si cambias de repo/usuario/dominio, edita esa constante.
 
 ## Personalización
 
-- Marca del encabezado: se toma de la tienda (`sh`) si viene; si no, el valor por defecto en `index.html` (`CLINICAPC`).
+- Encabezado: logo `logo.png` (copiado de `Assets/clinicapc-logo.png`). Para cambiarlo, reemplaza ese archivo.
+- Tema/colores: en `styles.css` (`:root`), misma paleta que la app (`App.xaml`).
 - Textos "qué es" por componente: editar el objeto `FRIENDLY` en `app.js`.
 - Las librerías (`pako`, `html2pdf`) se cargan por CDN; para uso 100% offline, descárgalas y sírvelas localmente.

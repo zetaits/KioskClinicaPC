@@ -4,7 +4,10 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="robots" content="noindex" />
-  <title>Ficha técnica del equipo</title>
+  <title>Ficha técnica del equipo · ClínicaPC</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -16,9 +19,11 @@
 
   <!-- Hoja que se exporta a PDF -->
   <main id="sheet" class="sheet" hidden>
+    <div class="glow"></div>
+
     <header class="sheet-head">
-      <div class="brand" id="brand">CLINICAPC</div>
-      <div class="doc-title">Ficha técnica del equipo</div>
+      <img class="logo" src="logo.png" alt="ClínicaPC" />
+      <div class="doc-title">FICHA TÉCNICA<br/>DEL EQUIPO</div>
     </header>
 
     <section class="identity">
@@ -27,22 +32,23 @@
     </section>
 
     <section class="price" id="priceBlock" hidden>
-      <div class="price-now" id="priceNow"></div>
-      <div class="price-meta">
+      <div class="price-label">PRECIO</div>
+      <div class="price-row">
+        <span class="price-now" id="priceNow"></span>
         <span class="price-old" id="priceOld"></span>
         <span class="price-disc" id="priceDisc"></span>
       </div>
     </section>
 
     <section class="components">
-      <h2>Componentes</h2>
+      <h2>// COMPONENTES</h2>
       <table id="compTable">
         <tbody></tbody>
       </table>
     </section>
 
     <footer class="sheet-foot">
-      <div id="address"></div>
+      <div id="shopline"></div>
       <div id="generated"></div>
     </footer>
   </main>

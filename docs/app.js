@@ -60,8 +60,6 @@ function escapeHtml(s) {
 }
 
 function render(data) {
-  if (data.sh) document.getElementById("brand").textContent = data.sh;
-
   // Identidad
   const title = [data.ch, data.mo].filter(Boolean).join(" ") || "Equipo";
   document.getElementById("title").textContent = title;
@@ -103,7 +101,8 @@ function render(data) {
   }).join("");
 
   // Footer
-  if (data.ad) document.getElementById("address").textContent = data.ad;
+  document.getElementById("shopline").textContent =
+    [data.sh, data.ad].filter(Boolean).join(" · ");
   document.getElementById("generated").textContent =
     "Generado el " + new Date().toLocaleDateString("es-ES") + " · specs reales detectadas en tienda";
 
@@ -117,16 +116,27 @@ function render(data) {
 function downloadPdf(title) {
   const safe = (title || "equipo").replace(/[^\w\-]+/g, "_").slice(0, 60);
   const opt = {
-    margin: [10, 10, 10, 10],
+    margin: 0,
     filename: `ficha_${safe}.pdf`,
     image: { type: "jpeg", quality: 0.98 },
-    html2canvas: { scale: 2, useCORS: true },
+    // Fondo oscuro de marca (si no, html2canvas pintaría blanco bajo las esquinas redondeadas).
+    html2canvas: { scale: 2, useCORS: true, backgroundColor: "#04020a" },
     jsPDF: { unit: "mm", format: "a4", orientation: "portrait" }
   };
   return html2pdf().set(opt).from(document.getElementById("sheet")).save();
 }
 
-(function main() {
+// Espera a que las fuentes y el logo estén listos para que el PDF no salga sin estilo.
+function waitForAssets() {
+  const fontsReady = (document.fonts && document.fonts.ready) ? document.fonts.ready : Promise.resolve();
+  const logo = document.querySelector(".logo");
+  const logoReady = (logo && !logo.complete)
+    ? new Promise(res => { logo.onload = logo.onerror = res; })
+    : Promise.resolve();
+  return Promise.all([fontsReady, logoReady]);
+}
+
+(async function main() {
   let title;
   try {
     const data = decodePayload();
@@ -138,6 +148,7 @@ function downloadPdf(title) {
 
   document.getElementById("downloadBtn").addEventListener("click", () => downloadPdf(title));
 
-  // Descarga automática al abrir (tras un instante para que la hoja se pinte por completo).
-  setTimeout(() => { downloadPdf(title).catch(() => {}); }, 600);
+  // Descarga automática al abrir, una vez cargadas fuentes y logo.
+  await waitForAssets();
+  setTimeout(() => { downloadPdf(title).catch(() => {}); }, 200);
 })();
