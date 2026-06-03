@@ -16,15 +16,19 @@ El PDF se genera **en el móvil del cliente** (con sus datos móviles), con `htm
 - `styles.css` — estilo de la hoja A4.
 - `app.js` — decodifica el `#hash`, pinta la ficha y exporta el PDF.
 
-## Despliegue
+## Despliegue con GitHub Pages (gratis, HTTPS)
 
-1. Sube los 3 archivos a tu hosting/dominio en una ruta, p. ej. `https://tudominio.com/ficha/`.
-2. En el kiosko: **Ajustes → Código QR · ficha PDF → URL BASE** pon esa ruta exacta
-   (sin `#`), p. ej. `https://tudominio.com/ficha/`.
-3. Listo. El kiosko construye `https://tudominio.com/ficha/#<datos>` y lo pinta como QR real.
+Esta carpeta es `docs/` precisamente para que GitHub Pages la sirva:
 
-> Sirve por **HTTPS** (los navegadores móviles lo prefieren para descargar archivos).
-> Funciona en cualquier hosting estático: tu dominio, Netlify, GitHub Pages, Cloudflare Pages, etc.
+1. Repo en GitHub → **Settings → Pages**.
+2. **Source: Deploy from a branch** → rama `master` → carpeta **`/docs`** → **Save**.
+3. Espera ~1 min. URL resultante: `https://<usuario>.github.io/<repo>/`
+   (p. ej. `https://zetaits.github.io/KioskClinicaPC/`).
+4. En el kiosko: **Ajustes → Código QR · ficha PDF → URL BASE** = esa URL (con `/` final).
+
+> Funciona bajo subruta `/<repo>/` porque las rutas de `index.html` son relativas.
+> Pages sirve HTTPS por defecto (los móviles lo prefieren para descargar archivos).
+> Para tu propio dominio: Settings → Pages → Custom domain.
 
 ## Formato del payload (referencia)
 
