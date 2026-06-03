@@ -23,8 +23,191 @@ namespace KioskClinicaPC.Services
                 config.Storage = GetStorageDetails();
                 config.Screen = GetScreenResolution();
                 config.Os = $"{GetOsName()} ({GetPcName()})";
+
+                // Identidad real del equipo (sustituye el hardcode "ASUS ROG").
+                config.ChassisName = GetManufacturer();
+                config.ModelName = GetModel();
+                config.Sku = GetSku();
+                config.Family = GetChassisFamily();
+
+                // Componentes opcionales: null si el equipo no los tiene (no se muestran).
+                config.Battery = GetBatteryInfo();
+                config.Wifi = GetWifiAdapter();
+                config.Camera = GetCameraName();
+                // Puertos no se detectan de forma fiable por WMI: se deja como override manual (Settings).
             });
             return config;
+        }
+
+        /// <summary>Igual que GetWmiProperty pero devuelve null cuando el valor no existe (componente ausente),
+        /// en vez de la cadena "No disponible". Permite ocultar componentes no presentes.</summary>
+        private string? GetWmiPropertyOrNull(string wmiClass, string property, string? where = null)
+        {
+            try
+            {
+                string query = where == null
+                    ? $"select {property} from {wmiClass}"
+                    : $"select {property} from {wmiClass} where {where}";
+                using var searcher = new ManagementObjectSearcher(query);
+                var first = searcher.Get().OfType<ManagementObject>().FirstOrDefault();
+                string? value = first?[property]?.ToString()?.Trim();
+                return string.IsNullOrWhiteSpace(value) ? null : value;
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Error al obtener propiedad WMI opcional {Property} de {WmiClass}", property, wmiClass);
+                return null;
+            }
+        }
+
+        private string? GetManufacturer()
+        {
+            var m = GetWmiPropertyOrNull("Win32_ComputerSystem", "Manufacturer")
+                    ?? GetWmiPropertyOrNull("Win32_ComputerSystemProduct", "Vendor");
+            if (m == null) return null;
+            // Limpia ruido habitual de OEM ("ASUSTeK COMPUTER INC." → "ASUSTeK COMPUTER").
+            m = m.Replace(" INC.", "", StringComparison.OrdinalIgnoreCase)
+                 .Replace(" CO., LTD.", "", StringComparison.OrdinalIgnoreCase)
+                 .Replace(", LTD.", "", StringComparison.OrdinalIgnoreCase)
+                 .Trim();
+            return m.Length == 0 ? null : m;
+        }
+
+        private string? GetModel()
+        {
+            var model = GetWmiPropertyOrNull("Win32_ComputerSystem", "Model")
+                        ?? GetWmiPropertyOrNull("Win32_ComputerSystemProduct", "Name");
+            if (model == null) return null;
+            // Filtra modelos genéricos sin valor ("System Product Name", "To be filled by O.E.M.").
+            string lower = model.ToLowerInvariant();
+            if (lower.Contains("to be filled") || lower.Contains("system product name") || lower.Contains("default string"))
+                return null;
+            return model;
+        }
+
+        private string? GetSku()
+        {
+            var sku = GetWmiPropertyOrNull("Win32_ComputerSystem", "SystemSKUNumber")
+                      ?? GetWmiPropertyOrNull("Win32_ComputerSystemProduct", "IdentifyingNumber");
+            if (sku == null) return null;
+            string lower = sku.ToLowerInvariant();
+            if (lower.Contains("to be filled") || lower.Contains("default string") || lower == "sku")
+                return null;
+            return sku;
+        }
+
+        /// <summary>Tipo de chasis legible (Portátil / Sobremesa / All-in-One) desde Win32_SystemEnclosure.</summary>
+        private string? GetChassisFamily()
+        {
+            try
+            {
+                using var searcher = new ManagementObjectSearcher("select ChassisTypes from Win32_SystemEnclosure");
+                var first = searcher.Get().OfType<ManagementObject>().FirstOrDefault();
+                if (first?["ChassisTypes"] is ushort[] types && types.Length > 0)
+                {
+                    int t = types[0];
+                    // Códigos SMBIOS de Win32_SystemEnclosure.ChassisTypes.
+                    if (t is 8 or 9 or 10 or 11 or 12 or 14 or 18 or 21 or 31) return "Portátil";
+                    if (t is 13) return "All-in-One";
+                    if (t is 3 or 4 or 5 or 6 or 7 or 15 or 16 or 35) return "Sobremesa";
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Error al obtener el tipo de chasis.");
+            }
+            return null;
+        }
+
+        /// <summary>Capacidad/presencia de batería. null en sobremesa (sin batería).</summary>
+        private string? GetBatteryInfo()
+        {
+            try
+            {
+                using var searcher = new ManagementObjectSearcher("select EstimatedChargeRemaining, Chemistry from Win32_Battery");
+                var battery = searcher.Get().OfType<ManagementObject>().FirstOrDefault();
+                if (battery == null) return null; // sobremesa: sin batería
+
+                // Capacidad de diseño en Wh desde root\wmi (más fiable que Win32_Battery).
+                double wh = GetBatteryDesignWh();
+                return wh > 0 ? $"{Math.Round(wh)} Wh" : "Batería integrada";
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Error al detectar la batería.");
+                return null;
+            }
+        }
+
+        private double GetBatteryDesignWh()
+        {
+            try
+            {
+                using var searcher = new ManagementObjectSearcher(@"root\wmi", "select DesignedCapacity from BatteryStaticData");
+                var data = searcher.Get().OfType<ManagementObject>().FirstOrDefault();
+                if (data?["DesignedCapacity"] != null)
+                {
+                    double mWh = Convert.ToDouble(data["DesignedCapacity"]);
+                    return mWh / 1000.0; // mWh → Wh
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "No se pudo leer la capacidad de diseño de la batería.");
+            }
+            return 0;
+        }
+
+        /// <summary>Nombre del adaptador WiFi (crudo). null si no hay adaptador inalámbrico.</summary>
+        private string? GetWifiAdapter()
+        {
+            try
+            {
+                using var searcher = new ManagementObjectSearcher(
+                    "select Name, NetConnectionID from Win32_NetworkAdapter where PhysicalAdapter = true");
+                foreach (var adapter in searcher.Get().OfType<ManagementObject>())
+                {
+                    string name = adapter["Name"]?.ToString() ?? "";
+                    string conn = adapter["NetConnectionID"]?.ToString() ?? "";
+                    string combined = (name + " " + conn).ToLowerInvariant();
+                    if (combined.Contains("wi-fi") || combined.Contains("wifi") || combined.Contains("wireless")
+                        || combined.Contains("802.11") || combined.Contains("wlan"))
+                    {
+                        return name.Trim();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Error al detectar el adaptador WiFi.");
+            }
+            return null;
+        }
+
+        /// <summary>Nombre de la cámara (crudo). Descarta cámaras virtuales. null si no hay.</summary>
+        private string? GetCameraName()
+        {
+            try
+            {
+                using var searcher = new ManagementObjectSearcher(
+                    "select Name, PNPClass from Win32_PnPEntity where PNPClass = 'Camera' or PNPClass = 'Image'");
+                foreach (var device in searcher.Get().OfType<ManagementObject>())
+                {
+                    string name = device["Name"]?.ToString()?.Trim() ?? "";
+                    if (string.IsNullOrWhiteSpace(name)) continue;
+                    string lower = name.ToLowerInvariant();
+                    // Excluye escáneres (PNPClass 'Image') y cámaras virtuales.
+                    if (lower.Contains("scanner") || lower.Contains("obs") || lower.Contains("virtual")
+                        || lower.Contains("droidcam") || lower.Contains("manycam"))
+                        continue;
+                    return name;
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Error al detectar la cámara.");
+            }
+            return null;
         }
 
         private string GetWmiProperty(string wmiClass, string property)
@@ -104,7 +287,10 @@ namespace KioskClinicaPC.Services
                     if (manufacturer == "0x0198") manufacturer = "Kingston";
                     if (manufacturer == "0x830B") manufacturer = "Samsung";
 
-                    return $"{totalGB} GB ({manufacturer} {partNumber} @ {speed} MHz)";
+                    string ddr = GetDdrGeneration(firstModule, speed);
+                    string gen = string.IsNullOrEmpty(ddr) ? "" : $" {ddr}";
+                    // Formato: "32 GB DDR5 (Kingston KF... @ 4800 MHz)" → el formatter parte titular/técnico.
+                    return $"{totalGB} GB{gen} ({manufacturer} {partNumber} @ {speed} MHz)";
                 }
 
                 return $"{totalGB} GB";
@@ -114,6 +300,37 @@ namespace KioskClinicaPC.Services
                 Log.Error(ex, "Error al obtener detalles de la RAM");
                 return "RAM No disponible";
             }
+        }
+
+        /// <summary>Generación DDR ("DDR5"/"DDR4"...). Usa SMBIOSMemoryType y, si no, infiere por velocidad.</summary>
+        private string GetDdrGeneration(ManagementObject module, string speedText)
+        {
+            try
+            {
+                if (module["SMBIOSMemoryType"] != null)
+                {
+                    int code = Convert.ToInt32(module["SMBIOSMemoryType"]);
+                    string mapped = code switch
+                    {
+                        34 => "DDR5",
+                        26 => "DDR4",
+                        24 => "DDR3",
+                        21 => "DDR2",
+                        _ => ""
+                    };
+                    if (mapped.Length > 0) return mapped;
+                }
+            }
+            catch { /* cae al heurístico por velocidad */ }
+
+            // Heurístico por velocidad (MT/s) cuando el tipo SMBIOS no está disponible.
+            if (int.TryParse(speedText, out int mhz))
+            {
+                if (mhz >= 4000) return "DDR5";
+                if (mhz >= 2100) return "DDR4";
+                if (mhz >= 1066) return "DDR3";
+            }
+            return "";
         }
 
         private string GetStorageDetails()

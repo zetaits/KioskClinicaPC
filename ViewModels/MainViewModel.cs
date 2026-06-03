@@ -26,8 +26,14 @@ namespace KioskClinicaPC.ViewModels
         public int CurrentScreen
         {
             get => _currentScreen;
-            set => SetProperty(ref _currentScreen, value);
+            set
+            {
+                if (SetProperty(ref _currentScreen, value))
+                    OnPropertyChanged(nameof(IsAttractScreen));
+            }
         }
+
+        public bool IsAttractScreen => _currentScreen == 0;
 
         private string _currentScreenName = "RESUMEN DEL EQUIPO";
         public string CurrentScreenName
@@ -62,8 +68,11 @@ namespace KioskClinicaPC.ViewModels
             get => _selectedSpec;
             set
             {
+                var previous = _selectedSpec;
                 if (SetProperty(ref _selectedSpec, value))
                 {
+                    if (previous != null) previous.IsCurrentDetail = false;
+                    if (value != null) value.IsCurrentDetail = true;
                     if (CurrentScreen == 3 && value != null)
                         CurrentScreenName = $"DETALLE · {value.Label?.ToUpperInvariant()}";
                 }
@@ -76,18 +85,18 @@ namespace KioskClinicaPC.ViewModels
         public string FormattedMonthly => CalculateMonthly();
         public bool HasDiscount => !string.IsNullOrWhiteSpace(DisplayConfig?.DiscountedPrice);
 
-        // Attract screen bindings
-        private string _attractEyebrow = "CLINICAPC · ANÁLISIS EN VIVO";
-        public string AttractEyebrow { get => _attractEyebrow; set => SetProperty(ref _attractEyebrow, value); }
+        // Attract screen slides
+        public ObservableCollection<AttractSlide> Slides { get; } = new ObservableCollection<AttractSlide>();
 
-        private string _attractTitle1 = "ESTE EQUIPO";
-        public string AttractTitle1 { get => _attractTitle1; set => SetProperty(ref _attractTitle1, value); }
+        private AttractSlide _currentSlide = new AttractSlide();
+        public AttractSlide CurrentSlide { get => _currentSlide; set => SetProperty(ref _currentSlide, value); }
 
-        private string _attractTitle2 = "TE ESTÁ OBSERVANDO.";
-        public string AttractTitle2 { get => _attractTitle2; set => SetProperty(ref _attractTitle2, value); }
+        // Textos de chrome editables (etiquetas fijas)
+        private EditableContent _texts = new EditableContent(null);
+        public EditableContent Texts { get => _texts; set => SetProperty(ref _texts, value); }
 
-        private string _attractSubtitle = "Conéctate · escanea · descubre cada componente en 30 segundos.";
-        public string AttractSubtitle { get => _attractSubtitle; set => SetProperty(ref _attractSubtitle, value); }
+        // Estado del modo edición libre (binding de la barra flotante)
+        public EditModeService EditMode => EditModeService.Instance;
 
         private string _currentTimeString = "";
         public string CurrentTimeString { get => _currentTimeString; set => SetProperty(ref _currentTimeString, value); }
@@ -120,16 +129,32 @@ namespace KioskClinicaPC.ViewModels
             AppConfig savedConfig = null;
             AppConfig lastDetectedSpecs = null;
 
+            // Config (crítico): si existe pero está dañado, respáldalo y avisa en vez de perderlo en silencio.
+            if (File.Exists(App.ConfigFilePath))
+            {
+                try
+                {
+                    savedConfig = JsonConvert.DeserializeObject<AppConfig>(await File.ReadAllTextAsync(App.ConfigFilePath));
+                }
+                catch (Exception ex)
+                {
+                    Log.Error(ex, "KioskConfig.json dañado; se respalda y se continúa con valores por defecto.");
+                    BackupCorruptFile(App.ConfigFilePath);
+                    MessageBox.Show(
+                        "El archivo de configuración estaba dañado. Se ha guardado una copia (.corrupt) y se han restaurado los valores por defecto.",
+                        "Configuración", MessageBoxButton.OK, MessageBoxImage.Warning);
+                }
+            }
+
+            // Hardware (no crítico): se re-detecta igualmente si falla la lectura.
             try
             {
-                if (File.Exists(App.ConfigFilePath))
-                    savedConfig = JsonConvert.DeserializeObject<AppConfig>(await File.ReadAllTextAsync(App.ConfigFilePath));
                 if (File.Exists(App.HardwareFilePath))
                     lastDetectedSpecs = JsonConvert.DeserializeObject<AppConfig>(await File.ReadAllTextAsync(App.HardwareFilePath));
             }
             catch (Exception ex)
             {
-                Log.Error(ex, "Error al cargar la configuración o el hardware guardado.");
+                Log.Error(ex, "KioskHardware.json no se pudo leer; se re-detecta.");
             }
 
             savedConfig ??= new AppConfig();
@@ -158,27 +183,67 @@ namespace KioskClinicaPC.ViewModels
                 if (result == MessageBoxResult.Yes)
                 {
                     savedConfig.Cpu = savedConfig.Cores = savedConfig.Ram = savedConfig.Gpu = savedConfig.Storage = savedConfig.Screen = savedConfig.Os = null;
-                    await File.WriteAllTextAsync(App.ConfigFilePath, JsonConvert.SerializeObject(savedConfig, Formatting.Indented));
+                    savedConfig.Battery = savedConfig.Wifi = savedConfig.Camera = savedConfig.Ports = null;
+                    savedConfig.ChassisName = savedConfig.ModelName = savedConfig.Family = savedConfig.Sku = null;
+                    JsonStore.WriteAtomic(App.ConfigFilePath, JsonConvert.SerializeObject(savedConfig, Formatting.Indented));
                 }
             }
 
-            await File.WriteAllTextAsync(App.HardwareFilePath, JsonConvert.SerializeObject(_detectedSpecs, Formatting.Indented));
+            JsonStore.WriteAtomic(App.HardwareFilePath, JsonConvert.SerializeObject(_detectedSpecs, Formatting.Indented));
 
             _savedConfig = savedConfig;
+
+            bool needsSeedSave = false;
 
             if (_savedConfig.MarketingData == null || _savedConfig.MarketingData.Count == 0)
             {
                 _savedConfig.MarketingData = GetDefaultMarketingData();
+                needsSeedSave = true;
+            }
+
+            if (_savedConfig.AttractSlides == null || _savedConfig.AttractSlides.Count == 0)
+            {
+                _savedConfig.AttractSlides = GetDefaultSlides();
+                needsSeedSave = true;
+            }
+
+            // Migra etiquetas por defecto obsoletas a las nuevas (solo si el usuario no las ha personalizado).
+            if (UpgradeStaleLabels(_savedConfig.MarketingData))
+                needsSeedSave = true;
+
+            if (needsSeedSave)
+            {
                 try
                 {
-                    await File.WriteAllTextAsync(App.ConfigFilePath, JsonConvert.SerializeObject(_savedConfig, Formatting.Indented));
+                    JsonStore.WriteAtomic(App.ConfigFilePath, JsonConvert.SerializeObject(_savedConfig, Formatting.Indented));
                 }
                 catch (Exception ex)
                 {
-                    Log.Error(ex, "Error al guardar la configuración con datos de marketing por defecto.");
+                    Log.Error(ex, "Error al guardar la configuración con datos por defecto.");
                 }
             }
-            
+
+            ApplyConfig();
+        }
+
+        /// <summary>Mueve un archivo dañado a una copia con sello de tiempo para no perder los datos.</summary>
+        private static void BackupCorruptFile(string path)
+        {
+            try
+            {
+                string backup = $"{path}.corrupt-{DateTime.Now:yyyyMMdd-HHmmss}.bak";
+                File.Move(path, backup, overwrite: true);
+                Log.Information("Archivo dañado respaldado en {Backup}.", backup);
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "No se pudo respaldar el archivo dañado {Path}.", path);
+            }
+        }
+
+        /// <summary>Reconstruye DisplayConfig/Texts/Slides/Specs desde _savedConfig (sin redetectar hardware).</summary>
+        private void ApplyConfig()
+        {
             DisplayConfig = new AppConfig
             {
                 Cpu = !string.IsNullOrWhiteSpace(_savedConfig.Cpu) ? _savedConfig.Cpu : (_detectedSpecs.Cpu),
@@ -188,20 +253,30 @@ namespace KioskClinicaPC.ViewModels
                 Storage = !string.IsNullOrWhiteSpace(_savedConfig.Storage) ? _savedConfig.Storage : (_detectedSpecs.Storage),
                 Screen = !string.IsNullOrWhiteSpace(_savedConfig.Screen) ? _savedConfig.Screen : (_detectedSpecs.Screen),
                 Os = !string.IsNullOrWhiteSpace(_savedConfig.Os) ? _savedConfig.Os : (_detectedSpecs.Os?.Split('(')[0].Trim()),
-                Battery = !string.IsNullOrWhiteSpace(_savedConfig.Battery) ? _savedConfig.Battery : "No detectada",
-                Wifi = !string.IsNullOrWhiteSpace(_savedConfig.Wifi) ? _savedConfig.Wifi : "No detectado",
-                Camera = !string.IsNullOrWhiteSpace(_savedConfig.Camera) ? _savedConfig.Camera : "No detectada",
-                Ports = !string.IsNullOrWhiteSpace(_savedConfig.Ports) ? _savedConfig.Ports : "No detectado",
+                // Componentes opcionales: override manual o lo detectado; null = ausente (no se muestra).
+                Battery = !string.IsNullOrWhiteSpace(_savedConfig.Battery) ? _savedConfig.Battery : _detectedSpecs.Battery,
+                Wifi = !string.IsNullOrWhiteSpace(_savedConfig.Wifi) ? _savedConfig.Wifi : _detectedSpecs.Wifi,
+                Camera = !string.IsNullOrWhiteSpace(_savedConfig.Camera) ? _savedConfig.Camera : _detectedSpecs.Camera,
+                Ports = !string.IsNullOrWhiteSpace(_savedConfig.Ports) ? _savedConfig.Ports : _detectedSpecs.Ports,
                 Price = _savedConfig.Price,
                 DiscountedPrice = _savedConfig.DiscountedPrice,
-                ChassisName = _savedConfig.ChassisName ?? "ASUS ROG",
-                ModelName = _savedConfig.ModelName ?? "STRIX G16",
-                Family = _savedConfig.Family ?? "Gaming Laptop · 16″",
-                Sku = _savedConfig.Sku ?? "G614JV-N3170W",
-                ShopAddress = !string.IsNullOrWhiteSpace(_savedConfig.ShopAddress) ? _savedConfig.ShopAddress : "Calle Goya 12 · Madrid",
+                // Identidad real detectada (sin hardcode). null si la detección no la aporta → editable en Settings.
+                ChassisName = !string.IsNullOrWhiteSpace(_savedConfig.ChassisName) ? _savedConfig.ChassisName : _detectedSpecs.ChassisName,
+                ModelName = !string.IsNullOrWhiteSpace(_savedConfig.ModelName) ? _savedConfig.ModelName : _detectedSpecs.ModelName,
+                Family = !string.IsNullOrWhiteSpace(_savedConfig.Family) ? _savedConfig.Family : _detectedSpecs.Family,
+                Sku = !string.IsNullOrWhiteSpace(_savedConfig.Sku) ? _savedConfig.Sku : _detectedSpecs.Sku,
+                ShopAddress = !string.IsNullOrWhiteSpace(_savedConfig.ShopAddress) ? _savedConfig.ShopAddress : "Calle Sevilla 54, Málaga",
                 ShopServices = !string.IsNullOrWhiteSpace(_savedConfig.ShopServices) ? _savedConfig.ShopServices : "Asistencia · Cambio · Reparación · Reacondicionado",
+                ProductImagePath = _savedConfig.ProductImagePath,
                 MarketingData = _savedConfig.MarketingData
             };
+
+            Texts = new EditableContent(new Dictionary<string, string>(_savedConfig.UiTexts ?? new Dictionary<string, string>()));
+
+            Slides.Clear();
+            foreach (var s in _savedConfig.AttractSlides ?? new List<AttractSlide>())
+                Slides.Add(new AttractSlide { Eyebrow = s.Eyebrow, Title1 = s.Title1, Title2 = s.Title2, Subtitle = s.Subtitle });
+            CurrentSlide = Slides.Count > 0 ? Slides[0] : new AttractSlide();
 
             PopulateSpecs();
         }
@@ -252,15 +327,24 @@ namespace KioskClinicaPC.ViewModels
 
             foreach (var m in marketingList)
             {
-                string val = GetValueForId(m.Id);
+                string raw = GetValueForId(m.Id);
                 string detail = GetDetailForId(m.Id, m.DefaultDetail);
-                
+
+                // Ocultar componentes ausentes: un opcional sin valor detectado ni override no se muestra.
+                bool present = ComponentIds.IsAlwaysPresent(m.Id) || !string.IsNullOrWhiteSpace(raw);
+                if (!present) continue;
+
+                // Titular amigable + técnico secundario (p.ej. "WiFi 6E" + "Intel AX211").
+                var fmt = SpecFormatter.Format(m.Id, raw);
+
                 var item = new SpecItem
                 {
                     Id = m.Id,
                     Family = m.Family,
                     Label = m.Label,
-                    Value = !string.IsNullOrWhiteSpace(val) ? val : (m.DefaultValue ?? "N/D"),
+                    Value = !string.IsNullOrWhiteSpace(fmt.Headline) ? fmt.Headline : (m.DefaultValue ?? "N/D"),
+                    TechDetail = fmt.Tech,
+                    IsPresent = present,
                     Detail = detail,
                     Summary = m.Summary,
                     BenchScore = m.BenchScore,
@@ -299,46 +383,163 @@ namespace KioskClinicaPC.ViewModels
 
         private string GetValueForId(string id)
         {
-            return id.ToLower() switch
+            return id.ToLowerInvariant() switch
             {
-                "cpu" => DisplayConfig.Cpu,
-                "gpu" => DisplayConfig.Gpu,
-                "ram" => DisplayConfig.Ram,
-                "storage" => DisplayConfig.Storage,
-                "screen" => DisplayConfig.Screen,
-                "battery" => DisplayConfig.Battery,
-                "wifi" => DisplayConfig.Wifi,
-                "camera" => DisplayConfig.Camera,
-                "ports" => DisplayConfig.Ports,
-                "os" => DisplayConfig.Os,
+                ComponentIds.Cpu => DisplayConfig.Cpu,
+                ComponentIds.Gpu => DisplayConfig.Gpu,
+                ComponentIds.Ram => DisplayConfig.Ram,
+                ComponentIds.Storage => DisplayConfig.Storage,
+                ComponentIds.Screen => DisplayConfig.Screen,
+                ComponentIds.Battery => DisplayConfig.Battery,
+                ComponentIds.Wifi => DisplayConfig.Wifi,
+                ComponentIds.Camera => DisplayConfig.Camera,
+                ComponentIds.Ports => DisplayConfig.Ports,
+                ComponentIds.Os => DisplayConfig.Os,
                 _ => null
             };
         }
 
         private string GetDetailForId(string id, string defaultDetail)
         {
-            return id.ToLower() switch
+            return id.ToLowerInvariant() switch
             {
-                "cpu" => DisplayConfig.Cores ?? defaultDetail,
+                ComponentIds.Cpu => DisplayConfig.Cores ?? defaultDetail,
                 _ => defaultDetail
             };
         }
 
-        private List<SpecMarketingData> GetDefaultMarketingData()
+        // Etiquetas por defecto antiguas → nuevas. Solo se aplican si coinciden exactamente con la antigua
+        // (es decir, el usuario no las ha cambiado), para no pisar personalizaciones.
+        private static readonly Dictionary<string, (string Old, string New)> StaleLabelMap = new()
         {
-            return new List<SpecMarketingData>
+            [ComponentIds.Gpu] = ("Gráfica", "Tarjeta gráfica"),
+            [ComponentIds.Ram] = ("Memoria", "Memoria RAM"),
+            [ComponentIds.Wifi] = ("Conectividad", "Conectividad WiFi"),
+            [ComponentIds.Os] = ("Sistema", "Sistema operativo"),
+        };
+
+        private static bool UpgradeStaleLabels(List<SpecMarketingData>? marketing)
+        {
+            if (marketing == null) return false;
+            bool changed = false;
+            foreach (var m in marketing)
             {
-                new SpecMarketingData { Id = "cpu", Family = "CPU", Label = "Procesador", Summary = "El cerebro del equipo. Más núcleos y más velocidad significan que abre programas al instante y no se atasca con varias cosas a la vez.", BenchScore = 86, BenchLabel = "vs. PC de gama media", Pros = new List<string> { "Edición de vídeo sin tirones", "Multitarea pesada", "Compilar / renderizar rápido" }, DefaultValue = "Intel Core i7", DefaultDetail = "13650HX · 14 núcleos · hasta 4.9 GHz" },
-                new SpecMarketingData { Id = "gpu", Family = "GPU", Label = "Gráfica", Summary = "La pieza que dibuja en pantalla. Esta gráfica está pensada para jugar a calidad alta y para acelerar IA, edición y modelado 3D.", BenchScore = 92, BenchLabel = "rendimiento gaming 1080p", Pros = new List<string> { "Juegos AAA en alto", "Streaming sin lag", "Aceleración IA local" }, DefaultValue = "NVIDIA RTX 4060", DefaultDetail = "8 GB GDDR6 · Ray Tracing · DLSS 3.5" },
-                new SpecMarketingData { Id = "ram", Family = "RAM", Label = "Memoria", Summary = "El espacio de trabajo del PC. Cuanta más RAM, más pestañas, programas y proyectos abiertos a la vez sin que vaya lento.", BenchScore = 90, BenchLabel = "vs. portátil estándar (8 GB)", Pros = new List<string> { "Decenas de pestañas abiertas", "Photoshop + navegador + Discord", "Máquinas virtuales" }, DefaultValue = "32 GB DDR5", DefaultDetail = "4800 MHz · 2× SO-DIMM · ampliable a 64 GB" },
-                new SpecMarketingData { Id = "storage", Family = "SSD", Label = "Almacenamiento", Summary = "Donde se guarda todo. Un SSD NVMe es hasta 30× más rápido que un disco duro: el PC arranca en segundos y los juegos cargan al vuelo.", BenchScore = 95, BenchLabel = "vs. disco duro tradicional", Pros = new List<string> { "Arranque en <10 s", "Carga de juegos instantánea", "Transferencia de archivos rápida" }, DefaultValue = "1 TB NVMe", DefaultDetail = "PCIe 4.0 · 7000 MB/s lectura · M.2 2280" },
-                new SpecMarketingData { Id = "screen", Family = "DISPLAY", Label = "Pantalla", Summary = "240 imágenes por segundo en alta resolución. Todo se ve nítido y el movimiento es mucho más suave que en una pantalla normal.", BenchScore = 88, BenchLabel = "fluidez en juegos competitivos", Pros = new List<string> { "Juegos competitivos", "Edición de foto/vídeo en color real", "Series y películas QHD" }, DefaultValue = "16″ QHD 240 Hz", DefaultDetail = "2560 × 1600 · IPS · 100% DCI-P3 · G-Sync" },
-                new SpecMarketingData { Id = "battery", Family = "POWER", Label = "Batería", Summary = "Una jornada de trabajo lejos del enchufe en uso normal. Para jugar se recomienda con el cargador conectado.", BenchScore = 70, BenchLabel = "autonomía vs. gaming laptops", Pros = new List<string> { "Universidad / oficina", "Carga rápida USB-C", "Sin enchufe para tareas ligeras" }, DefaultValue = "90 Wh", DefaultDetail = "Hasta 8 h uso ofimática · carga rápida 65 %/30 min" },
-                new SpecMarketingData { Id = "wifi", Family = "WIFI 6E", Label = "Conectividad", Summary = "La última generación de WiFi: hasta 3× más rápido y con menos interferencias. Bluetooth 5.3 para mando, auriculares y periféricos.", BenchScore = 84, BenchLabel = "vs. WiFi 5", Pros = new List<string> { "Streaming 4K sin cortes", "Partidas con ping bajo", "Latencia mínima en BT" }, DefaultValue = "WiFi 6E + BT 5.3", DefaultDetail = "Tri-banda 6 GHz · Bluetooth 5.3 · 2.5 GbE" },
-                new SpecMarketingData { Id = "camera", Family = "WEBCAM", Label = "Cámara", Summary = "Resolución Full HD para videollamadas con buena cara. Lleva tapa física, así que cuando no la usas estás 100% privado.", BenchScore = 65, BenchLabel = "calidad llamadas", Pros = new List<string> { "Teams / Zoom / Meet", "Privacidad por hardware", "Reconocimiento facial" }, DefaultValue = "1080p FHD", DefaultDetail = "Con obturador de privacidad · micrófono dual" },
-                new SpecMarketingData { Id = "ports", Family = "I/O", Label = "Puertos", Summary = "Todo lo que necesitas conectar sin adaptadores: dos monitores externos por HDMI/USB-C, red por cable, periféricos USB-A clásicos.", BenchScore = 0, BenchLabel = "", Pros = new List<string> { "Dos monitores externos", "Carga por USB-C", "LAN gigabit" }, DefaultValue = "USB-C × 2 · HDMI 2.1", DefaultDetail = "Thunderbolt 4 · USB-A × 3 · RJ-45 · jack 3.5" },
-                new SpecMarketingData { Id = "os", Family = "OS", Label = "Sistema", Summary = "Sistema operativo más reciente, con todas las actualizaciones de seguridad al día y licencia legal incluida.", BenchScore = 0, BenchLabel = "", Pros = new List<string> { "Activado de fábrica", "Office compatible", "Soporte oficial Microsoft" }, DefaultValue = "Windows 11 Home", DefaultDetail = "Licencia original · activada · 64-bit" }
-            };
+                if (m.Id != null && StaleLabelMap.TryGetValue(m.Id.ToLowerInvariant(), out var map)
+                    && string.Equals(m.Label?.Trim(), map.Old, StringComparison.OrdinalIgnoreCase))
+                {
+                    m.Label = map.New;
+                    changed = true;
+                }
+            }
+            return changed;
+        }
+
+        private List<SpecMarketingData> GetDefaultMarketingData() => SpecCatalog.DefaultMarketing();
+
+        private List<AttractSlide> GetDefaultSlides() => SpecCatalog.DefaultSlides();
+
+        /// <summary>Persiste el estado editado (DisplayConfig/Specs/Slides/Texts) en KioskConfig.json.</summary>
+        public void SaveEdits()
+        {
+            try
+            {
+                foreach (var spec in Specs)
+                {
+                    SetDisplayValueById(spec.Id, spec.Value);
+                    if (string.Equals(spec.Id, "cpu", StringComparison.OrdinalIgnoreCase))
+                        DisplayConfig.Cores = spec.Detail;
+
+                    var m = _savedConfig.MarketingData?.FirstOrDefault(x => string.Equals(x.Id, spec.Id, StringComparison.OrdinalIgnoreCase));
+                    if (m != null)
+                    {
+                        m.Label = spec.Label;
+                        m.Summary = spec.Summary;
+                        m.BenchLabel = spec.BenchLabel;
+                        m.Pros = spec.Pros?.Select(p => p.Text).ToList() ?? new List<string>();
+                    }
+                }
+
+                string? Override(string? manual, string? detected) =>
+                    (string.IsNullOrWhiteSpace(manual) || string.Equals(manual, detected, StringComparison.OrdinalIgnoreCase)) ? null : manual;
+                string? NoPlaceholder(string? v) =>
+                    (string.IsNullOrWhiteSpace(v) || v == "No detectada" || v == "No detectado") ? null : v;
+
+                string? detectedOs = _detectedSpecs.Os?.Split('(')[0].Trim();
+
+                _savedConfig.Cpu = Override(DisplayConfig.Cpu, _detectedSpecs.Cpu);
+                _savedConfig.Cores = Override(DisplayConfig.Cores, _detectedSpecs.Cores);
+                _savedConfig.Ram = Override(DisplayConfig.Ram, _detectedSpecs.Ram);
+                _savedConfig.Gpu = Override(DisplayConfig.Gpu, _detectedSpecs.Gpu);
+                _savedConfig.Storage = Override(DisplayConfig.Storage, _detectedSpecs.Storage);
+                _savedConfig.Screen = Override(DisplayConfig.Screen, _detectedSpecs.Screen);
+                _savedConfig.Os = Override(DisplayConfig.Os, detectedOs);
+                _savedConfig.Battery = NoPlaceholder(DisplayConfig.Battery);
+                _savedConfig.Wifi = NoPlaceholder(DisplayConfig.Wifi);
+                _savedConfig.Camera = NoPlaceholder(DisplayConfig.Camera);
+                _savedConfig.Ports = NoPlaceholder(DisplayConfig.Ports);
+
+                _savedConfig.ChassisName = DisplayConfig.ChassisName;
+                _savedConfig.ModelName = DisplayConfig.ModelName;
+                _savedConfig.Family = DisplayConfig.Family;
+                _savedConfig.Sku = DisplayConfig.Sku;
+                _savedConfig.ShopAddress = DisplayConfig.ShopAddress;
+                _savedConfig.ShopServices = DisplayConfig.ShopServices;
+                _savedConfig.ProductImagePath = DisplayConfig.ProductImagePath;
+                _savedConfig.Price = DisplayConfig.Price;
+                _savedConfig.DiscountedPrice = DisplayConfig.DiscountedPrice;
+
+                _savedConfig.AttractSlides = Slides
+                    .Select(s => new AttractSlide { Eyebrow = s.Eyebrow, Title1 = s.Title1, Title2 = s.Title2, Subtitle = s.Subtitle })
+                    .ToList();
+                _savedConfig.UiTexts = new Dictionary<string, string>(Texts.Overrides);
+
+                JsonStore.WriteAtomic(App.ConfigFilePath, JsonConvert.SerializeObject(_savedConfig, Formatting.Indented));
+                EditModeService.Instance.IsDirty = false;
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Error al guardar los cambios del modo edición.");
+                throw;
+            }
+        }
+
+        /// <summary>Fija y persiste de inmediato la ruta de la foto del producto (drag-drop en la pantalla Resumen).</summary>
+        public void SaveProductImage(string? path)
+        {
+            DisplayConfig.ProductImagePath = path;
+            _savedConfig.ProductImagePath = path;
+            try
+            {
+                JsonStore.WriteAtomic(App.ConfigFilePath, JsonConvert.SerializeObject(_savedConfig, Formatting.Indented));
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Error al guardar la ruta de la foto del producto.");
+            }
+        }
+
+        /// <summary>Revierte los cambios no guardados reconstruyendo desde la configuración en memoria/disco.</summary>
+        public void DiscardEdits()
+        {
+            ApplyConfig();
+            EditModeService.Instance.IsDirty = false;
+        }
+
+        private void SetDisplayValueById(string? id, string? value)
+        {
+            switch (id?.ToLowerInvariant())
+            {
+                case "cpu": DisplayConfig.Cpu = value; break;
+                case "gpu": DisplayConfig.Gpu = value; break;
+                case "ram": DisplayConfig.Ram = value; break;
+                case "storage": DisplayConfig.Storage = value; break;
+                case "screen": DisplayConfig.Screen = value; break;
+                case "battery": DisplayConfig.Battery = value; break;
+                case "wifi": DisplayConfig.Wifi = value; break;
+                case "camera": DisplayConfig.Camera = value; break;
+                case "ports": DisplayConfig.Ports = value; break;
+                case "os": DisplayConfig.Os = value; break;
+            }
         }
 
         private static readonly CultureInfo EsCulture = CultureInfo.GetCultureInfo("es-ES");

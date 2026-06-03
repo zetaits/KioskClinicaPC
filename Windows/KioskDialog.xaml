@@ -1,0 +1,43 @@
+<Window x:Class="KioskClinicaPC.Windows.KioskDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="KioskClinicaPC"
+        SizeToContent="Height" Width="460"
+        WindowStartupLocation="CenterOwner"
+        WindowStyle="None"
+        ResizeMode="NoResize"
+        AllowsTransparency="True"
+        Background="Transparent"
+        Foreground="White"
+        FontFamily="{StaticResource SpaceGrotesk}">
+    <Border Background="#FF0A0716" BorderBrush="#FFF37A4A" BorderThickness="1" CornerRadius="14">
+        <Border.Effect>
+            <DropShadowEffect Color="#FFF37A4A" BlurRadius="34" ShadowDepth="0" Opacity="0.35"/>
+        </Border.Effect>
+        <Grid Margin="30,28,30,24">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,12">
+                <Border x:Name="AccentDot" Width="10" Height="10" CornerRadius="5" Background="#FFF37A4A" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                <TextBlock x:Name="TitleText" FontFamily="{StaticResource ChakraPetch}" FontWeight="Bold"
+                           FontSize="20" Foreground="White" VerticalAlignment="Center"/>
+            </StackPanel>
+
+            <TextBlock Grid.Row="1" x:Name="MessageText" FontSize="14" Foreground="#FFD6D2E8"
+                       TextWrapping="Wrap" LineHeight="21"/>
+
+            <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,26,0,0">
+                <Button x:Name="CancelBtn" Content="Cancelar" Style="{StaticResource SecondaryButton}"
+                        Padding="18,9" Margin="0,0,10,0" Visibility="Collapsed" Click="CancelBtn_Click" IsCancel="True"/>
+                <Button x:Name="SecondaryBtn" Content="No" Style="{StaticResource SecondaryButton}"
+                        Padding="18,9" Margin="0,0,10,0" Visibility="Collapsed" Click="SecondaryBtn_Click"/>
+                <Button x:Name="PrimaryBtn" Content="Aceptar" Style="{StaticResource PrimaryButton}"
+                        Padding="22,9" Click="PrimaryBtn_Click" IsDefault="True"/>
+            </StackPanel>
+        </Grid>
+    </Border>
+</Window>

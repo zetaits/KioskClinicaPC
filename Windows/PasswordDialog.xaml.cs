@@ -1,5 +1,7 @@
 ﻿using System.Windows;
 using System.Windows.Input;
+using KioskClinicaPC.Core;
+using KioskClinicaPC.Windows;
 
 namespace KioskClinicaPC
 {
@@ -26,14 +28,15 @@ namespace KioskClinicaPC
 
         private void CheckPassword()
         {
-            if (PasswordInput.Password == "clinicapc2025")
+            var settings = KioskSettings.Load(App.SettingsFilePath);
+            if (PasswordService.Verify(PasswordInput.Password, settings.PasswordHash))
             {
                 this.DialogResult = true;
                 this.Close();
             }
             else
             {
-                MessageBox.Show("Contraseña incorrecta.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                KioskDialog.Alert(this, "Acceso restringido", "Contraseña incorrecta.", danger: true);
                 PasswordInput.Clear();
                 PasswordInput.Focus();
             }

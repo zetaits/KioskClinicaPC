@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex" />
+  <title>Ficha técnica del equipo</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="status" class="status">Cargando ficha del equipo…</div>
+
+  <div id="actions" class="actions" hidden>
+    <button id="downloadBtn" class="btn">Descargar PDF</button>
+  </div>
+
+  <!-- Hoja que se exporta a PDF -->
+  <main id="sheet" class="sheet" hidden>
+    <header class="sheet-head">
+      <div class="brand" id="brand">CLINICAPC</div>
+      <div class="doc-title">Ficha técnica del equipo</div>
+    </header>
+
+    <section class="identity">
+      <h1 id="title">—</h1>
+      <div class="subtitle" id="subtitle"></div>
+    </section>
+
+    <section class="price" id="priceBlock" hidden>
+      <div class="price-now" id="priceNow"></div>
+      <div class="price-meta">
+        <span class="price-old" id="priceOld"></span>
+        <span class="price-disc" id="priceDisc"></span>
+      </div>
+    </section>
+
+    <section class="components">
+      <h2>Componentes</h2>
+      <table id="compTable">
+        <tbody></tbody>
+      </table>
+    </section>
+
+    <footer class="sheet-foot">
+      <div id="address"></div>
+      <div id="generated"></div>
+    </footer>
+  </main>
+
+  <!-- pako: descomprime el gzip que viaja en el #hash; html2pdf: genera el PDF en el propio móvil -->
+  <script src="https://cdn.jsdelivr.net/npm/pako@2.1.0/dist/pako.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.2/dist/html2pdf.bundle.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

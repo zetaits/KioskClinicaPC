@@ -13,6 +13,7 @@ namespace KioskClinicaPC
         private const int VK_TAB = 0x09;
         private const int VK_LWIN = 0x5B;
         private const int VK_RWIN = 0x5C;
+        private const int VK_CONTROL = 0x11;
 
         private const uint LLKHF_ALTDOWN = 0x20;
 
@@ -35,6 +36,9 @@ namespace KioskClinicaPC
 
         [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
         private static extern IntPtr GetModuleHandle(string lpModuleName);
+
+        [DllImport("user32.dll")]
+        private static extern short GetAsyncKeyState(int vKey);
 
         private delegate IntPtr LowLevelKeyboardProc(int nCode, IntPtr wParam, IntPtr lParam);
 
@@ -107,7 +111,7 @@ namespace KioskClinicaPC
                 // 4. Bloquear Ctrl + Esc o Alt + Esc
                 if (vkCode == 0x1B) // VK_ESCAPE
                 {
-                    bool ctrlDown = (System.Windows.Forms.Control.ModifierKeys & System.Windows.Forms.Keys.Control) != 0;
+                    bool ctrlDown = (GetAsyncKeyState(VK_CONTROL) & 0x8000) != 0;
                     if (altDown || ctrlDown) return (IntPtr)1;
                 }
             }

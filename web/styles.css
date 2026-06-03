@@ -1,0 +1,112 @@
+:root {
+  --ink: #14101e;
+  --muted: #6b6580;
+  --line: #e3e0ea;
+  --accent: #1bd1c8;
+  --bg: #f4f3f7;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  padding: 16px;
+}
+
+.status {
+  max-width: 640px;
+  margin: 40px auto;
+  text-align: center;
+  font-size: 16px;
+  color: var(--muted);
+}
+.status.error { color: #c0392b; }
+
+.actions {
+  max-width: 800px;
+  margin: 0 auto 16px;
+  text-align: center;
+}
+.btn {
+  background: var(--ink);
+  color: #fff;
+  border: 0;
+  border-radius: 10px;
+  padding: 14px 28px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.btn:active { transform: translateY(1px); }
+
+/* Hoja A4 que se exporta a PDF */
+.sheet {
+  max-width: 800px;
+  margin: 0 auto;
+  background: #fff;
+  padding: 28px 32px;
+  border-radius: 12px;
+  box-shadow: 0 4px 24px rgba(20, 16, 30, 0.08);
+}
+
+.sheet-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  border-bottom: 2px solid var(--ink);
+  padding-bottom: 12px;
+  margin-bottom: 20px;
+}
+.brand { font-size: 22px; font-weight: 800; letter-spacing: 1px; }
+.doc-title { font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+
+.identity h1 { font-size: 30px; margin: 0 0 4px; line-height: 1.15; }
+.identity .subtitle { color: var(--muted); font-size: 14px; }
+
+.price {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  margin: 18px 0 8px;
+  padding: 14px 18px;
+  background: var(--bg);
+  border-radius: 10px;
+}
+.price-now { font-size: 30px; font-weight: 800; }
+.price-meta { display: flex; align-items: baseline; gap: 10px; }
+.price-old { color: var(--muted); text-decoration: line-through; font-size: 16px; }
+.price-disc { color: var(--accent); font-weight: 700; font-size: 16px; }
+
+.components { margin-top: 18px; }
+.components h2 {
+  font-size: 13px; text-transform: uppercase; letter-spacing: 1px;
+  color: var(--muted); margin: 0 0 8px;
+}
+
+table { width: 100%; border-collapse: collapse; }
+tr { border-bottom: 1px solid var(--line); }
+tr:last-child { border-bottom: 0; }
+td { padding: 12px 6px; vertical-align: top; }
+
+.c-label {
+  width: 32%;
+  font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;
+  color: var(--muted); padding-top: 14px;
+}
+.c-value .value { font-size: 18px; font-weight: 700; }
+.c-value .detail { font-size: 13px; color: #4a4560; margin-top: 2px; }
+.c-value .tech { font-size: 12px; color: var(--muted); margin-top: 2px; font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+.c-value .explain { font-size: 12px; color: var(--muted); margin-top: 5px; font-style: italic; }
+
+.sheet-foot {
+  margin-top: 24px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--muted);
+}

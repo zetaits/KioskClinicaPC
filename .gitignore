@@ -47,3 +47,22 @@ _ReSharper*/
 *.user
 *.userosscache
 *.sln.docstates
+
+# Local agent notes
+CLAUDE.md
+
+# Claude Code / Ruflo / agent tooling (no forma parte del código del proyecto)
+.claude/
+.claude-flow/
+.swarm/
+.hive-mind/
+.ruflo/
+.roo/
+.mcp.json
+ruvector.db
+*.ruv
+memory/
+
+# Artefactos accidentales de shell (archivos basura en la raíz)
+/0
+/new

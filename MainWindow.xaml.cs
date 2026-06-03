@@ -17,6 +17,7 @@ using System.Windows.Media;
 using Microsoft.Win32;
 using Newtonsoft.Json;
 using KioskClinicaPC.Core;
+using KioskClinicaPC.Controls;
 using KioskClinicaPC.Windows;
 using KioskClinicaPC.ViewModels;
 using KioskClinicaPC.Services;
@@ -40,10 +41,14 @@ namespace KioskClinicaPC
         private int _attractSlideIndex = 0;
         private const int InactivityTimeoutSeconds = 90;
 
+        private KioskSettings _settings = new KioskSettings();
+        private int _hotspotClicks = 0;
+        private readonly DispatcherTimer _hotspotResetTimer;
+
         public MainWindow()
         {
             InitializeComponent();
-            
+
             _viewModel = new MainViewModel(new HardwareDiscoveryService());
             DataContext = _viewModel;
 
@@ -58,11 +63,14 @@ namespace KioskClinicaPC
             _attractAutoScanTimer.Tick += (s, e) =>
             {
                 _attractAutoScanTimer.Stop();
-                if (_viewModel.CurrentScreen == 0) StartScanSequence();
+                if (_viewModel.CurrentScreen == 0 && !EditModeService.Instance.IsActive) StartScanSequence();
             };
 
             _highlightTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(3) };
             _highlightTimer.Tick += HighlightTimer_Tick;
+
+            _hotspotResetTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1.5) };
+            _hotspotResetTimer.Tick += (s, e) => { _hotspotResetTimer.Stop(); _hotspotClicks = 0; };
         }
 
         private async void Window_Loaded(object sender, RoutedEventArgs e)
@@ -71,37 +79,48 @@ namespace KioskClinicaPC
             _hook.Start();
             RegisterInStartup();
 #endif
+            _settings = KioskSettings.Load(App.SettingsFilePath);
+            ApplyTimerIntervals();
+
             SpawnParticles(26);
-            BuildQrPattern();
             await _viewModel.LoadHardwareAndConfigAsync();
+            RefreshQr();
+            UpdateSlideDots(0);
             _attractTimer.Start();
             _attractAutoScanTimer.Start();
         }
 
-        private void BuildQrPattern()
+        private void ApplyTimerIntervals()
         {
-            QrPattern.Children.Clear();
-            for (int i = 0; i < 81; i++)
+            _inactivityTimer.Interval = TimeSpan.FromSeconds(Math.Max(5, _settings.InactivitySeconds));
+            _attractTimer.Interval = TimeSpan.FromSeconds(Math.Max(1, _settings.SlideIntervalSeconds));
+            _attractAutoScanTimer.Interval = TimeSpan.FromSeconds(Math.Max(3, _settings.AutoScanSeconds));
+        }
+
+        /// <summary>Genera el QR real con la ficha del equipo embebida (URL configurable + datos en #hash).
+        /// Si no hay PdfBaseUrl configurada, oculta el QR.</summary>
+        private void RefreshQr()
+        {
+            try
             {
-                int x = i % 9;
-                int y = i / 9;
-                bool corner = (x < 3 && y < 3) || (x > 5 && y < 3) || (x < 3 && y > 5);
-                bool on;
-                if (corner)
+                var specs = _viewModel.Specs.Select(s => new EquipmentPayload.SpecLine
                 {
-                    if ((x == 1 && y == 1) || (x == 7 && y == 1) || (x == 1 && y == 7)) on = false;
-                    else on = true;
-                }
-                else
-                {
-                    int n = ((x * 31 + y * 17 + x * y) % 7);
-                    on = n < 3;
-                }
-                QrPattern.Children.Add(new Rectangle
-                {
-                    Fill = on ? Brushes.Black : Brushes.Transparent,
-                    Margin = new Thickness(1)
+                    Id = s.Id,
+                    Label = s.Label,
+                    Value = s.Value,
+                    Detail = s.Detail,
+                    Tech = s.TechDetail
                 });
+
+                string? url = EquipmentPayload.BuildUrl(_settings.PdfBaseUrl, _viewModel.DisplayConfig, specs, shopName: null);
+                var qr = QrGenerator.Generate(url);
+                QrImage.Source = qr;
+                QrBorder.Visibility = qr != null ? Visibility.Visible : Visibility.Collapsed;
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "No se pudo refrescar el código QR de la ficha.");
+                QrBorder.Visibility = Visibility.Collapsed;
             }
         }
 
@@ -160,6 +179,7 @@ namespace KioskClinicaPC
 
         private void AttractScreen_Click(object sender, MouseButtonEventArgs e)
         {
+            if (EditModeService.Instance.IsActive) return;
             StartScanSequence();
         }
 
@@ -217,34 +237,39 @@ namespace KioskClinicaPC
             }
         }
 
-        public void SpecNode_Loaded(object sender, RoutedEventArgs e)
+        private static readonly string[] ImageExtensions = { ".png", ".jpg", ".jpeg", ".bmp", ".webp" };
+
+        private void ProductImage_DragOver(object sender, DragEventArgs e)
         {
-            if (sender is not FrameworkElement fe || fe.DataContext is not SpecItem item) return;
+            e.Effects = TryGetDroppedImagePath(e) != null ? DragDropEffects.Copy : DragDropEffects.None;
+            e.Handled = true;
+        }
 
-            var st = new ScaleTransform(0.4, 0.4);
-            fe.RenderTransformOrigin = new Point(0.5, 0.5);
-            fe.RenderTransform = st;
-
-            var sx = new DoubleAnimationUsingKeyFrames { Duration = TimeSpan.FromMilliseconds(550), BeginTime = item.NodeAnimDelay };
-            sx.KeyFrames.Add(new DiscreteDoubleKeyFrame(0.4, KeyTime.FromTimeSpan(TimeSpan.Zero)));
-            sx.KeyFrames.Add(new SplineDoubleKeyFrame(1.06, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(330)), new KeySpline(0.2, 0.8, 0.2, 1.1)));
-            sx.KeyFrames.Add(new LinearDoubleKeyFrame(1.0, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(550))));
-
-            var sy = new DoubleAnimationUsingKeyFrames { Duration = TimeSpan.FromMilliseconds(550), BeginTime = item.NodeAnimDelay };
-            sy.KeyFrames.Add(new DiscreteDoubleKeyFrame(0.4, KeyTime.FromTimeSpan(TimeSpan.Zero)));
-            sy.KeyFrames.Add(new SplineDoubleKeyFrame(1.06, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(330)), new KeySpline(0.2, 0.8, 0.2, 1.1)));
-            sy.KeyFrames.Add(new LinearDoubleKeyFrame(1.0, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(550))));
-
-            var op = new DoubleAnimation
+        private void ProductImage_Drop(object sender, DragEventArgs e)
+        {
+            string? src = TryGetDroppedImagePath(e);
+            if (src == null) return;
+            try
             {
-                From = 0, To = 1,
-                Duration = TimeSpan.FromMilliseconds(400),
-                BeginTime = item.NodeAnimDelay
-            };
+                string dest = System.IO.Path.Combine(App.AppDataFolderPath, "product" + System.IO.Path.GetExtension(src).ToLowerInvariant());
+                File.Copy(src, dest, overwrite: true);
+                // Clear first so the binding/converter reloads even when the path string is unchanged.
+                _viewModel.SaveProductImage(null);
+                _viewModel.SaveProductImage(dest);
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "No se pudo guardar la foto del producto arrastrada.");
+            }
+            e.Handled = true;
+        }
 
-            st.BeginAnimation(ScaleTransform.ScaleXProperty, sx);
-            st.BeginAnimation(ScaleTransform.ScaleYProperty, sy);
-            fe.BeginAnimation(OpacityProperty, op);
+        private static string? TryGetDroppedImagePath(DragEventArgs e)
+        {
+            if (!e.Data.GetDataPresent(DataFormats.FileDrop)) return null;
+            if (e.Data.GetData(DataFormats.FileDrop) is not string[] files || files.Length == 0) return null;
+            string f = files[0];
+            return ImageExtensions.Contains(System.IO.Path.GetExtension(f).ToLowerInvariant()) ? f : null;
         }
 
         private void DetailBack_Click(object sender, RoutedEventArgs e)
@@ -287,14 +312,23 @@ namespace KioskClinicaPC
                 if (target > 0) { _inactivityTimer.Start(); _attractAutoScanTimer.Stop(); }
                 else { _attractTimer.Start(); _attractAutoScanTimer.Stop(); _attractAutoScanTimer.Start(); }
 
-                if (target == 2) _highlightTimer.Start();
+                if (target == 2 && !EditModeService.Instance.IsActive) _highlightTimer.Start();
                 else _highlightTimer.Stop();
+
+                if (EditModeService.Instance.IsActive)
+                {
+                    _inactivityTimer.Stop();
+                    _attractTimer.Stop();
+                    _attractAutoScanTimer.Stop();
+                    RefreshEditHighlights();
+                }
             };
             screens[_viewModel.CurrentScreen].BeginAnimation(OpacityProperty, fadeOut);
         }
 
         private void ResetInactivityTimer()
         {
+            if (EditModeService.Instance.IsActive) return;
             if (_viewModel.CurrentScreen > 0)
             {
                 _inactivityTimer.Stop();
@@ -314,35 +348,20 @@ namespace KioskClinicaPC
 
         private void AttractTimer_Tick(object sender, EventArgs e)
         {
-            _attractSlideIndex = (_attractSlideIndex + 1) % 3;
-            if (_attractSlideIndex == 0)
-            {
-                _viewModel.AttractEyebrow = "CLINICAPC · ANÁLISIS EN VIVO";
-                _viewModel.AttractTitle1 = "ESTE EQUIPO";
-                _viewModel.AttractTitle2 = "TE ESTÁ OBSERVANDO.";
-                _viewModel.AttractSubtitle = "Conéctate · escanea · descubre cada componente en 30 segundos.";
-            }
-            else if (_attractSlideIndex == 1)
-            {
-                _viewModel.AttractEyebrow = "SIN TECNICISMOS";
-                _viewModel.AttractTitle1 = "LO ENTIENDES";
-                _viewModel.AttractTitle2 = "AUNQUE NO SEAS TÉCNICO.";
-                _viewModel.AttractSubtitle = "Te traducimos cada spec a lenguaje de calle.";
-            }
-            else
-            {
-                _viewModel.AttractEyebrow = "REACONDICIONADOS CON CABEZA";
-                _viewModel.AttractTitle1 = "HASTA 60% MENOS";
-                _viewModel.AttractTitle2 = "QUE COMPRARLO NUEVO.";
-                _viewModel.AttractSubtitle = "Probado, limpiado y con 24 meses de garantía.";
-            }
+            if (_viewModel.Slides.Count == 0) return;
+            _attractSlideIndex = (_attractSlideIndex + 1) % _viewModel.Slides.Count;
+            _viewModel.CurrentSlide = _viewModel.Slides[_attractSlideIndex];
+            UpdateSlideDots(_attractSlideIndex);
+        }
 
+        private void UpdateSlideDots(int index)
+        {
             var dots = new[] { SlideDot0, SlideDot1, SlideDot2 };
             var cyanBrush = (SolidColorBrush)FindResource("CyanBrush");
             var cyanColor = (Color)FindResource("CyanColor");
             for (int i = 0; i < dots.Length; i++)
             {
-                if (i == _attractSlideIndex)
+                if (i == index)
                 {
                     dots[i].Width = 32;
                     dots[i].Fill = cyanBrush;
@@ -391,22 +410,163 @@ namespace KioskClinicaPC
                 if (e.Key == Key.P)
                 {
                     KeyboardHook.AllowWindowsKey = !KeyboardHook.AllowWindowsKey;
-                    MessageBox.Show(
+                    KioskDialog.Alert(this, "Capturas",
                         KeyboardHook.AllowWindowsKey
                             ? "Tecla Windows DESBLOQUEADA. Win+Impr Pant guardará captura en Imágenes\\Capturas de pantalla."
-                            : "Tecla Windows BLOQUEADA.",
-                        "Capturas",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Information);
+                            : "Tecla Windows BLOQUEADA.");
                 }
             }
-            if (e.Key == Key.Escape && _viewModel.CurrentScreen > 0) NavigateToScreen(0);
+            if (e.Key == Key.Escape && _viewModel.CurrentScreen > 0 && !EditModeService.Instance.IsActive) NavigateToScreen(0);
+
+            // En la pantalla de atracción, cualquier tecla (no modificadora) inicia el escaneo, igual que un clic.
+            if (_viewModel.CurrentScreen == 0 && !EditModeService.Instance.IsActive
+                && Keyboard.Modifiers == ModifierKeys.None
+                && e.Key != Key.System && e.Key != Key.LeftCtrl && e.Key != Key.RightCtrl
+                && e.Key != Key.LeftShift && e.Key != Key.RightShift
+                && e.Key != Key.LWin && e.Key != Key.RWin)
+            {
+                StartScanSequence();
+            }
         }
 
-        private void SettingsClickArea_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        private void SettingsHotspot_MouseDown(object sender, MouseButtonEventArgs e)
         {
-            if (e.ClickCount == 3) OpenSettingsDialog();
+            if (EditModeService.Instance.IsActive) return;
+            _hotspotClicks++;
+            _hotspotResetTimer.Stop();
+            _hotspotResetTimer.Start();
+            if (_hotspotClicks >= 3)
+            {
+                _hotspotClicks = 0;
+                _hotspotResetTimer.Stop();
+                OpenSettingsDialog();
+            }
         }
+
+        private void Window_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (!EditModeService.Instance.IsActive) return;
+            if (InlineEditController.TryBeginEdit(e.OriginalSource)) e.Handled = true;
+        }
+
+        #region Edit Mode
+
+        private void EnterEditMode()
+        {
+            _inactivityTimer.Stop();
+            _attractTimer.Stop();
+            _attractAutoScanTimer.Stop();
+            _highlightTimer.Stop();
+            foreach (var s in _viewModel.Specs) s.IsHighlighted = false;
+
+            EditModeService.Instance.IsDirty = false;
+            EditModeService.Instance.IsActive = true;
+            RefreshEditHighlights();
+        }
+
+        private void ExitEditMode()
+        {
+            InlineEditController.CommitActive();
+            InlineEditController.SetHighlights(RootGrid, false);
+            EditModeService.Instance.IsActive = false;
+
+            if (_viewModel.CurrentScreen == 0) { _attractTimer.Start(); _attractAutoScanTimer.Start(); }
+            else { _inactivityTimer.Start(); }
+            if (_viewModel.CurrentScreen == 2) _highlightTimer.Start();
+
+            RefreshQr(); // los datos editados (precio, specs) pueden haber cambiado
+        }
+
+        private void RefreshEditHighlights()
+        {
+            if (!EditModeService.Instance.IsActive) return;
+            Dispatcher.BeginInvoke(new Action(() => InlineEditController.SetHighlights(RootGrid, true)), DispatcherPriority.Loaded);
+        }
+
+        private void EditSave_Click(object sender, RoutedEventArgs e)
+        {
+            InlineEditController.CommitActive();
+            try
+            {
+                _viewModel.SaveEdits();
+                RefreshEditHighlights();
+            }
+            catch (Exception ex)
+            {
+                KioskDialog.Alert(this, "Error", $"No se pudieron guardar los cambios.\n{ex.Message}", danger: true);
+            }
+        }
+
+        private void EditDiscard_Click(object sender, RoutedEventArgs e)
+        {
+            InlineEditController.CancelActive();
+            _viewModel.DiscardEdits();
+            if (_viewModel.CurrentScreen == 3) NavigateToScreen(2);
+            _attractSlideIndex = 0;
+            UpdateSlideDots(0);
+            RefreshEditHighlights();
+        }
+
+        private void EditExit_Click(object sender, RoutedEventArgs e)
+        {
+            if (EditModeService.Instance.IsDirty)
+            {
+                var r = KioskDialog.Show(this, "Modo edición", "Tienes cambios sin guardar.",
+                    primaryText: "Guardar y salir", secondaryText: "Salir sin guardar", cancelText: "Cancelar");
+                if (r == KioskDialogResult.Cancel) return;
+                if (r == KioskDialogResult.Primary)
+                {
+                    InlineEditController.CommitActive();
+                    try { _viewModel.SaveEdits(); }
+                    catch (Exception ex)
+                    {
+                        KioskDialog.Alert(this, "Error", $"No se pudieron guardar los cambios.\n{ex.Message}", danger: true);
+                        return;
+                    }
+                }
+                else
+                {
+                    InlineEditController.CancelActive();
+                    _viewModel.DiscardEdits();
+                    if (_viewModel.CurrentScreen == 3) NavigateToScreen(2);
+                }
+            }
+            ExitEditMode();
+        }
+
+        private void EditPrevSlide_Click(object sender, RoutedEventArgs e) => StepSlide(-1);
+        private void EditNextSlide_Click(object sender, RoutedEventArgs e) => StepSlide(1);
+
+        private void StepSlide(int dir)
+        {
+            if (_viewModel.Slides.Count == 0) return;
+            int idx = _viewModel.Slides.IndexOf(_viewModel.CurrentSlide);
+            if (idx < 0) idx = 0;
+            idx = (idx + dir + _viewModel.Slides.Count) % _viewModel.Slides.Count;
+            _viewModel.CurrentSlide = _viewModel.Slides[idx];
+            _attractSlideIndex = idx;
+            UpdateSlideDots(idx);
+            RefreshEditHighlights();
+        }
+
+        // Navegación entre pantallas dentro del modo edición (sin estos botones el usuario
+        // queda atascado en la pantalla activa y no puede llegar a editar las demás).
+        private void EditGoAttract_Click(object sender, RoutedEventArgs e) => GoToScreenInEdit(0);
+        private void EditGoScan_Click(object sender, RoutedEventArgs e) => GoToScreenInEdit(1);
+        private void EditGoMain_Click(object sender, RoutedEventArgs e) => GoToScreenInEdit(2);
+        private void EditGoDetail_Click(object sender, RoutedEventArgs e)
+        {
+            _viewModel.SelectedSpec ??= _viewModel.Specs.FirstOrDefault();
+            GoToScreenInEdit(3);
+        }
+
+        private void GoToScreenInEdit(int target)
+        {
+            if (_viewModel.CurrentScreen == target) { RefreshEditHighlights(); return; }
+            NavigateToScreen(target);
+        }
+
+        #endregion
 
         private void RegisterInStartup()
         {
@@ -424,13 +584,33 @@ namespace KioskClinicaPC
 
         private async void OpenSettingsDialog()
         {
-            if (new PasswordDialog { Owner = this }.ShowDialog() == true)
+            // Pausa el render del kiosko (animaciones/blur) mientras el panel está abierto → scroll fluido.
+            RootGrid.Visibility = Visibility.Collapsed;
+            bool launchEdit = false;
+            try
             {
-                if (new SettingsWindow(_viewModel.DetectedSpecs) { Owner = this }.ShowDialog() == true)
-                {
+                if (new PasswordDialog { Owner = this }.ShowDialog() != true) return;
+
+                var settingsWindow = new SettingsWindow(_viewModel.DetectedSpecs) { Owner = this };
+                bool? result = settingsWindow.ShowDialog();
+
+                // Recarga ajustes y reaplica intervalos (timeouts/contraseña pueden haber cambiado).
+                _settings = KioskSettings.Load(App.SettingsFilePath);
+                ApplyTimerIntervals();
+
+                if (result == true)
                     await _viewModel.LoadHardwareAndConfigAsync();
-                }
+
+                RefreshQr(); // PdfBaseUrl o specs pueden haber cambiado
+                launchEdit = settingsWindow.LaunchEditMode;
             }
+            finally
+            {
+                RootGrid.Visibility = Visibility.Visible;
+            }
+
+            if (launchEdit)
+                EnterEditMode();
         }
 
         #endregion

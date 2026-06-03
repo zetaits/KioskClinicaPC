@@ -18,6 +18,7 @@ namespace KioskClinicaPC
         
         public static readonly string ConfigFilePath = Path.Combine(AppDataFolderPath, "KioskConfig.json");
         public static readonly string HardwareFilePath = Path.Combine(AppDataFolderPath, "KioskHardware.json");
+        public static readonly string SettingsFilePath = Path.Combine(AppDataFolderPath, "KioskSettings.json");
         public static readonly string LogFilePath = Path.Combine(AppDataFolderPath, "logs", "log.txt");
 
         protected override void OnStartup(StartupEventArgs e)
@@ -34,7 +35,18 @@ namespace KioskClinicaPC
 
             KioskManager.Protect();
 
+            // Asegura que exista KioskSettings.json con contraseña sembrada.
+            var settings = KioskSettings.Load(SettingsFilePath);
+            if (settings.EnsurePasswordSeeded())
+            {
+                settings.Save(SettingsFilePath);
+                Log.Information("KioskSettings creado con contraseña por defecto.");
+            }
+
             this.DispatcherUnhandledException += App_DispatcherUnhandledException;
+            // Excepciones fatales fuera del hilo de UI: restaura el escritorio antes de morir
+            // (si no, taskbar oculta + Task Manager bloqueado quedarían tras el crash).
+            AppDomain.CurrentDomain.UnhandledException += (_, __) => KioskManager.Release();
 
             if (!File.Exists(ConfigFilePath))
             {
@@ -45,7 +57,7 @@ namespace KioskClinicaPC
                 {
                     var config = configDialog.ConfigData;
                     string json = JsonConvert.SerializeObject(config, Formatting.Indented);
-                    File.WriteAllText(ConfigFilePath, json);
+                    JsonStore.WriteAtomic(ConfigFilePath, json);
                     Log.Information("Configuración inicial creada.");
                 }
                 else
@@ -64,6 +76,7 @@ namespace KioskClinicaPC
         private void App_DispatcherUnhandledException(object sender, System.Windows.Threading.DispatcherUnhandledExceptionEventArgs e)
         {
             Log.Fatal(e.Exception, "Se ha producido una excepción no controlada.");
+            KioskManager.Release();
             e.Handled = true;
             MessageBox.Show("Se ha producido un error inesperado. Por favor, contacte con el soporte técnico.", "Error Crítico", MessageBoxButton.OK, MessageBoxImage.Error);
             Application.Current.Shutdown();
