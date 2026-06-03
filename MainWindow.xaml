@@ -633,14 +633,14 @@
                                     </Button.Effect>
                                 </Button>
 
-                                <!-- QR + text -->
-                                <StackPanel Orientation="Horizontal" Margin="0,18,0,0">
-                                    <Border x:Name="QrBorder" Width="156" Height="156" Background="White" Padding="8" Margin="0,0,16,0" VerticalAlignment="Center">
+                                <!-- QR (grande, escaneable) + texto debajo -->
+                                <StackPanel Margin="0,18,0,0">
+                                    <Border x:Name="QrBorder" Width="240" Height="240" Background="White" Padding="10" HorizontalAlignment="Center">
                                         <Image x:Name="QrImage" Stretch="Uniform" RenderOptions.BitmapScalingMode="NearestNeighbor"/>
                                     </Border>
-                                    <StackPanel VerticalAlignment="Center" Width="180">
-                                        <TextBlock Text="{Binding Texts[price.scanTitle]}" Style="{StaticResource MonoFont}" FontSize="13" Foreground="{StaticResource Text2Brush}" Margin="0,0,0,6"/>
-                                        <TextBlock Text="{Binding Texts[price.scanText]}" edit:Editable.Multiline="True" Foreground="{StaticResource Text1Brush}" FontSize="14" TextWrapping="Wrap" LineHeight="20"/>
+                                    <StackPanel Margin="0,14,0,0">
+                                        <TextBlock Text="{Binding Texts[price.scanTitle]}" Style="{StaticResource MonoFont}" FontSize="13" Foreground="{StaticResource Text2Brush}" Margin="0,0,0,6" TextAlignment="Center"/>
+                                        <TextBlock Text="{Binding Texts[price.scanText]}" edit:Editable.Multiline="True" Foreground="{StaticResource Text1Brush}" FontSize="14" TextWrapping="Wrap" LineHeight="20" TextAlignment="Center"/>
                                     </StackPanel>
                                 </StackPanel>
                             </StackPanel>

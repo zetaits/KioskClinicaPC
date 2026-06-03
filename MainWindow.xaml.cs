@@ -110,8 +110,7 @@ namespace KioskClinicaPC
                     Id = s.Id,
                     Label = s.Label,
                     Value = s.Value,
-                    Detail = s.Detail,
-                    Tech = s.TechDetail
+                    Detail = s.Detail
                 });
 
                 string? url = EquipmentPayload.BuildUrl(FichaPdfBaseUrl, _viewModel.DisplayConfig, specs, shopName: null);

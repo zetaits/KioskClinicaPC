@@ -93,12 +93,11 @@ function render(data) {
   tbody.innerHTML = comps.map(c => {
     const explain = FRIENDLY[c.i] ? `<div class="explain">${escapeHtml(FRIENDLY[c.i])}</div>` : "";
     const detail = c.d ? `<div class="detail">${escapeHtml(c.d)}</div>` : "";
-    const tech = c.t ? `<div class="tech">${escapeHtml(c.t)}</div>` : "";
     return `<tr>
       <td class="c-label">${escapeHtml(c.l || c.i || "")}</td>
       <td class="c-value">
         <div class="value">${escapeHtml(c.v || "")}</div>
-        ${detail}${tech}${explain}
+        ${detail}${explain}
       </td>
     </tr>`;
   }).join("");

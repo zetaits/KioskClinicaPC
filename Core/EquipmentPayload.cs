@@ -38,7 +38,6 @@ namespace KioskClinicaPC.Core
             [JsonProperty("l")] public string? Label { get; set; }
             [JsonProperty("v")] public string? Value { get; set; }
             [JsonProperty("d")] public string? Detail { get; set; }
-            [JsonProperty("t")] public string? Tech { get; set; }
         }
 
         public class SpecLine
@@ -47,7 +46,6 @@ namespace KioskClinicaPC.Core
             public string? Label { get; set; }
             public string? Value { get; set; }
             public string? Detail { get; set; }
-            public string? Tech { get; set; }
         }
 
         /// <summary>Construye la URL completa "{baseUrl}#{payload}" o null si no hay baseUrl válida.</summary>
@@ -74,8 +72,7 @@ namespace KioskClinicaPC.Core
                     Id = s.Id,
                     Label = NullIfEmpty(s.Label),
                     Value = NullIfEmpty(s.Value),
-                    Detail = NullIfEmpty(s.Detail),
-                    Tech = NullIfEmpty(s.Tech)
+                    Detail = NullIfEmpty(s.Detail)
                 });
             }
 

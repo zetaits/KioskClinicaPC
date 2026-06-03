@@ -12,7 +12,7 @@ namespace KioskClinicaPC.Core
     {
         /// <summary>Devuelve un BitmapSource con el QR, o null si el texto es vacío o falla la generación.
         /// ECC nivel L para maximizar la capacidad (las URLs con datos embebidos son largas).</summary>
-        public static BitmapSource? Generate(string? text, int pixelsPerModule = 12)
+        public static BitmapSource? Generate(string? text, int pixelsPerModule = 20)
         {
             if (string.IsNullOrWhiteSpace(text)) return null;
             try
