@@ -79,7 +79,6 @@ namespace KioskClinicaPC.Windows
             InactivityTextBox.Text = _settings.InactivitySeconds.ToString(CultureInfo.InvariantCulture);
             AutoScanTextBox.Text = _settings.AutoScanSeconds.ToString(CultureInfo.InvariantCulture);
             SlideIntervalTextBox.Text = _settings.SlideIntervalSeconds.ToString(CultureInfo.InvariantCulture);
-            PdfBaseUrlTextBox.Text = _settings.PdfBaseUrl;
         }
 
         private void SaveButton_Click(object sender, RoutedEventArgs e)
@@ -128,7 +127,6 @@ namespace KioskClinicaPC.Windows
             _settings.InactivitySeconds = Math.Max(5, ParseInt(InactivityTextBox.Text, _settings.InactivitySeconds));
             _settings.AutoScanSeconds = Math.Max(3, ParseInt(AutoScanTextBox.Text, _settings.AutoScanSeconds));
             _settings.SlideIntervalSeconds = Math.Max(1, ParseDouble(SlideIntervalTextBox.Text, _settings.SlideIntervalSeconds));
-            _settings.PdfBaseUrl = string.IsNullOrWhiteSpace(PdfBaseUrlTextBox.Text) ? null : PdfBaseUrlTextBox.Text.Trim();
 
             if (!string.IsNullOrEmpty(NewPasswordBox.Password))
             {

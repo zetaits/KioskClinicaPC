@@ -216,16 +216,6 @@
                     </StackPanel>
                 </Border>
 
-                <!-- Código QR / ficha PDF -->
-                <Border Style="{StaticResource SectionCard}">
-                    <StackPanel>
-                        <TextBlock Style="{StaticResource SectionTitle}" Text="Código QR · ficha PDF"/>
-                        <TextBlock Style="{StaticResource SectionHint}" Text="URL base de tu web que genera el PDF. El QR apunta a esta dirección con las specs del equipo embebidas. Déjalo vacío para ocultar el QR."/>
-                        <TextBlock Style="{StaticResource FieldLabel}" Text="URL BASE (p. ej. https://tudominio.com/ficha)"/>
-                        <TextBox x:Name="PdfBaseUrlTextBox" Style="{StaticResource ConfigTextBox}"/>
-                    </StackPanel>
-                </Border>
-
                 <!-- Seguridad -->
                 <Border Style="{StaticResource SectionCard}">
                     <StackPanel>

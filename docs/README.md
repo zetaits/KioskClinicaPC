@@ -22,9 +22,10 @@ Esta carpeta es `docs/` precisamente para que GitHub Pages la sirva:
 
 1. Repo en GitHub → **Settings → Pages**.
 2. **Source: Deploy from a branch** → rama `master` → carpeta **`/docs`** → **Save**.
-3. Espera ~1 min. URL resultante: `https://<usuario>.github.io/<repo>/`
-   (p. ej. `https://zetaits.github.io/KioskClinicaPC/`).
-4. En el kiosko: **Ajustes → Código QR · ficha PDF → URL BASE** = esa URL (con `/` final).
+3. Espera ~1 min. URL resultante: `https://zetaits.github.io/KioskClinicaPC/`.
+
+Esa URL está **fija en el kiosko** (constante `FichaPdfBaseUrl` en `MainWindow.xaml.cs`); no hay nada que configurar.
+Si cambias de repo/usuario/dominio, edita esa constante.
 
 > Funciona bajo subruta `/<repo>/` porque las rutas de `index.html` son relativas.
 > Pages sirve HTTPS por defecto (los móviles lo prefieren para descargar archivos).

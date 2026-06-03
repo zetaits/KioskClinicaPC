@@ -15,10 +15,6 @@ namespace KioskClinicaPC.Core
         public int AutoScanSeconds { get; set; } = 18;
         public double SlideIntervalSeconds { get; set; } = 5.2;
 
-        /// <summary>URL base de la web que genera el PDF de la ficha. El QR apunta a "{PdfBaseUrl}#{datos}".
-        /// Vacío = QR deshabilitado (se oculta). Las specs del equipo viajan en el #hash, no en el servidor.</summary>
-        public string? PdfBaseUrl { get; set; }
-
         public static KioskSettings Load(string path)
         {
             try

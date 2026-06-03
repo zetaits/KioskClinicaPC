@@ -97,8 +97,10 @@ namespace KioskClinicaPC
             _attractAutoScanTimer.Interval = TimeSpan.FromSeconds(Math.Max(3, _settings.AutoScanSeconds));
         }
 
-        /// <summary>Genera el QR real con la ficha del equipo embebida (URL configurable + datos en #hash).
-        /// Si no hay PdfBaseUrl configurada, oculta el QR.</summary>
+        /// <summary>URL de la web (GitHub Pages) que genera el PDF de la ficha. El QR apunta a "{url}#{datos}".</summary>
+        private const string FichaPdfBaseUrl = "https://zetaits.github.io/KioskClinicaPC/";
+
+        /// <summary>Genera el QR real con la ficha del equipo embebida (datos en el #hash de la URL).</summary>
         private void RefreshQr()
         {
             try
@@ -112,7 +114,7 @@ namespace KioskClinicaPC
                     Tech = s.TechDetail
                 });
 
-                string? url = EquipmentPayload.BuildUrl(_settings.PdfBaseUrl, _viewModel.DisplayConfig, specs, shopName: null);
+                string? url = EquipmentPayload.BuildUrl(FichaPdfBaseUrl, _viewModel.DisplayConfig, specs, shopName: null);
                 var qr = QrGenerator.Generate(url);
                 QrImage.Source = qr;
                 QrBorder.Visibility = qr != null ? Visibility.Visible : Visibility.Collapsed;
