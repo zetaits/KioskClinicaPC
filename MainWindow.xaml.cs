@@ -80,12 +80,12 @@ namespace KioskClinicaPC
         {
 #if !DEBUG
             _hook.Start();
-            RegisterInStartup();
+            AutostartRegistration.Register();
 #endif
             _settings = KioskSettings.Load(App.SettingsFilePath);
             ApplyTimerIntervals();
 
-            SpawnParticles(26);
+            ParticleField.Spawn(ParticleCanvas, 26);
             await _viewModel.LoadHardwareAndConfigAsync();
             RefreshQr();
             UpdateSlideDots(0);
@@ -135,57 +135,6 @@ namespace KioskClinicaPC
             {
                 Log.Error(ex, "No se pudo refrescar el código QR de la ficha.");
                 QrBorder.Visibility = Visibility.Collapsed;
-            }
-        }
-
-        private void SpawnParticles(int count)
-        {
-            var random = new Random();
-            for (int i = 0; i < count; i++)
-            {
-                double size = 1 + random.NextDouble() * 2.5;
-                var dot = new Ellipse
-                {
-                    Width = size,
-                    Height = size,
-                    Fill = random.NextDouble() > 0.5 ? (SolidColorBrush)FindResource("CyanBrush") : (SolidColorBrush)FindResource("MagentaBrush"),
-                    Effect = new DropShadowEffect
-                    {
-                        Color = random.NextDouble() > 0.5 ? (Color)FindResource("CyanColor") : (Color)FindResource("MagentaColor"),
-                        BlurRadius = 16,
-                        ShadowDepth = 0,
-                        Opacity = 0.9
-                    },
-                    Opacity = 0
-                };
-                Canvas.SetLeft(dot, random.NextDouble() * 1920);
-                Canvas.SetTop(dot, 1080 + 20);
-                ParticleCanvas.Children.Add(dot);
-
-                double duration = 14 + random.NextDouble() * 18;
-                double delay = random.NextDouble() * -22;
-
-                var up = new DoubleAnimation
-                {
-                    From = 1100,
-                    To = -20,
-                    Duration = TimeSpan.FromSeconds(duration),
-                    RepeatBehavior = RepeatBehavior.Forever,
-                    BeginTime = TimeSpan.FromSeconds(delay)
-                };
-                var fade = new DoubleAnimationUsingKeyFrames
-                {
-                    Duration = TimeSpan.FromSeconds(duration),
-                    RepeatBehavior = RepeatBehavior.Forever,
-                    BeginTime = TimeSpan.FromSeconds(delay)
-                };
-                fade.KeyFrames.Add(new LinearDoubleKeyFrame(0, KeyTime.FromPercent(0)));
-                fade.KeyFrames.Add(new LinearDoubleKeyFrame(0.9, KeyTime.FromPercent(0.1)));
-                fade.KeyFrames.Add(new LinearDoubleKeyFrame(0.6, KeyTime.FromPercent(0.9)));
-                fade.KeyFrames.Add(new LinearDoubleKeyFrame(0, KeyTime.FromPercent(1)));
-
-                dot.BeginAnimation(Canvas.TopProperty, up);
-                dot.BeginAnimation(OpacityProperty, fade);
             }
         }
 
@@ -611,28 +560,6 @@ namespace KioskClinicaPC
         }
 
         #endregion
-
-        private void RegisterInStartup()
-        {
-            try
-            {
-                const string appName = "KioskHardwareDisplay";
-                // MainModule.FileName es seguro bajo publicación single-file (Assembly.Location
-                // devuelve "" ahí → registraba una ruta vacía y rompía el autostart).
-                string? exePath = Process.GetCurrentProcess().MainModule?.FileName;
-                if (string.IsNullOrEmpty(exePath))
-                {
-                    Log.Warning("No se pudo resolver la ruta del ejecutable; autostart no registrado.");
-                    return;
-                }
-                using var key = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Run", true);
-                if (key != null) key.SetValue(appName, $"\"{exePath}\"");
-            }
-            catch (Exception ex)
-            {
-                Log.Error(ex, "Error al intentar registrar la aplicación en el inicio de Windows.");
-            }
-        }
 
         private async void OpenSettingsDialog()
         {
