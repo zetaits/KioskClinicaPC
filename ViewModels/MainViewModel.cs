@@ -269,27 +269,27 @@ namespace KioskClinicaPC.ViewModels
         {
             DisplayConfig = new AppConfig
             {
-                Cpu = !string.IsNullOrWhiteSpace(_savedConfig.Cpu) ? _savedConfig.Cpu : (_detectedSpecs.Cpu),
-                Cores = !string.IsNullOrWhiteSpace(_savedConfig.Cores) ? _savedConfig.Cores : (_detectedSpecs.Cores),
-                Ram = !string.IsNullOrWhiteSpace(_savedConfig.Ram) ? _savedConfig.Ram : (_detectedSpecs.Ram),
-                Gpu = !string.IsNullOrWhiteSpace(_savedConfig.Gpu) ? _savedConfig.Gpu : (_detectedSpecs.Gpu),
-                Storage = !string.IsNullOrWhiteSpace(_savedConfig.Storage) ? _savedConfig.Storage : (_detectedSpecs.Storage),
-                Screen = !string.IsNullOrWhiteSpace(_savedConfig.Screen) ? _savedConfig.Screen : (_detectedSpecs.Screen),
-                Os = !string.IsNullOrWhiteSpace(_savedConfig.Os) ? _savedConfig.Os : (_detectedSpecs.Os?.Split('(')[0].Trim()),
+                Cpu = ConfigMerger.Display(_savedConfig.Cpu, _detectedSpecs.Cpu),
+                Cores = ConfigMerger.Display(_savedConfig.Cores, _detectedSpecs.Cores),
+                Ram = ConfigMerger.Display(_savedConfig.Ram, _detectedSpecs.Ram),
+                Gpu = ConfigMerger.Display(_savedConfig.Gpu, _detectedSpecs.Gpu),
+                Storage = ConfigMerger.Display(_savedConfig.Storage, _detectedSpecs.Storage),
+                Screen = ConfigMerger.Display(_savedConfig.Screen, _detectedSpecs.Screen),
+                Os = ConfigMerger.Display(_savedConfig.Os, ConfigMerger.NormalizeOs(_detectedSpecs.Os)),
                 // Componentes opcionales: override manual o lo detectado; null = ausente (no se muestra).
-                Battery = !string.IsNullOrWhiteSpace(_savedConfig.Battery) ? _savedConfig.Battery : _detectedSpecs.Battery,
-                Wifi = !string.IsNullOrWhiteSpace(_savedConfig.Wifi) ? _savedConfig.Wifi : _detectedSpecs.Wifi,
-                Camera = !string.IsNullOrWhiteSpace(_savedConfig.Camera) ? _savedConfig.Camera : _detectedSpecs.Camera,
-                Ports = !string.IsNullOrWhiteSpace(_savedConfig.Ports) ? _savedConfig.Ports : _detectedSpecs.Ports,
+                Battery = ConfigMerger.Display(_savedConfig.Battery, _detectedSpecs.Battery),
+                Wifi = ConfigMerger.Display(_savedConfig.Wifi, _detectedSpecs.Wifi),
+                Camera = ConfigMerger.Display(_savedConfig.Camera, _detectedSpecs.Camera),
+                Ports = ConfigMerger.Display(_savedConfig.Ports, _detectedSpecs.Ports),
                 Price = _savedConfig.Price,
                 DiscountedPrice = _savedConfig.DiscountedPrice,
                 // Identidad real detectada (sin hardcode). null si la detección no la aporta → editable en Settings.
-                ChassisName = !string.IsNullOrWhiteSpace(_savedConfig.ChassisName) ? _savedConfig.ChassisName : _detectedSpecs.ChassisName,
-                ModelName = !string.IsNullOrWhiteSpace(_savedConfig.ModelName) ? _savedConfig.ModelName : _detectedSpecs.ModelName,
-                Family = !string.IsNullOrWhiteSpace(_savedConfig.Family) ? _savedConfig.Family : _detectedSpecs.Family,
-                Sku = !string.IsNullOrWhiteSpace(_savedConfig.Sku) ? _savedConfig.Sku : _detectedSpecs.Sku,
-                ShopAddress = !string.IsNullOrWhiteSpace(_savedConfig.ShopAddress) ? _savedConfig.ShopAddress : "Calle Sevilla 54, Málaga",
-                ShopServices = !string.IsNullOrWhiteSpace(_savedConfig.ShopServices) ? _savedConfig.ShopServices : "Asistencia · Cambio · Reparación · Reacondicionado",
+                ChassisName = ConfigMerger.Display(_savedConfig.ChassisName, _detectedSpecs.ChassisName),
+                ModelName = ConfigMerger.Display(_savedConfig.ModelName, _detectedSpecs.ModelName),
+                Family = ConfigMerger.Display(_savedConfig.Family, _detectedSpecs.Family),
+                Sku = ConfigMerger.Display(_savedConfig.Sku, _detectedSpecs.Sku),
+                ShopAddress = ConfigMerger.Display(_savedConfig.ShopAddress, "Calle Sevilla 54, Málaga"),
+                ShopServices = ConfigMerger.Display(_savedConfig.ShopServices, "Asistencia · Cambio · Reparación · Reacondicionado"),
                 ProductImagePath = _savedConfig.ProductImagePath,
                 MarketingData = _savedConfig.MarketingData
             };
@@ -501,24 +501,19 @@ namespace KioskClinicaPC.ViewModels
                     }
                 }
 
-                string? Override(string? manual, string? detected) =>
-                    (string.IsNullOrWhiteSpace(manual) || string.Equals(manual, detected, StringComparison.OrdinalIgnoreCase)) ? null : manual;
-                string? NoPlaceholder(string? v) =>
-                    (string.IsNullOrWhiteSpace(v) || v == "No detectada" || v == "No detectado") ? null : v;
+                string? detectedOs = ConfigMerger.NormalizeOs(_detectedSpecs.Os);
 
-                string? detectedOs = _detectedSpecs.Os?.Split('(')[0].Trim();
-
-                _savedConfig.Cpu = Override(DisplayConfig.Cpu, _detectedSpecs.Cpu);
-                _savedConfig.Cores = Override(DisplayConfig.Cores, _detectedSpecs.Cores);
-                _savedConfig.Ram = Override(DisplayConfig.Ram, _detectedSpecs.Ram);
-                _savedConfig.Gpu = Override(DisplayConfig.Gpu, _detectedSpecs.Gpu);
-                _savedConfig.Storage = Override(DisplayConfig.Storage, _detectedSpecs.Storage);
-                _savedConfig.Screen = Override(DisplayConfig.Screen, _detectedSpecs.Screen);
-                _savedConfig.Os = Override(DisplayConfig.Os, detectedOs);
-                _savedConfig.Battery = NoPlaceholder(DisplayConfig.Battery);
-                _savedConfig.Wifi = NoPlaceholder(DisplayConfig.Wifi);
-                _savedConfig.Camera = NoPlaceholder(DisplayConfig.Camera);
-                _savedConfig.Ports = NoPlaceholder(DisplayConfig.Ports);
+                _savedConfig.Cpu = ConfigMerger.Override(DisplayConfig.Cpu, _detectedSpecs.Cpu);
+                _savedConfig.Cores = ConfigMerger.Override(DisplayConfig.Cores, _detectedSpecs.Cores);
+                _savedConfig.Ram = ConfigMerger.Override(DisplayConfig.Ram, _detectedSpecs.Ram);
+                _savedConfig.Gpu = ConfigMerger.Override(DisplayConfig.Gpu, _detectedSpecs.Gpu);
+                _savedConfig.Storage = ConfigMerger.Override(DisplayConfig.Storage, _detectedSpecs.Storage);
+                _savedConfig.Screen = ConfigMerger.Override(DisplayConfig.Screen, _detectedSpecs.Screen);
+                _savedConfig.Os = ConfigMerger.Override(DisplayConfig.Os, detectedOs);
+                _savedConfig.Battery = ConfigMerger.NoPlaceholder(DisplayConfig.Battery);
+                _savedConfig.Wifi = ConfigMerger.NoPlaceholder(DisplayConfig.Wifi);
+                _savedConfig.Camera = ConfigMerger.NoPlaceholder(DisplayConfig.Camera);
+                _savedConfig.Ports = ConfigMerger.NoPlaceholder(DisplayConfig.Ports);
 
                 _savedConfig.ChassisName = DisplayConfig.ChassisName;
                 _savedConfig.ModelName = DisplayConfig.ModelName;

@@ -59,13 +59,15 @@ namespace KioskClinicaPC.Windows
             PriceTextBox.Text = _savedConfig.Price;
             DiscountedPriceTextBox.Text = _savedConfig.DiscountedPrice;
 
-            CpuTextBox.Text = !string.IsNullOrWhiteSpace(_savedConfig.Cpu) ? _savedConfig.Cpu : _detectedSpecs.Cpu;
-            CoresTextBox.Text = !string.IsNullOrWhiteSpace(_savedConfig.Cores) ? _savedConfig.Cores : _detectedSpecs.Cores;
-            RamTextBox.Text = !string.IsNullOrWhiteSpace(_savedConfig.Ram) ? _savedConfig.Ram : _detectedSpecs.Ram;
-            GpuTextBox.Text = !string.IsNullOrWhiteSpace(_savedConfig.Gpu) ? _savedConfig.Gpu : _detectedSpecs.Gpu;
-            StorageTextBox.Text = !string.IsNullOrWhiteSpace(_savedConfig.Storage) ? _savedConfig.Storage : _detectedSpecs.Storage;
-            ScreenTextBox.Text = !string.IsNullOrWhiteSpace(_savedConfig.Screen) ? _savedConfig.Screen : _detectedSpecs.Screen;
-            OsTextBox.Text = !string.IsNullOrWhiteSpace(_savedConfig.Os) ? _savedConfig.Os : _detectedSpecs.Os;
+            CpuTextBox.Text = ConfigMerger.Display(_savedConfig.Cpu, _detectedSpecs.Cpu);
+            CoresTextBox.Text = ConfigMerger.Display(_savedConfig.Cores, _detectedSpecs.Cores);
+            RamTextBox.Text = ConfigMerger.Display(_savedConfig.Ram, _detectedSpecs.Ram);
+            GpuTextBox.Text = ConfigMerger.Display(_savedConfig.Gpu, _detectedSpecs.Gpu);
+            StorageTextBox.Text = ConfigMerger.Display(_savedConfig.Storage, _detectedSpecs.Storage);
+            ScreenTextBox.Text = ConfigMerger.Display(_savedConfig.Screen, _detectedSpecs.Screen);
+            // OS normalizado (sin "(NOMBRE-PC)"), igual que en el modo edición, para que el override
+            // se compare y guarde con el mismo criterio en ambos sitios.
+            OsTextBox.Text = ConfigMerger.Display(_savedConfig.Os, ConfigMerger.NormalizeOs(_detectedSpecs.Os));
             BatteryTextBox.Text = _savedConfig.Battery;
             WifiTextBox.Text = _savedConfig.Wifi;
             CameraTextBox.Text = _savedConfig.Camera;
@@ -87,27 +89,22 @@ namespace KioskClinicaPC.Windows
             {
                 if (!TrySaveSettings()) return;
 
-                string GetOverride(string manualValue, string detectedValue)
-                {
-                    if (string.Equals(manualValue, detectedValue, StringComparison.OrdinalIgnoreCase) || string.IsNullOrWhiteSpace(manualValue))
-                        return null;
-                    return manualValue;
-                }
-
                 _savedConfig.Price = PriceTextBox.Text;
                 _savedConfig.DiscountedPrice = DiscountedPriceTextBox.Text;
 
-                _savedConfig.Cpu = GetOverride(CpuTextBox.Text, _detectedSpecs.Cpu);
-                _savedConfig.Cores = GetOverride(CoresTextBox.Text, _detectedSpecs.Cores);
-                _savedConfig.Ram = GetOverride(RamTextBox.Text, _detectedSpecs.Ram);
-                _savedConfig.Gpu = GetOverride(GpuTextBox.Text, _detectedSpecs.Gpu);
-                _savedConfig.Storage = GetOverride(StorageTextBox.Text, _detectedSpecs.Storage);
-                _savedConfig.Screen = GetOverride(ScreenTextBox.Text, _detectedSpecs.Screen);
-                _savedConfig.Os = GetOverride(OsTextBox.Text, _detectedSpecs.Os);
-                _savedConfig.Battery = string.IsNullOrWhiteSpace(BatteryTextBox.Text) ? null : BatteryTextBox.Text;
-                _savedConfig.Wifi = string.IsNullOrWhiteSpace(WifiTextBox.Text) ? null : WifiTextBox.Text;
-                _savedConfig.Camera = string.IsNullOrWhiteSpace(CameraTextBox.Text) ? null : CameraTextBox.Text;
-                _savedConfig.Ports = string.IsNullOrWhiteSpace(PortsTextBox.Text) ? null : PortsTextBox.Text;
+                // Mismas reglas que el modo edición (ConfigMerger): antes esto divergía (OS sin
+                // normalizar y placeholders sin filtrar) según se guardara aquí o en edición.
+                _savedConfig.Cpu = ConfigMerger.Override(CpuTextBox.Text, _detectedSpecs.Cpu);
+                _savedConfig.Cores = ConfigMerger.Override(CoresTextBox.Text, _detectedSpecs.Cores);
+                _savedConfig.Ram = ConfigMerger.Override(RamTextBox.Text, _detectedSpecs.Ram);
+                _savedConfig.Gpu = ConfigMerger.Override(GpuTextBox.Text, _detectedSpecs.Gpu);
+                _savedConfig.Storage = ConfigMerger.Override(StorageTextBox.Text, _detectedSpecs.Storage);
+                _savedConfig.Screen = ConfigMerger.Override(ScreenTextBox.Text, _detectedSpecs.Screen);
+                _savedConfig.Os = ConfigMerger.Override(OsTextBox.Text, ConfigMerger.NormalizeOs(_detectedSpecs.Os));
+                _savedConfig.Battery = ConfigMerger.NoPlaceholder(BatteryTextBox.Text);
+                _savedConfig.Wifi = ConfigMerger.NoPlaceholder(WifiTextBox.Text);
+                _savedConfig.Camera = ConfigMerger.NoPlaceholder(CameraTextBox.Text);
+                _savedConfig.Ports = ConfigMerger.NoPlaceholder(PortsTextBox.Text);
                 _savedConfig.Sku = string.IsNullOrWhiteSpace(SkuTextBox.Text) ? null : SkuTextBox.Text;
 
                 string json = JsonConvert.SerializeObject(_savedConfig, Formatting.Indented);
