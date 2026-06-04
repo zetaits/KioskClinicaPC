@@ -10,6 +10,15 @@
     <ApplicationIcon>Assets/clinicapc-logo.ico</ApplicationIcon>
 </PropertyGroup>
 
+    <!-- El proyecto de tests vive en Tests\ bajo esta carpeta; sin esto, el glob por defecto
+         (**/*.cs) lo compilaría aquí y fallaría por no tener xUnit. -->
+    <ItemGroup>
+      <Compile Remove="Tests\**\*.cs" />
+      <Content Remove="Tests\**\*" />
+      <None Remove="Tests\**\*" />
+      <Page Remove="Tests\**\*" />
+    </ItemGroup>
+
     <ItemGroup>
       <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
       <PackageReference Include="QRCoder" Version="1.8.0" />
