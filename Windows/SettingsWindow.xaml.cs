@@ -195,7 +195,11 @@ namespace KioskClinicaPC.Windows
         {
             try
             {
-                Process.Start(new ProcessStartInfo("shutdown", args) { CreateNoWindow = true, UseShellExecute = false });
+                // Ruta completa (no "shutdown" por PATH): evita que un shutdown.exe plantado en el
+                // PATH se ejecute en su lugar.
+                string shutdownExe = System.IO.Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.System), "shutdown.exe");
+                Process.Start(new ProcessStartInfo(shutdownExe, args) { CreateNoWindow = true, UseShellExecute = false });
                 (this.Owner as MainWindow)?.ShutdownKiosk();
             }
             catch (Exception ex)

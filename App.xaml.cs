@@ -102,9 +102,12 @@ namespace KioskClinicaPC
                 }
                 else
                 {
-                    Log.Warning("Configuración inicial cancelada. Cerrando aplicación.");
-                    Application.Current.Shutdown();
-                    return; 
+                    // Antes se cerraba la app: en un kiosko autostart desatendido, un cancel dejaba
+                    // pantalla negra. Siembra configuración por defecto y arranca igualmente
+                    // (MainViewModel completa marketing/slides; el hardware se detecta solo).
+                    Log.Warning("Configuración inicial cancelada; se siembra configuración por defecto.");
+                    var fallback = new AppConfig { SchemaVersion = AppConfig.CurrentSchemaVersion };
+                    JsonStore.WriteAtomic(ConfigFilePath, JsonConvert.SerializeObject(fallback, Formatting.Indented));
                 }
             }
             
