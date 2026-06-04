@@ -6,6 +6,14 @@ namespace KioskClinicaPC.Core
 {
     public class AppConfig : INotifyPropertyChanged
     {
+        /// <summary>Versión del esquema de configuración actual. Súbela al cambiar la forma del
+        /// JSON (renombrar/mover/cambiar tipos) y añade el paso correspondiente en ConfigMigrator.</summary>
+        public const int CurrentSchemaVersion = 1;
+
+        /// <summary>Versión del esquema con que se guardó este archivo. Los archivos previos al
+        /// versionado no la traen → se deserializa como 0 y ConfigMigrator la actualiza.</summary>
+        public int SchemaVersion { get; set; }
+
         public event PropertyChangedEventHandler? PropertyChanged;
 
         protected bool SetProperty<T>(ref T storage, T value, [CallerMemberName] string? propertyName = null)

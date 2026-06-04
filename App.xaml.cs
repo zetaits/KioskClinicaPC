@@ -95,6 +95,7 @@ namespace KioskClinicaPC
                 if (result == true)
                 {
                     var config = configDialog.ConfigData;
+                    config.SchemaVersion = AppConfig.CurrentSchemaVersion; // nace en el esquema actual
                     string json = JsonConvert.SerializeObject(config, Formatting.Indented);
                     JsonStore.WriteAtomic(ConfigFilePath, json);
                     Log.Information("Configuración inicial creada.");

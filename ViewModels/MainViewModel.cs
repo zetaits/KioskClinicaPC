@@ -142,13 +142,17 @@ namespace KioskClinicaPC.ViewModels
         {
             AppConfig savedConfig = null;
             AppConfig lastDetectedSpecs = null;
+            bool configMigrated = false;
 
             // Config (crítico): si existe pero está dañado, respáldalo y avisa en vez de perderlo en silencio.
             if (File.Exists(App.ConfigFilePath))
             {
                 try
                 {
-                    savedConfig = JsonConvert.DeserializeObject<AppConfig>(await File.ReadAllTextAsync(App.ConfigFilePath));
+                    // Migra el esquema si hace falta (campos renombrados/movidos entre versiones) en
+                    // vez de descartarlos en silencio. JObject.Parse lanza solo si el JSON está corrupto.
+                    savedConfig = ConfigMigrator.Migrate(await File.ReadAllTextAsync(App.ConfigFilePath), out configMigrated);
+                    if (configMigrated) Log.Information("KioskConfig.json migrado al esquema v{Version}.", AppConfig.CurrentSchemaVersion);
                 }
                 catch (Exception ex)
                 {
@@ -207,7 +211,8 @@ namespace KioskClinicaPC.ViewModels
 
             _savedConfig = savedConfig;
 
-            bool needsSeedSave = false;
+            // Persiste la migración de esquema (sello de versión + campos reubicados).
+            bool needsSeedSave = configMigrated;
 
             if (_savedConfig.MarketingData == null || _savedConfig.MarketingData.Count == 0)
             {
