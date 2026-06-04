@@ -250,8 +250,12 @@ namespace KioskClinicaPC.ViewModels
         {
             try
             {
+                // Sello a segundos + sufijo único: dos corruptos en el mismo segundo no deben
+                // sobrescribir el backup anterior (overwrite:true los perdería).
                 string backup = $"{path}.corrupt-{DateTime.Now:yyyyMMdd-HHmmss}.bak";
-                File.Move(path, backup, overwrite: true);
+                if (File.Exists(backup))
+                    backup = $"{path}.corrupt-{DateTime.Now:yyyyMMdd-HHmmss}-{Guid.NewGuid():N}.bak";
+                File.Move(path, backup, overwrite: false);
                 Log.Information("Archivo dañado respaldado en {Backup}.", backup);
             }
             catch (Exception ex)
