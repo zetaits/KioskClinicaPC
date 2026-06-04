@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+using System.Threading;
 using System.Windows;
 using KioskClinicaPC.Core; 
 using KioskClinicaPC.Windows; 
@@ -10,6 +11,12 @@ namespace KioskClinicaPC
 {
     public partial class App : Application
     {
+        // Mantiene viva la referencia: si el GC la recoge, el mutex se libera y la guardia falla.
+        private static Mutex? _singleInstanceMutex;
+        // Solo restauramos el escritorio al salir si esta instancia llegó a protegerlo. Evita que
+        // una segunda instancia (que se autocierra) desactive la protección de la primera en OnExit.
+        private bool _protected = false;
+
         public static readonly string AppDataFolderName = "KioskClinicaPC";
         public static readonly string AppDataFolderPath = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), 
@@ -43,6 +50,21 @@ namespace KioskClinicaPC
 
             Log.Information("Aplicación iniciada.");
 
+            // Instancia única: dos kioscos a la vez pelean por Topmost y dejan el estado de
+            // bloqueo inconsistente (uno protege, el otro libera). Si ya hay una, cierra esta
+            // SIN tocar la protección (no hemos protegido aún → _protected sigue false).
+            _singleInstanceMutex = new Mutex(true, @"Global\KioskClinicaPC_SingleInstance", out bool createdNew);
+            if (!createdNew)
+            {
+                // Esta instancia NO es dueña del mutex: liberar/Dispose sin ReleaseMutex y anular
+                // para que OnExit no intente liberarlo (lanzaría por no ser propietaria).
+                _singleInstanceMutex.Dispose();
+                _singleInstanceMutex = null;
+                Log.Warning("Ya hay una instancia del kiosko en ejecución. Cerrando esta.");
+                Shutdown();
+                return;
+            }
+
             // Registra los manejadores ANTES de Protect(): si Protect() o el sembrado de
             // ajustes lanzan, Release() debe ejecutarse igualmente para no dejar el escritorio
             // bloqueado (taskbar oculta + Task Manager deshabilitado).
@@ -55,6 +77,7 @@ namespace KioskClinicaPC
             // de re-proteger, para que cada arranque parta de un estado conocido.
             KioskManager.Release();
             KioskManager.Protect();
+            _protected = true;
 
             // Asegura que exista KioskSettings.json con contraseña sembrada.
             var settings = KioskSettings.Load(SettingsFilePath);
@@ -100,7 +123,11 @@ namespace KioskClinicaPC
 
         protected override void OnExit(ExitEventArgs e)
         {
-            KioskManager.Release();
+            // Solo libera si esta instancia protegió (una segunda instancia que se autocierra no
+            // debe desactivar la protección de la primera).
+            if (_protected) KioskManager.Release();
+            try { _singleInstanceMutex?.ReleaseMutex(); } catch { /* no propietaria/abandonada */ }
+            _singleInstanceMutex?.Dispose();
             Log.Information("Aplicación cerrada con código {ExitCode}.", e.ApplicationExitCode);
             Log.CloseAndFlush();
             base.OnExit(e);

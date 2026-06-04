@@ -11,6 +11,10 @@ namespace KioskClinicaPC
         {
             InitializeComponent();
             PasswordInput.Focus(); // Pone el cursor en el cuadro de contraseña
+#if !DEBUG
+            // Kiosco táctil sin teclado físico: abre el teclado en pantalla para poder escribir.
+            TouchKeyboard.Show();
+#endif
         }
 
         private void OkButton_Click(object sender, RoutedEventArgs e)

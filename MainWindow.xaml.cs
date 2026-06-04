@@ -1,6 +1,7 @@
 using System;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -116,7 +117,17 @@ namespace KioskClinicaPC
                 });
 
                 string? url = EquipmentPayload.BuildUrl(FichaPdfBaseUrl, _viewModel.DisplayConfig, specs, shopName: null);
+                if (url != null) Log.Information("QR payload longitud {Len} caracteres.", url.Length);
                 var qr = QrGenerator.Generate(url);
+
+                // Si el payload excede la capacidad del QR (ECC-L ~2.9KB), genera uno con la URL
+                // base sin datos: al menos la landing es alcanzable en vez de quedarse sin QR.
+                if (qr == null)
+                {
+                    Log.Warning("QR con datos embebidos falló (payload demasiado grande); usando URL base.");
+                    qr = QrGenerator.Generate(FichaPdfBaseUrl);
+                }
+
                 QrImage.Source = qr;
                 QrBorder.Visibility = qr != null ? Visibility.Visible : Visibility.Collapsed;
             }
@@ -606,8 +617,16 @@ namespace KioskClinicaPC
             try
             {
                 const string appName = "KioskHardwareDisplay";
+                // MainModule.FileName es seguro bajo publicación single-file (Assembly.Location
+                // devuelve "" ahí → registraba una ruta vacía y rompía el autostart).
+                string? exePath = Process.GetCurrentProcess().MainModule?.FileName;
+                if (string.IsNullOrEmpty(exePath))
+                {
+                    Log.Warning("No se pudo resolver la ruta del ejecutable; autostart no registrado.");
+                    return;
+                }
                 using var key = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Run", true);
-                if (key != null) key.SetValue(appName, $"\"{Assembly.GetExecutingAssembly().Location}\"");
+                if (key != null) key.SetValue(appName, $"\"{exePath}\"");
             }
             catch (Exception ex)
             {

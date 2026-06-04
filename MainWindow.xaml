@@ -40,7 +40,9 @@
         </Style>
     </Window.Resources>
 
-    <Grid x:Name="WindowRoot">
+    <!-- Fondo ambiente (no negro) para que las bandas de letterbox en paneles no 16:9 no sean
+         vacíos negros, sino que se fundan con el fondo de la app. -->
+    <Grid x:Name="WindowRoot" Background="{StaticResource Bg0Brush}">
     <Viewbox Stretch="Uniform" StretchDirection="Both" UseLayoutRounding="True" SnapsToDevicePixels="True">
         <Grid x:Name="RootGrid" Width="1920" Height="1080" ClipToBounds="True" Background="{StaticResource Bg0Brush}"
               TextOptions.TextFormattingMode="Ideal" TextOptions.TextRenderingMode="ClearType"

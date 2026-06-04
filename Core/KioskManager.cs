@@ -70,7 +70,7 @@ namespace KioskClinicaPC.Core
         {
             try
             {
-                // Note: This requires admin privileges as configured in app.manifest
+                // HKCU no requiere privilegios de administrador (la app corre como asInvoker).
                 using (RegistryKey key = Registry.CurrentUser.CreateSubKey(RegistryKeyPath))
                 {
                     if (enabled)

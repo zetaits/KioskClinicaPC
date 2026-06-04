@@ -8,6 +8,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
 using KioskClinicaPC.Core;
+using Serilog;
 
 namespace KioskClinicaPC.Controls
 {
@@ -99,10 +100,19 @@ namespace KioskClinicaPC.Controls
             _finished = true;
             try
             {
-                _box.GetBindingExpression(TextBox.TextProperty)?.UpdateSource();
-                EditModeService.Instance.IsDirty = true;
+                var expr = _box.GetBindingExpression(TextBox.TextProperty);
+                expr?.UpdateSource();
+                // Un ConvertBack fallido no lanza excepción: deja HasError. No marques como
+                // modificado en ese caso, o el usuario creería que guardó algo que se descartó.
+                if (expr == null || !expr.HasError)
+                    EditModeService.Instance.IsDirty = true;
+                else
+                    Log.Warning("Edición en línea: el binding quedó con error, cambio no aplicado.");
             }
-            catch { /* binding no escribible: se ignora */ }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, "Edición en línea: fallo al escribir el origen del binding.");
+            }
             Finished?.Invoke();
         }
 

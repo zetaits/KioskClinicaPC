@@ -4,7 +4,11 @@
   <trustInfo xmlns="urn:schemas-microsoft-com:asm.v2">
     <security>
       <requestedPrivileges xmlns="urn:schemas-microsoft-com:asm.v3">
-        <requestedExecutionLevel level="requireAdministrator" uiAccess="false" />
+        <!-- asInvoker: la app no necesita admin. Todo el registro que toca es HKCU
+             (DisableTaskMgr en Policies\System, autostart en Run) y apagar/reiniciar el
+             equipo es un derecho de usuario estándar. Evita el prompt UAC al arrancar y
+             reduce la superficie de ataque (Seguridad C2). -->
+        <requestedExecutionLevel level="asInvoker" uiAccess="false" />
       </requestedPrivileges>
     </security>
   </trustInfo>
