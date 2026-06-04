@@ -298,14 +298,26 @@ namespace KioskClinicaPC.ViewModels
         private void PopulateSpecs()
         {
             Specs.Clear();
-            var cyanBrush = (System.Windows.Media.SolidColorBrush)Application.Current.FindResource("CyanBrush");
-            var cyanColor = (System.Windows.Media.Color)Application.Current.FindResource("CyanColor");
-            var magentaBrush = (System.Windows.Media.SolidColorBrush)Application.Current.FindResource("MagentaBrush");
-            var magentaColor = (System.Windows.Media.Color)Application.Current.FindResource("MagentaColor");
-            var limeBrush = (System.Windows.Media.SolidColorBrush)Application.Current.FindResource("OkBrush");
-            var limeColor = (System.Windows.Media.Color)Application.Current.FindResource("OkColor");
-            var amberBrush = (System.Windows.Media.SolidColorBrush)Application.Current.FindResource("AmberBrush");
-            var amberColor = (System.Windows.Media.Color)Application.Current.FindResource("AmberColor");
+
+            // TryFindResource (no FindResource): si faltara una clave de tema, FindResource lanza
+            // y aborta toda la creación de specs. Con fallback al color real del tema, degrada en
+            // vez de romper. El color resuelto sirve de respaldo para su brush, manteniéndolos coherentes.
+            System.Windows.Media.Color Col(string key, string hex)
+                => Application.Current.TryFindResource(key) is System.Windows.Media.Color c
+                    ? c
+                    : (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(hex);
+            System.Windows.Media.SolidColorBrush Br(string key, System.Windows.Media.Color fb)
+                => Application.Current.TryFindResource(key) as System.Windows.Media.SolidColorBrush
+                    ?? new System.Windows.Media.SolidColorBrush(fb);
+
+            var cyanColor = Col("CyanColor", "#F37A4A");
+            var cyanBrush = Br("CyanBrush", cyanColor);
+            var magentaColor = Col("MagentaColor", "#FFB069");
+            var magentaBrush = Br("MagentaBrush", magentaColor);
+            var limeColor = Col("OkColor", "#F0D26B");
+            var limeBrush = Br("OkBrush", limeColor);
+            var amberColor = Col("AmberColor", "#FFA75C");
+            var amberBrush = Br("AmberBrush", amberColor);
 
             const string IconCpu = "M 9,9 L 23,9 L 23,23 L 9,23 Z M 13,13 L 19,13 L 19,19 L 13,19 Z M 12,9 L 12,6 M 15,9 L 15,6 M 18,9 L 18,6 M 21,9 L 21,6 M 12,23 L 12,26 M 15,23 L 15,26 M 18,23 L 18,26 M 21,23 L 21,26 M 9,12 L 6,12 M 9,15 L 6,15 M 9,18 L 6,18 M 9,21 L 6,21 M 23,12 L 26,12 M 23,15 L 26,15 M 23,18 L 26,18 M 23,21 L 26,21";
             const string IconGpu = "M 4,11 L 28,11 L 28,22 L 4,22 Z M 11,14 A 2.6,2.6 0 1,0 11,19 A 2.6,2.6 0 1,0 11,14 M 21,14 A 2.6,2.6 0 1,0 21,19 A 2.6,2.6 0 1,0 21,14 M 4,22 L 2,25 M 28,22 L 30,25";

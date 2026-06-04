@@ -14,6 +14,10 @@ namespace KioskClinicaPC.Services
         public async Task<AppConfig> GetHardwareInfoAsync()
         {
             var config = new AppConfig();
+            // SystemParameters debe leerse en el hilo de UI. Captúralo ANTES de Task.Run: si se
+            // leyera dentro vía Dispatcher.Invoke desde un hilo del pool, un .Result/.Wait() del
+            // llamador provocaría deadlock del hilo de UI.
+            string screen = GetScreenResolution();
             await Task.Run(() =>
             {
                 config.Cpu = GetCpuName();
@@ -21,7 +25,7 @@ namespace KioskClinicaPC.Services
                 config.Ram = GetRamDetails();
                 config.Gpu = GetGpuName();
                 config.Storage = GetStorageDetails();
-                config.Screen = GetScreenResolution();
+                config.Screen = screen;
                 config.Os = $"{GetOsName()} ({GetPcName()})";
 
                 // Identidad real del equipo (sustituye el hardcode "ASUS ROG").
