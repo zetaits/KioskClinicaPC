@@ -93,10 +93,10 @@ namespace KioskClinicaPC.ViewModels
             set => SetProperty(ref _activeSpec, value);
         }
 
-        public string FormattedPrice => FormatPrice(DisplayConfig?.DiscountedPrice ?? DisplayConfig?.Price);
-        public string FormattedOriginalPrice => FormatPrice(DisplayConfig?.Price);
-        public string FormattedDiscount => CalculateDiscount();
-        public string FormattedMonthly => CalculateMonthly();
+        public string FormattedPrice => PriceFormatter.Format(DisplayConfig?.DiscountedPrice ?? DisplayConfig?.Price);
+        public string FormattedOriginalPrice => PriceFormatter.Format(DisplayConfig?.Price);
+        public string FormattedDiscount => PriceFormatter.Discount(DisplayConfig?.Price, DisplayConfig?.DiscountedPrice);
+        public string FormattedMonthly => PriceFormatter.Monthly(DisplayConfig?.DiscountedPrice ?? DisplayConfig?.Price);
         public bool HasDiscount => !string.IsNullOrWhiteSpace(DisplayConfig?.DiscountedPrice);
 
         // Attract screen slides
@@ -584,37 +584,5 @@ namespace KioskClinicaPC.ViewModels
             }
         }
 
-        private static readonly CultureInfo EsCulture = CultureInfo.GetCultureInfo("es-ES");
-
-        private string FormatPrice(string price)
-        {
-            if (string.IsNullOrWhiteSpace(price)) return "";
-            if (double.TryParse(price, NumberStyles.Any, CultureInfo.InvariantCulture, out double val))
-                return val.ToString("C0", EsCulture);
-            return price;
-        }
-
-        private string CalculateDiscount()
-        {
-            if (string.IsNullOrWhiteSpace(DisplayConfig?.Price) || string.IsNullOrWhiteSpace(DisplayConfig?.DiscountedPrice)) return "";
-            if (double.TryParse(DisplayConfig.Price, NumberStyles.Any, CultureInfo.InvariantCulture, out double p) &&
-                double.TryParse(DisplayConfig.DiscountedPrice, NumberStyles.Any, CultureInfo.InvariantCulture, out double d))
-            {
-                double pct = Math.Round((1 - (d / p)) * 100);
-                return $"-{pct}%";
-            }
-            return "";
-        }
-
-        private string CalculateMonthly()
-        {
-            string pStr = DisplayConfig?.DiscountedPrice ?? DisplayConfig?.Price;
-            if (string.IsNullOrWhiteSpace(pStr)) return "";
-            if (double.TryParse(pStr, NumberStyles.Any, CultureInfo.InvariantCulture, out double p))
-            {
-                return (p / 12).ToString("C2", EsCulture);
-            }
-            return "";
-        }
     }
 }
