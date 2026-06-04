@@ -1,0 +1,41 @@
+FOTOS DE COMPONENTES
+====================
+
+Suelta aquí la foto real de cada componente. Se empaquetan dentro del .exe.
+
+ORGANIZACIÓN EN SUBCARPETAS
+---------------------------
+Hay una subcarpeta por tipo de componente, solo para tenerlo ordenado:
+
+    cpu\        gpu\        ram\        storage\
+    pantalla\   so\         wifi\       camara\
+    bateria\    puertos\
+
+La búsqueda es RECURSIVA: da igual la subcarpeta donde pongas el archivo, casa por
+NOMBRE. Las carpetas son solo para que tú lo tengas claro. (Puedes incluso dejar
+archivos en la raíz; también valen.)
+
+NOMBRE DEL ARCHIVO
+------------------
+Nombre = modelo del componente (sin importar mayúsculas/espacios/guiones). Ejemplos:
+
+    cpu\intel-core-i5.png
+    cpu\intel-core-i5-1135g7.png   (más específico: gana sobre el genérico)
+    cpu\amd-ryzen-7.png
+    gpu\rtx-4060.png
+    gpu\iris-xe.png
+    ram\16gb.png
+    storage\ssd.png
+
+Formatos: png, jpg, jpeg, webp, bmp.
+
+CÓMO CASA
+---------
+El nombre del archivo debe estar contenido en el texto del componente
+(ej. "intel-core-i5" casa con "Intel Core i5-1135G7"). Gana el nombre de archivo
+MÁS LARGO que case. Si no hay foto → se muestra el icono vectorial (fallback).
+
+OVERRIDE SIN RECOMPILAR
+-----------------------
+Las mismas imágenes en %LOCALAPPDATA%\KioskClinicaPC\SpecImages\ (con las mismas
+subcarpetas si quieres) tienen prioridad sobre estas.

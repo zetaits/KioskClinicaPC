@@ -30,15 +30,46 @@ namespace KioskClinicaPC.Models
         public string LabelShort { get; set; }  // first 6 chars for mini-thumbs
 
         private string _value;
-        public string Value { get => _value; set => SetProperty(ref _value, value); }
+        public string Value
+        {
+            get => _value;
+            set
+            {
+                if (SetProperty(ref _value, value))
+                {
+                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(DetailTitle)));
+                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(DetailSubtitle)));
+                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(HasDetailSubtitle)));
+                }
+            }
+        }
 
         private string _detail;
         public string Detail { get => _detail; set => SetProperty(ref _detail, value); }
 
         // Nombre técnico/chip secundario (p.ej. "Intel AX211"). Vacío si no aporta. Se muestra pequeño.
         private string _techDetail;
-        public string TechDetail { get => _techDetail; set { if (SetProperty(ref _techDetail, value)) PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(HasTechDetail))); } }
+        public string TechDetail
+        {
+            get => _techDetail;
+            set
+            {
+                if (SetProperty(ref _techDetail, value))
+                {
+                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(HasTechDetail)));
+                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(DetailTitle)));
+                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(DetailSubtitle)));
+                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(HasDetailSubtitle)));
+                }
+            }
+        }
         public bool HasTechDetail => !string.IsNullOrWhiteSpace(_techDetail);
+
+        // Pantalla Detail: el modelo concreto manda como título; el nombre amigable pasa a subtítulo.
+        // Si no hay modelo concreto, el título cae al nombre amigable y no se muestra subtítulo.
+        public string DetailTitle => HasTechDetail ? _techDetail : _value;
+        public string DetailSubtitle => HasTechDetail ? _value : string.Empty;
+        public bool HasDetailSubtitle => HasTechDetail && !string.IsNullOrWhiteSpace(_value);
 
         // El equipo tiene este componente (detectado o forzado manualmente). Los ausentes no se muestran.
         public bool IsPresent { get; set; } = true;
@@ -87,6 +118,20 @@ namespace KioskClinicaPC.Models
         public double BenchMarkerLeft => BenchBarWidth;
         public List<ProItem> Pros { get; set; }
         public string IconData { get; set; }
+
+        // Foto real del componente (p.ej. "Intel Core i5"). Resuelta desde %LOCALAPPDATA%\…\SpecImages.
+        // Si está vacía, el spotlight cae al icono vectorial de siempre.
+        private string _imagePath;
+        public string ImagePath
+        {
+            get => _imagePath;
+            set
+            {
+                if (SetProperty(ref _imagePath, value))
+                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(HasImage)));
+            }
+        }
+        public bool HasImage => !string.IsNullOrWhiteSpace(_imagePath);
 
         private bool _isHighlighted;
         public bool IsHighlighted

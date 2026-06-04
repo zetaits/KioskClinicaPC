@@ -1,0 +1,18 @@
+LOGOS DE MARCA
+==============
+
+Suelta aquí el logo de cada fabricante. Se empaquetan dentro del .exe.
+
+Nombre del archivo = marca (sin importar mayúsculas/espacios). Ejemplos:
+    asus.png
+    dell.png
+    hp.png
+    lenovo.png
+    acer.png
+    msi.png
+
+Formatos: png, jpg, jpeg, webp, bmp. Recomendado PNG con fondo transparente.
+
+Cómo casa: el nombre del archivo debe estar contenido en el fabricante detectado
+(ej. archivo "asus" casa con "ASUSTeK Computer Inc."). Si no hay logo → se muestra
+el texto de la marca como siempre (fallback).

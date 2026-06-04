@@ -29,6 +29,8 @@ namespace KioskClinicaPC
     public partial class MainWindow : Window
     {
         private bool _isExitingSafely = false;
+        private bool _scanning = false;       // evita secuencias de escaneo solapadas
+        private bool _isNavigating = false;   // evita transiciones de pantalla re-entrantes
         private readonly KeyboardHook _hook;
         private readonly MainViewModel _viewModel;
         
@@ -186,12 +188,18 @@ namespace KioskClinicaPC
 
         private async void StartScanSequence()
         {
+            // Disparable desde clic en atracción, timer de auto-escaneo y teclado. Sin este guard,
+            // dos secuencias concurrentes duplicarían logs y navegarían dos veces.
+            if (_scanning) return;
+            _scanning = true;
+            try
+            {
             _attractTimer.Stop();
             _attractAutoScanTimer.Stop();
             NavigateToScreen(1); // Scan
             _viewModel.ScanLogs.Clear();
             ScanProgressText.Text = "000";
-            
+
             var spin = new DoubleAnimation(0, 360, TimeSpan.FromSeconds(2)) { RepeatBehavior = RepeatBehavior.Forever };
             ScanRadarTransform.BeginAnimation(RotateTransform.AngleProperty, spin);
 
@@ -227,6 +235,8 @@ namespace KioskClinicaPC
             await Task.Delay(600);
             ScanRadarTransform.BeginAnimation(RotateTransform.AngleProperty, null);
             NavigateToScreen(2); // Main HUD
+            }
+            finally { _scanning = false; }
         }
 
         public void SpecNode_Click(object sender, RoutedEventArgs e)
@@ -297,15 +307,21 @@ namespace KioskClinicaPC
         private void NavigateToScreen(int target)
         {
             if (target == _viewModel.CurrentScreen) return;
+            // Si una transición está en curso, ignora: el handler Completed leía CurrentScreen y
+            // una llamada re-entrante durante el fade (250ms) colapsaba la pantalla equivocada y
+            // dejaba otra invisible. Capturamos 'from' y serializamos las transiciones.
+            if (_isNavigating) return;
+            _isNavigating = true;
             _inactivityTimer.Stop();
 
+            int from = _viewModel.CurrentScreen;
             Grid[] screens = { Screen0_Attract, Screen1_Scan, Screen2_Main, Screen3_Detail };
             string[] names = { "MODO ESPERA", "ANÁLISIS DE SISTEMA", "RESUMEN DEL EQUIPO", "ESPECIFICACIONES" };
-            
+
             var fadeOut = new DoubleAnimation(1, 0, TimeSpan.FromMilliseconds(250));
             fadeOut.Completed += (s, e) =>
             {
-                screens[_viewModel.CurrentScreen].Visibility = Visibility.Collapsed;
+                screens[from].Visibility = Visibility.Collapsed;
                 screens[target].Visibility = Visibility.Visible;
                 _viewModel.CurrentScreenName = names[target];
                 screens[target].BeginAnimation(OpacityProperty, new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(300)));
@@ -313,7 +329,12 @@ namespace KioskClinicaPC
                 if (target > 0) { _inactivityTimer.Start(); _attractAutoScanTimer.Stop(); }
                 else { _attractTimer.Start(); _attractAutoScanTimer.Stop(); _attractAutoScanTimer.Start(); }
 
-                if (target == 2 && !EditModeService.Instance.IsActive) _highlightTimer.Start();
+                if (target == 2)
+                {
+                    _viewModel.ActiveSpec ??= _viewModel.Specs.FirstOrDefault();
+                    if (!EditModeService.Instance.IsActive) _highlightTimer.Start();
+                    else _highlightTimer.Stop();
+                }
                 else _highlightTimer.Stop();
 
                 if (EditModeService.Instance.IsActive)
@@ -323,8 +344,10 @@ namespace KioskClinicaPC
                     _attractAutoScanTimer.Stop();
                     RefreshEditHighlights();
                 }
+
+                _isNavigating = false;
             };
-            screens[_viewModel.CurrentScreen].BeginAnimation(OpacityProperty, fadeOut);
+            screens[from].BeginAnimation(OpacityProperty, fadeOut);
         }
 
         private void ResetInactivityTimer()
@@ -381,7 +404,9 @@ namespace KioskClinicaPC
         {
             if (_viewModel.Specs == null || _viewModel.Specs.Count == 0) return;
             foreach (var spec in _viewModel.Specs) spec.IsHighlighted = false;
-            _viewModel.Specs[_highlightIndex].IsHighlighted = true;
+            var active = _viewModel.Specs[_highlightIndex];
+            active.IsHighlighted = true;
+            _viewModel.ActiveSpec = active; // el spotlight central sigue al componente resaltado (anima en XAML vía TargetUpdated)
             _highlightIndex = (_highlightIndex + 1) % _viewModel.Specs.Count;
         }
 
@@ -449,6 +474,13 @@ namespace KioskClinicaPC
             if (!EditModeService.Instance.IsActive) return;
             if (InlineEditController.TryBeginEdit(e.OriginalSource)) e.Handled = true;
         }
+
+        // En un kiosco táctil sin teclado, la actividad del cliente llega por toque/ratón, no por
+        // tecla. Estos handlers resetean el timer de inactividad para no expulsar a la pantalla de
+        // atracción a alguien que está leyendo la ficha. No marcan el evento como manejado.
+        private void Window_PreviewActivity(object sender, MouseButtonEventArgs e) => ResetInactivityTimer();
+
+        private void Window_PreviewTouchActivity(object sender, TouchEventArgs e) => ResetInactivityTimer();
 
         #region Edit Mode
 

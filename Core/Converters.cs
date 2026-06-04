@@ -43,6 +43,36 @@ namespace KioskClinicaPC.Core
             => throw new NotImplementedException();
     }
 
+    /// <summary>
+    /// Igual que PathToImageConverter pero SIN fallback: devuelve null si la ruta es vacía o
+    /// el archivo no existe. Para logos de marca / fotos de componente que sólo aparecen si hay imagen.
+    /// </summary>
+    public class OptionalPathToImageConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            try
+            {
+                if (value is string path && !string.IsNullOrWhiteSpace(path) && File.Exists(path))
+                {
+                    var bmp = new BitmapImage();
+                    bmp.BeginInit();
+                    bmp.CacheOption = BitmapCacheOption.OnLoad;
+                    bmp.CreateOptions = BitmapCreateOptions.IgnoreImageCache;
+                    bmp.UriSource = new Uri(path, UriKind.Absolute);
+                    bmp.EndInit();
+                    bmp.Freeze();
+                    return bmp;
+                }
+            }
+            catch { /* ruta inválida → sin imagen */ }
+            return null;
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+            => throw new NotImplementedException();
+    }
+
     public class LeftMarginConverter : IValueConverter
     {
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)

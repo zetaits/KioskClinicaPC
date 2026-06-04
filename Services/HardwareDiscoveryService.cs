@@ -230,7 +230,45 @@ namespace KioskClinicaPC.Services
         private string GetPcName() => Environment.MachineName;
         private string GetOsName() => GetWmiProperty("Win32_OperatingSystem", "Caption");
         private string GetCpuName() => GetWmiProperty("Win32_Processor", "Name").Trim();
-        private string GetGpuName() => GetWmiProperty("Win32_VideoController", "Name");
+        /// <summary>
+        /// Devuelve la GPU dedicada si existe (NVIDIA o AMD discreta), no la integrada.
+        /// Win32_VideoController lista todas las GPU instaladas; en portátiles híbridos
+        /// (Optimus) hay iGPU + dedicada y el orden WMI no es fiable, así que filtramos.
+        /// </summary>
+        private string GetGpuName()
+        {
+            try
+            {
+                using var searcher = new ManagementObjectSearcher(
+                    "select Name, AdapterCompatibility from Win32_VideoController");
+                var gpus = searcher.Get().OfType<ManagementObject>()
+                    .Select(o => new {
+                        Name = o["Name"]?.ToString() ?? "",
+                        Vendor = o["AdapterCompatibility"]?.ToString() ?? ""
+                    })
+                    .Where(g => !string.IsNullOrWhiteSpace(g.Name))
+                    .ToList();
+
+                if (gpus.Count == 0) return "No disponible";
+
+                bool IsIntegrated(string n) =>
+                    n.Contains("Intel", StringComparison.OrdinalIgnoreCase) ||
+                    n.Contains("UHD", StringComparison.OrdinalIgnoreCase) ||
+                    n.Contains("Vega", StringComparison.OrdinalIgnoreCase) ||
+                    n.Contains("Radeon Graphics", StringComparison.OrdinalIgnoreCase); // iGPU AMD
+
+                var dedicated = gpus.FirstOrDefault(g =>
+                    g.Vendor.Contains("NVIDIA", StringComparison.OrdinalIgnoreCase) ||
+                    (g.Vendor.Contains("Advanced Micro", StringComparison.OrdinalIgnoreCase) && !IsIntegrated(g.Name)));
+
+                return (dedicated ?? gpus[0]).Name;
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Error al detectar la GPU.");
+                return "Error WMI";
+            }
+        }
 
         private string GetScreenResolution()
         {
@@ -264,36 +302,46 @@ namespace KioskClinicaPC.Services
         {
             try
             {
-                var searcher = new ManagementObjectSearcher("select * from Win32_PhysicalMemory");
-                var modules = searcher.Get().OfType<ManagementObject>().ToList();
-
-                ulong totalBytes = 0;
-                foreach (var module in modules)
+                using var searcher = new ManagementObjectSearcher("select * from Win32_PhysicalMemory");
+                using var collection = searcher.Get();
+                var modules = collection.OfType<ManagementObject>().ToList();
+                try
                 {
-                    totalBytes += (ulong)module["Capacity"];
+                    ulong totalBytes = 0;
+                    foreach (var module in modules)
+                    {
+                        // Algunos BIOS OEM no reportan Capacity: saltar ese módulo en vez de
+                        // abortar (un null desboxeado tiraba toda la detección de RAM).
+                        if (module["Capacity"] is null) continue;
+                        totalBytes += Convert.ToUInt64(module["Capacity"]);
+                    }
+
+                    double totalGB = Math.Round(totalBytes / (1024.0 * 1024.0 * 1024.0), 1);
+
+                    var firstModule = modules.FirstOrDefault();
+                    if (firstModule != null)
+                    {
+                        string manufacturer = (firstModule["Manufacturer"]?.ToString() ?? "Desconocido").Trim();
+                        string speed = (firstModule["Speed"]?.ToString() ?? "N/A").Trim();
+                        string partNumber = (firstModule["PartNumber"]?.ToString() ?? "").Trim();
+
+                        if (manufacturer == "0x80AD") manufacturer = "Hynix";
+                        if (manufacturer == "0x802C") manufacturer = "Micron";
+                        if (manufacturer == "0x0198") manufacturer = "Kingston";
+                        if (manufacturer == "0x830B") manufacturer = "Samsung";
+
+                        string ddr = GetDdrGeneration(firstModule, speed);
+                        string gen = string.IsNullOrEmpty(ddr) ? "" : $" {ddr}";
+                        // Formato: "32 GB DDR5 (Kingston KF... @ 4800 MHz)" → el formatter parte titular/técnico.
+                        return $"{totalGB} GB{gen} ({manufacturer} {partNumber} @ {speed} MHz)";
+                    }
+
+                    return $"{totalGB} GB";
                 }
-
-                double totalGB = Math.Round(totalBytes / (1024.0 * 1024.0 * 1024.0), 1);
-
-                var firstModule = modules.FirstOrDefault();
-                if (firstModule != null)
+                finally
                 {
-                    string manufacturer = (firstModule["Manufacturer"]?.ToString() ?? "Desconocido").Trim();
-                    string speed = (firstModule["Speed"]?.ToString() ?? "N/A").Trim();
-                    string partNumber = (firstModule["PartNumber"]?.ToString() ?? "").Trim();
-
-                    if (manufacturer == "0x80AD") manufacturer = "Hynix";
-                    if (manufacturer == "0x802C") manufacturer = "Micron";
-                    if (manufacturer == "0x0198") manufacturer = "Kingston";
-                    if (manufacturer == "0x830B") manufacturer = "Samsung";
-
-                    string ddr = GetDdrGeneration(firstModule, speed);
-                    string gen = string.IsNullOrEmpty(ddr) ? "" : $" {ddr}";
-                    // Formato: "32 GB DDR5 (Kingston KF... @ 4800 MHz)" → el formatter parte titular/técnico.
-                    return $"{totalGB} GB{gen} ({manufacturer} {partNumber} @ {speed} MHz)";
+                    foreach (var m in modules) m.Dispose();
                 }
-
-                return $"{totalGB} GB";
             }
             catch (Exception ex)
             {
@@ -337,23 +385,31 @@ namespace KioskClinicaPC.Services
         {
             try
             {
-                var searcher = new ManagementObjectSearcher("SELECT * FROM Win32_DiskDrive");
+                using var searcher = new ManagementObjectSearcher("SELECT * FROM Win32_DiskDrive");
+                using var collection = searcher.Get();
                 var driveStrings = new List<string>();
 
-                foreach (ManagementObject mo in searcher.Get())
+                foreach (ManagementObject mo in collection)
                 {
-                    string model = (mo["Model"]?.ToString() ?? "Disco Genérico").Trim();
-                    ulong totalBytes = (ulong)mo["Size"];
-                    double totalGB = Math.Round(totalBytes / (1024.0 * 1024.0 * 1024.0), 0);
-
-                    string mediaType = GetMediaTypeString(mo["MediaType"]?.ToString() ?? "", model);
-
-                    if (model.Contains("WDC PC SN530"))
+                    using (mo)
                     {
-                        model = "Western Digital SN530";
-                    }
+                        // Size es null en lectores de tarjetas / unidades vacías: saltar esa fila
+                        // en vez de abortar la enumeración (un disco malo ocultaba los buenos).
+                        if (mo["Size"] is null) continue;
 
-                    driveStrings.Add($"{model} ({totalGB} GB {mediaType})");
+                        string model = (mo["Model"]?.ToString() ?? "Disco Genérico").Trim();
+                        ulong totalBytes = Convert.ToUInt64(mo["Size"]);
+                        double totalGB = Math.Round(totalBytes / (1024.0 * 1024.0 * 1024.0), 0);
+
+                        string mediaType = GetMediaTypeString(mo["MediaType"]?.ToString() ?? "", model);
+
+                        if (model.Contains("WDC PC SN530"))
+                        {
+                            model = "Western Digital SN530";
+                        }
+
+                        driveStrings.Add($"{model} ({totalGB} GB {mediaType})");
+                    }
                 }
 
                 if (driveStrings.Count == 1) return driveStrings[0];

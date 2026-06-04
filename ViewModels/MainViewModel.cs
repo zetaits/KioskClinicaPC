@@ -55,9 +55,15 @@ namespace KioskClinicaPC.ViewModels
                     OnPropertyChanged(nameof(FormattedDiscount));
                     OnPropertyChanged(nameof(FormattedMonthly));
                     OnPropertyChanged(nameof(HasDiscount));
+                    OnPropertyChanged(nameof(BrandLogoPath));
+                    OnPropertyChanged(nameof(HasBrandLogo));
                 }
             }
         }
+
+        // Logo de la marca detectada (ChassisName = fabricante). Si no hay archivo → texto de siempre.
+        public string BrandLogoPath => Core.AssetResolver.ResolveBrandLogo(DisplayConfig?.ChassisName);
+        public bool HasBrandLogo => !string.IsNullOrWhiteSpace(BrandLogoPath);
 
         public ObservableCollection<SpecItem> Specs { get; } = new ObservableCollection<SpecItem>();
         public ObservableCollection<ScanLogItem> ScanLogs { get; } = new ObservableCollection<ScanLogItem>();
@@ -77,6 +83,14 @@ namespace KioskClinicaPC.ViewModels
                         CurrentScreenName = $"DETALLE · {value.Label?.ToUpperInvariant()}";
                 }
             }
+        }
+
+        // Componente "en foco" en la pantalla Main: el spotlight central lo sigue (icono + nombre + valor).
+        private SpecItem _activeSpec;
+        public SpecItem ActiveSpec
+        {
+            get => _activeSpec;
+            set => SetProperty(ref _activeSpec, value);
         }
 
         public string FormattedPrice => FormatPrice(DisplayConfig?.DiscountedPrice ?? DisplayConfig?.Price);
@@ -299,7 +313,10 @@ namespace KioskClinicaPC.ViewModels
             const string IconStorage = "M 5,6 L 27,6 L 27,12 L 5,12 Z M 5,14 L 27,14 L 27,20 L 5,20 Z M 5,22 L 27,22 L 27,28 L 5,28 Z M 23,9 A 0.6,0.6 0 1,0 23,9.01 M 23,17 A 0.6,0.6 0 1,0 23,17.01 M 23,25 A 0.6,0.6 0 1,0 23,25.01";
             const string IconScreen = "M 3,6 L 29,6 L 29,22 L 3,22 Z M 11,26 L 21,26 M 16,22 L 16,26";
             const string IconBattery = "M 3,10 L 27,10 L 27,22 L 3,22 Z M 27,13 L 29,13 L 29,19 L 27,19 Z M 6,13 L 20,13 L 20,19 L 6,19 Z";
-            const string IconWifi = "M 5,13 A 17,17 0 0,1 27,13 M 9,17 A 11,11 0 0,1 23,17 M 13,21 A 5,5 0 0,1 19,21 M 16,25 A 1,1 0 1,0 16,25.01";
+            // Iconos se renderizan con Fill (no Stroke): el wifi debe ser formas CERRADAS.
+            // Antes eran arcos abiertos → al rellenarse formaban medias lunas ("AI slop").
+            // Ahora: dos bandas anulares (sector exterior+interior cerrado) + punto sólido.
+            const string IconWifi = "M 0.24,13.68 A 20,20 0 0,1 31.76,13.68 L 28.61,16.14 A 16,16 0 0,0 3.39,16.14 Z M 5.76,17.99 A 13,13 0 0,1 26.24,17.99 L 23.09,20.46 A 9,9 0 0,0 8.91,20.46 Z M 13.8,26 A 2.2,2.2 0 1,1 18.2,26 A 2.2,2.2 0 1,1 13.8,26 Z";
             const string IconCamera = "M 3,8 L 29,8 L 29,24 L 3,24 Z M 16,11.5 A 4.5,4.5 0 1,0 16,20.5 A 4.5,4.5 0 1,0 16,11.5 M 20,5 L 26,5 L 26,8 L 20,8 Z";
             const string IconPorts = "M 3,13 L 12,13 L 12,19 L 3,19 Z M 14,11 L 20,11 L 20,21 L 14,21 Z M 22,14 L 29,14 L 29,18 L 22,18 Z";
             const string IconOs = "M 4,5 L 15,5 L 15,15 L 4,15 Z M 17,5 L 28,5 L 28,15 L 17,15 Z M 4,17 L 15,17 L 15,27 L 4,27 Z M 17,17 L 28,17 L 28,27 L 17,27 Z";
@@ -355,6 +372,8 @@ namespace KioskClinicaPC.ViewModels
                     AccentColor = brushes.ContainsKey(m.Id) ? brushes[m.Id].Color : cyanColor,
                     Angle = angles.ContainsKey(m.Id) ? angles[m.Id] : 0
                 };
+                // Foto real del componente: empareja modelo concreto / valor con archivo en SpecImages.
+                item.ImagePath = Core.AssetResolver.ResolveSpecImage(item.TechDetail, item.Value);
                 items.Add(item);
             }
 
@@ -379,6 +398,8 @@ namespace KioskClinicaPC.ViewModels
 
                 Specs.Add(items[i]);
             }
+
+            ActiveSpec = Specs.Count > 0 ? Specs[0] : null;
         }
 
         private string GetValueForId(string id)

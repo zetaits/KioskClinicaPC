@@ -31,6 +31,13 @@
       </Page>
     </ItemGroup>
 
+    <!-- Imágenes de marca y de componente: van DENTRO del programa (se copian junto al .exe),
+         así el instalable ya las trae. Suelta PNG/JPG en estas carpetas del repo y se empaquetan. -->
+    <ItemGroup>
+      <Content Include="Assets\Brands\**\*" CopyToOutputDirectory="PreserveNewest" />
+      <Content Include="Assets\SpecImages\**\*" CopyToOutputDirectory="PreserveNewest" />
+    </ItemGroup>
+
     <ItemGroup>
       <None Remove="Assets\clinicapc-logo.png" />
       <Resource Include="Assets\clinicapc-logo.png" />
