@@ -49,32 +49,50 @@
               RenderOptions.BitmapScalingMode="HighQuality">
             
             <!-- ================= AMBIENT BACKGROUNDS ================= -->
-            <Grid IsHitTestVisible="False">
-                <!-- bg-mesh: 5 gradient layers matching CSS mockup -->
+            <!-- Fondo estático (5 gradientes radiales pantalla completa + rejilla tileada). Nunca cambia,
+                 así que se rasteriza una sola vez con BitmapCache: en render por software estos gradientes
+                 se recomponían en CPU en cada invalidación. Cacheado = se paga una vez. -->
+            <Grid IsHitTestVisible="False" CacheMode="BitmapCache">
+                <!-- bg-mesh (orden CSS: el lineal es el fondo y los radiales van ENCIMA). En WPF lo
+                     último se pinta arriba, así que el lineal va PRIMERO; antes iba el último y tapaba
+                     (opaco) los radiales cálidos → fondo plano y oscuro. -->
+                <!-- linear-gradient(180deg, bg-0, bg-1 55%, #07050f) — base -->
+                <Rectangle>
+                    <Rectangle.Fill>
+                        <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                            <GradientStop Color="{StaticResource Bg0Color}" Offset="0"/>
+                            <GradientStop Color="{StaticResource Bg1Color}" Offset="0.55"/>
+                            <GradientStop Color="#07050f" Offset="1"/>
+                        </LinearGradientBrush>
+                    </Rectangle.Fill>
+                </Rectangle>
                 <!-- radial-gradient(70% 55% at 82% 12%, magenta 24%, transparent 65%) -->
                 <Rectangle Opacity="0.24">
                     <Rectangle.Fill>
                         <RadialGradientBrush Center="0.82,0.12" GradientOrigin="0.82,0.12" RadiusX="0.70" RadiusY="0.55">
                             <GradientStop Color="{StaticResource MagentaColor}" Offset="0"/>
-                            <GradientStop Color="Transparent" Offset="0.65"/>
+                            <!-- Fade a alpha-0 del MISMO color (#00FFB069), no a Transparent (#00FFFFFF):
+                                 WPF interpola sin premultiplicar → amber→transparent-blanco pasa por grises
+                                 lechosos (halo blanco lechoso). Mismo hue con alpha 0 = desvanecido limpio. -->
+                            <GradientStop Color="#00FFB069" Offset="0.65"/>
                         </RadialGradientBrush>
                     </Rectangle.Fill>
                 </Rectangle>
-                <!-- radial-gradient(65% 50% at 12% 92%, cyan 28%, transparent 65%) -->
-                <Rectangle Opacity="0.28">
+                <!-- radial-gradient(65% 50% at 12% 92%, cyan 30%, transparent 65%) -->
+                <Rectangle Opacity="0.30">
                     <Rectangle.Fill>
                         <RadialGradientBrush Center="0.12,0.92" GradientOrigin="0.12,0.92" RadiusX="0.65" RadiusY="0.50">
                             <GradientStop Color="{StaticResource CyanColor}" Offset="0"/>
-                            <GradientStop Color="Transparent" Offset="0.65"/>
+                            <GradientStop Color="#00F37A4A" Offset="0.65"/>
                         </RadialGradientBrush>
                     </Rectangle.Fill>
                 </Rectangle>
-                <!-- radial-gradient(55% 45% at 50% 55%, deep warm 32%, transparent 70%) -->
-                <Rectangle Opacity="0.32">
+                <!-- radial-gradient(55% 45% at 50% 55%, deep warm 34%, transparent 70%) -->
+                <Rectangle Opacity="0.34">
                     <Rectangle.Fill>
                         <RadialGradientBrush Center="0.50,0.55" GradientOrigin="0.50,0.55" RadiusX="0.55" RadiusY="0.45">
                             <GradientStop Color="#CC3D00" Offset="0"/>
-                            <GradientStop Color="Transparent" Offset="0.70"/>
+                            <GradientStop Color="#00CC3D00" Offset="0.70"/>
                         </RadialGradientBrush>
                     </Rectangle.Fill>
                 </Rectangle>
@@ -83,18 +101,8 @@
                     <Rectangle.Fill>
                         <RadialGradientBrush Center="0.95,0.78" GradientOrigin="0.95,0.78" RadiusX="0.45" RadiusY="0.40">
                             <GradientStop Color="#331A66" Offset="0"/>
-                            <GradientStop Color="Transparent" Offset="0.70"/>
+                            <GradientStop Color="#00331A66" Offset="0.70"/>
                         </RadialGradientBrush>
-                    </Rectangle.Fill>
-                </Rectangle>
-                <!-- linear-gradient(180deg, bg-0, bg-1 55%, #07050f) -->
-                <Rectangle>
-                    <Rectangle.Fill>
-                        <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-                            <GradientStop Color="{StaticResource Bg0Color}" Offset="0"/>
-                            <GradientStop Color="{StaticResource Bg1Color}" Offset="0.55"/>
-                            <GradientStop Color="#07050f" Offset="1"/>
-                        </LinearGradientBrush>
                     </Rectangle.Fill>
                 </Rectangle>
 
@@ -171,21 +179,8 @@
                     </Rectangle.Fill>
                 </Rectangle>
 
-                <!-- bg-noise: tiled noise pattern at 5% opacity -->
-                <Rectangle Opacity="0.05">
-                    <Rectangle.Fill>
-                        <DrawingBrush Viewport="0,0,4,4" ViewportUnits="Absolute" TileMode="Tile">
-                            <DrawingBrush.Drawing>
-                                <DrawingGroup>
-                                    <GeometryDrawing Brush="#40FFFFFF"><GeometryDrawing.Geometry><RectangleGeometry Rect="0,0,1,1"/></GeometryDrawing.Geometry></GeometryDrawing>
-                                    <GeometryDrawing Brush="#20FFFFFF"><GeometryDrawing.Geometry><RectangleGeometry Rect="2,1,1,1"/></GeometryDrawing.Geometry></GeometryDrawing>
-                                    <GeometryDrawing Brush="#30FFFFFF"><GeometryDrawing.Geometry><RectangleGeometry Rect="1,3,1,1"/></GeometryDrawing.Geometry></GeometryDrawing>
-                                    <GeometryDrawing Brush="#10FFFFFF"><GeometryDrawing.Geometry><RectangleGeometry Rect="3,2,1,1"/></GeometryDrawing.Geometry></GeometryDrawing>
-                                </DrawingGroup>
-                            </DrawingBrush.Drawing>
-                        </DrawingBrush>
-                    </Rectangle.Fill>
-                </Rectangle>
+                <!-- bg-noise eliminado: añadía grano blanco aditivo en toda la pantalla (efecto "niebla
+                     blanca"). El mockup (base.css) no lleva capa de ruido, solo grid + scanlines. -->
 
                 <!-- bg-vignette eliminado (feedback v4 sesión 2): radios 0.40/0.35 dibujaban óvalo oscuro
                      en lugar de oscurecer esquinas. Visible en todas las pantallas. Comentado por si se
@@ -201,8 +196,33 @@
                 -->
 
 
-                <!-- Particle Layer -->
-                <Canvas x:Name="ParticleCanvas" IsHitTestVisible="False"/>
+            </Grid>
+
+            <!-- Capa de partículas: FUERA del Grid con BitmapCache. Si va dentro, su animación continua
+                 (Canvas.Top/Opacity) re-rasteriza el caché del fondo cada frame; las líneas de 1px del
+                 grid resamplean distinto en cada frame bajo el escalado fraccionario del Viewbox y el
+                 fondo "tiembla" al animarse cualquier cosa (p.ej. al cambiar de spec). Fuera del caché,
+                 el fondo se rasteriza una sola vez = source estable = sin shimmer. -->
+            <Canvas x:Name="ParticleCanvas" IsHitTestVisible="False"/>
+
+            <!-- Deriva ambiental: blob radial naranja difuminado que se desplaza muy lento (~26 s) para
+                 dar movimiento continuo de fondo. NO va dentro del Grid cacheado estático (ese se
+                 rasteriza una vez y no debe moverse). El degradado suave evita BlurEffect animado;
+                 BitmapCache propio + animar solo el TranslateTransform = barato. Arranque y gating
+                 (GraphicsQuality.IsLow) en Window_Loaded. -->
+            <Grid x:Name="DriftLayer" IsHitTestVisible="False">
+                <Ellipse Width="1300" Height="800" HorizontalAlignment="Center" VerticalAlignment="Center"
+                         Opacity="0.42" RenderTransformOrigin="0.5,0.5" CacheMode="BitmapCache">
+                    <Ellipse.RenderTransform>
+                        <TranslateTransform x:Name="DriftTransform"/>
+                    </Ellipse.RenderTransform>
+                    <Ellipse.Fill>
+                        <RadialGradientBrush Center="0.5,0.5" GradientOrigin="0.5,0.5" RadiusX="0.5" RadiusY="0.5">
+                            <GradientStop Color="#80F37A4A" Offset="0"/>
+                            <GradientStop Color="#00F37A4A" Offset="0.72"/>
+                        </RadialGradientBrush>
+                    </Ellipse.Fill>
+                </Ellipse>
             </Grid>
 
             <!-- ================= SCREENS ================= -->
@@ -216,14 +236,29 @@
                     
                     <Rectangle Fill="Transparent" MouseLeftButtonDown="AttractScreen_Click" />
 
-                    <!-- Wireframe orb behind text (monochrome orange, sphere-like) -->
-                    <Viewbox Width="1480" Height="1480" HorizontalAlignment="Center" VerticalAlignment="Center"
-                             Margin="0,-60,0,0" Opacity="1.0" IsHitTestVisible="False">
+                    <!-- Wireframe orb behind text (monochrome orange, sphere-like).
+                         En reposo: quieto, normal (lo de siempre). Cada cierto tiempo se dispara un
+                         "episodio" (PlayOrbEpisode): se encoge un poco, se vuelve más tenue/fina y da
+                         una vuelta, luego vuelve a reposo. Giro continuo descartado (mareaba). -->
+                    <!-- Opacidad de reposo 0.32 (como el mockup: orbe fino y tenue, no la malla
+                         brillante saturada que tapaba el fondo). El episodio la atenúa aún más. -->
+                    <Viewbox x:Name="AttractOrb" Width="1480" Height="1480" HorizontalAlignment="Center" VerticalAlignment="Center"
+                             Margin="0,-60,0,0" Opacity="0.32" IsHitTestVisible="False">
+                        <!-- Centro de giro/escala SOLO vía CenterX/Y=50 (centro del canvas 100×100).
+                             Antes había también RenderTransformOrigin="0.5,0.5" → doble centrado: el centro
+                             efectivo caía en ~(100,100), y escalado ×14.8 el orbe orbitaba un punto fuera de
+                             pantalla en vez de rotar sobre sí mismo. -->
                         <Canvas Width="100" Height="100">
                             <Canvas.Effect>
                                 <DropShadowEffect Color="{StaticResource CyanColor}" BlurRadius="22"
-                                                  ShadowDepth="0" Opacity="0.7"/>
+                                                  ShadowDepth="0" Opacity="0.5"/>
                             </Canvas.Effect>
+                            <Canvas.RenderTransform>
+                                <TransformGroup>
+                                    <ScaleTransform x:Name="AttractOrbScale" CenterX="50" CenterY="50"/>
+                                    <RotateTransform x:Name="AttractOrbTransform" CenterX="50" CenterY="50"/>
+                                </TransformGroup>
+                            </Canvas.RenderTransform>
 
                             <!-- Outer ring -->
                             <Ellipse Canvas.Left="2" Canvas.Top="2" Width="96" Height="96"
@@ -350,9 +385,11 @@
                                 <Border.Triggers>
                                     <EventTrigger RoutedEvent="Loaded">
                                         <BeginStoryboard>
+                                            <!-- Pulso solo por opacidad: animar BlurRadius forzaba re-rasterizar
+                                                 la sombra entera cada frame (caro en iGPU). El cambio de opacidad
+                                                 da el mismo latido visual sin recalcular el blur. -->
                                             <Storyboard RepeatBehavior="Forever" AutoReverse="True">
-                                                <DoubleAnimation Storyboard.TargetProperty="(Border.Effect).(DropShadowEffect.Opacity)" From="0.30" To="0.55" Duration="0:0:1.1"/>
-                                                <DoubleAnimation Storyboard.TargetProperty="(Border.Effect).(DropShadowEffect.BlurRadius)" From="24" To="36" Duration="0:0:1.1"/>
+                                                <DoubleAnimation Storyboard.TargetProperty="(Border.Effect).(DropShadowEffect.Opacity)" From="0.30" To="0.60" Duration="0:0:1.1"/>
                                             </Storyboard>
                                         </BeginStoryboard>
                                     </EventTrigger>
@@ -395,27 +432,34 @@
                 <!-- ====== SCREEN 1: SCAN ====== -->
                 <Grid x:Name="Screen1_Scan" Visibility="Collapsed" Opacity="0">
                     <Grid>
-                        <!-- Huge Radar -->
-                        <Grid Width="720" Height="720" HorizontalAlignment="Center" VerticalAlignment="Center">
-                            <!-- 5 concentric circles (radii 100/78/56/34/14% of 720 → symmetric margins) -->
+                        <!-- Anillo de progreso del radar (0–100 %). Hermano del radar (no hijo) y en su
+                             propio lienzo 820 holgado: si fuera hijo del radar (760), la grid menor lo
+                             recortaría en los 4 cardinales (donde el aro, ~788, sobresale del 760). -->
+                        <Grid Width="820" Height="820" HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False">
+                            <Path x:Name="ScanProgressRing" Stroke="{StaticResource CyanBrush}" StrokeThickness="4"
+                                  StrokeStartLineCap="Round" StrokeEndLineCap="Round" Opacity="0.9">
+                                <Path.Effect>
+                                    <DropShadowEffect Color="{StaticResource CyanColor}" BlurRadius="8" ShadowDepth="0" Opacity="0.9"/>
+                                </Path.Effect>
+                            </Path>
+                        </Grid>
+
+                        <!-- Huge Radar (760×760, centro 380,380) — variación lock-on del mockup -->
+                        <Grid Width="760" Height="760" HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <!-- 5 anillos concéntricos (mockup inset 0/84/168/252/330) -->
                             <Ellipse Stroke="#4DF37A4A" StrokeThickness="1"/>
-                            <Ellipse Stroke="#4DF37A4A" StrokeThickness="1" Margin="79"/>
-                            <Ellipse Stroke="#4DF37A4A" StrokeThickness="1" Margin="158"/>
-                            <Ellipse Stroke="#4DF37A4A" StrokeThickness="1" Margin="238"/>
-                            <Ellipse Stroke="#4DF37A4A" StrokeThickness="1" Margin="310"/>
+                            <Ellipse Stroke="#4DF37A4A" StrokeThickness="1" Margin="84"/>
+                            <Ellipse Stroke="#4DF37A4A" StrokeThickness="1" Margin="168"/>
+                            <Ellipse Stroke="#4DF37A4A" StrokeThickness="1" Margin="252"/>
+                            <Ellipse Stroke="#4DF37A4A" StrokeThickness="1" Margin="330"/>
                             <!-- Crosshair lines -->
                             <Rectangle Height="1" Fill="#4DF37A4A" VerticalAlignment="Center"/>
                             <Rectangle Width="1" Fill="#4DF37A4A" HorizontalAlignment="Center"/>
-                            <!-- Conic-gradient sweep, approximated with a pie wedge that fades along its
-                                 trailing edge. Pivots on the radar CENTRE (360,360); using
-                                 RenderTransformOrigin here would pivot on the wedge's own bbox and make
-                                 it orbit off-centre (the old "rota y bugeada" bug). -->
-                            <!-- 60° sector. Endpoint (671.77,180) = centre(360,360) + 360·(sin60,-cos60),
-                                 i.e. exactly on the outer circle (dist=360). The old (614.7,180) sat at
-                                 dist 311.9 → wedge floated off the rings ("no encaja"). -->
-                            <Path Fill="{StaticResource CyanBrush}" Opacity="0.32" Data="M 360 360 L 360 0 A 360 360 0 0 1 671.77 180 Z">
+                            <!-- Sweep: cuña que pivota en el centro (380,380). Endpoint (691.76,190) =
+                                 centro + 380·(sin60,-cos60), exactamente en el círculo exterior. Gira a
+                                 1.7 s/vuelta (arrancado en code-behind durante el escaneo). -->
+                            <Path Fill="{StaticResource CyanBrush}" Opacity="0.42" Data="M 380 380 L 380 0 A 380 380 0 0 1 691.76 190 Z">
                                 <Path.OpacityMask>
-                                    <!-- Fade along the sweep: bright leading radial edge → transparent trailing edge -->
                                     <LinearGradientBrush StartPoint="0,0" EndPoint="1,0.5">
                                         <GradientStop Color="#CCFFFFFF" Offset="0"/>
                                         <GradientStop Color="#55FFFFFF" Offset="0.55"/>
@@ -423,7 +467,7 @@
                                     </LinearGradientBrush>
                                 </Path.OpacityMask>
                                 <Path.RenderTransform>
-                                    <RotateTransform x:Name="ScanRadarTransform" Angle="0" CenterX="360" CenterY="360"/>
+                                    <RotateTransform x:Name="ScanRadarTransform" Angle="0" CenterX="380" CenterY="380"/>
                                 </Path.RenderTransform>
                             </Path>
                             <!-- Center dot with heavy glow -->
@@ -432,24 +476,132 @@
                                     <DropShadowEffect Color="{StaticResource CyanColor}" BlurRadius="60" ShadowDepth="0" Opacity="1"/>
                                 </Ellipse.Effect>
                             </Ellipse>
-                            <!-- Ping blips -->
-                            <Canvas x:Name="BlipCanvas" IsHitTestVisible="False">
-                                <Ellipse Canvas.Left="216" Canvas.Top="288" Width="8" Height="8" Fill="{StaticResource MagentaBrush}">
-                                    <Ellipse.Effect><DropShadowEffect Color="{StaticResource MagentaColor}" BlurRadius="12" ShadowDepth="0"/></Ellipse.Effect>
-                                </Ellipse>
-                                <Ellipse Canvas.Left="490" Canvas.Top="202" Width="8" Height="8" Fill="{StaticResource MagentaBrush}">
-                                    <Ellipse.Effect><DropShadowEffect Color="{StaticResource MagentaColor}" BlurRadius="12" ShadowDepth="0"/></Ellipse.Effect>
-                                </Ellipse>
-                                <Ellipse Canvas.Left="144" Canvas.Top="518" Width="8" Height="8" Fill="{StaticResource MagentaBrush}">
-                                    <Ellipse.Effect><DropShadowEffect Color="{StaticResource MagentaColor}" BlurRadius="12" ShadowDepth="0"/></Ellipse.Effect>
-                                </Ellipse>
-                                <Ellipse Canvas.Left="562" Canvas.Top="576" Width="8" Height="8" Fill="{StaticResource MagentaBrush}">
-                                    <Ellipse.Effect><DropShadowEffect Color="{StaticResource MagentaColor}" BlurRadius="12" ShadowDepth="0"/></Ellipse.Effect>
-                                </Ellipse>
-                                <Ellipse Canvas.Left="374" Canvas.Top="130" Width="8" Height="8" Fill="{StaticResource MagentaBrush}">
-                                    <Ellipse.Effect><DropShadowEffect Color="{StaticResource MagentaColor}" BlurRadius="12" ShadowDepth="0"/></Ellipse.Effect>
-                                </Ellipse>
-                            </Canvas>
+
+                            <!-- Blips + retículas lock-on, ligados a los componentes reales (RadarBlips).
+                                 Cada ítem se posiciona en (X,Y); el blip hace ping continuo y la retícula
+                                 se revela cuando IsDetected pasa a true (sincronizado con el log). -->
+                            <ItemsControl ItemsSource="{Binding RadarBlips}" IsHitTestVisible="False">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate><Canvas/></ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemContainerStyle>
+                                    <Style TargetType="ContentPresenter">
+                                        <Setter Property="Canvas.Left" Value="{Binding X}"/>
+                                        <Setter Property="Canvas.Top" Value="{Binding Y}"/>
+                                    </Style>
+                                </ItemsControl.ItemContainerStyle>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <!-- Canvas 0×0 anclado en (X,Y); todo se posiciona relativo al punto. -->
+                                        <Canvas Width="0" Height="0">
+                                            <!-- Anillo de ping (continuo). Escala 10→64px (×6.4) + fade.
+                                                 El desfase por blip (Pd) lo aplica el handler Loaded. -->
+                                            <Ellipse x:Name="PingRing" Canvas.Left="-5" Canvas.Top="-5" Width="10" Height="10"
+                                                     Stroke="{StaticResource MagentaBrush}" StrokeThickness="1.5" Opacity="0"
+                                                     RenderTransformOrigin="0.5,0.5"
+                                                     Loaded="ScanPingRing_Loaded" Tag="{Binding PingDelaySeconds}">
+                                                <Ellipse.RenderTransform><ScaleTransform/></Ellipse.RenderTransform>
+                                            </Ellipse>
+                                            <!-- Blip: ámbar; al detectarse pasa a naranja con glow fuerte. -->
+                                            <Ellipse Canvas.Left="-5" Canvas.Top="-5" Width="10" Height="10">
+                                                <Ellipse.Style>
+                                                    <Style TargetType="Ellipse">
+                                                        <Setter Property="Fill" Value="{StaticResource MagentaBrush}"/>
+                                                        <Setter Property="Effect">
+                                                            <Setter.Value>
+                                                                <DropShadowEffect Color="{StaticResource MagentaColor}" BlurRadius="12" ShadowDepth="0"/>
+                                                            </Setter.Value>
+                                                        </Setter>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsDetected}" Value="True">
+                                                                <Setter Property="Fill" Value="{StaticResource CyanBrush}"/>
+                                                                <Setter Property="Effect">
+                                                                    <Setter.Value>
+                                                                        <DropShadowEffect Color="{StaticResource CyanColor}" BlurRadius="18" ShadowDepth="0" Opacity="1"/>
+                                                                    </Setter.Value>
+                                                                </Setter>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Ellipse.Style>
+                                            </Ellipse>
+                                            <!-- Retícula lock-on: oculta hasta IsDetected; entra con scale 1.5→1 + fade. -->
+                                            <Grid Canvas.Left="-29" Canvas.Top="-29" Width="58" Height="58" RenderTransformOrigin="0.5,0.5">
+                                                <Grid.RenderTransform><ScaleTransform ScaleX="1" ScaleY="1"/></Grid.RenderTransform>
+                                                <Grid.Style>
+                                                    <Style TargetType="Grid">
+                                                        <Setter Property="Opacity" Value="0"/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsDetected}" Value="True">
+                                                                <DataTrigger.EnterActions>
+                                                                    <BeginStoryboard>
+                                                                        <Storyboard>
+                                                                            <DoubleAnimation Storyboard.TargetProperty="Opacity" To="1" Duration="0:0:0.3"/>
+                                                                            <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)" From="1.5" To="1" Duration="0:0:0.4">
+                                                                                <DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut"/></DoubleAnimation.EasingFunction>
+                                                                            </DoubleAnimation>
+                                                                            <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)" From="1.5" To="1" Duration="0:0:0.4">
+                                                                                <DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut"/></DoubleAnimation.EasingFunction>
+                                                                            </DoubleAnimation>
+                                                                        </Storyboard>
+                                                                    </BeginStoryboard>
+                                                                </DataTrigger.EnterActions>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Grid.Style>
+                                                <!-- 4 brackets en L -->
+                                                <Path Stroke="{Binding AccentBrush}" StrokeThickness="2" HorizontalAlignment="Left" VerticalAlignment="Top" Data="M 0,14 L 0,0 L 14,0"/>
+                                                <Path Stroke="{Binding AccentBrush}" StrokeThickness="2" HorizontalAlignment="Right" VerticalAlignment="Top" Data="M 0,0 L 14,0 L 14,14"/>
+                                                <Path Stroke="{Binding AccentBrush}" StrokeThickness="2" HorizontalAlignment="Left" VerticalAlignment="Bottom" Data="M 0,0 L 0,14 L 14,14"/>
+                                                <Path Stroke="{Binding AccentBrush}" StrokeThickness="2" HorizontalAlignment="Right" VerticalAlignment="Bottom" Data="M 0,14 L 14,14 L 14,0"/>
+                                                <!-- Icono del componente -->
+                                                <Path Data="{Binding IconData}" Fill="{Binding AccentBrush}" Stretch="Uniform" Width="26" Height="26"
+                                                      HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            </Grid>
+                                            <!-- Tag "{Label} · OK". Dos variantes: derecha (normal) / izquierda (flip). -->
+                                            <Border Canvas.Left="34" Canvas.Top="-13" Background="#B30A0716" BorderThickness="2,0,0,0"
+                                                    BorderBrush="{Binding AccentBrush}" Padding="8,4"
+                                                    Visibility="{Binding Flip, Converter={StaticResource InverseBoolToVis}}">
+                                                <Border.Style>
+                                                    <Style TargetType="Border">
+                                                        <Setter Property="Opacity" Value="0"/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsDetected}" Value="True">
+                                                                <DataTrigger.EnterActions>
+                                                                    <BeginStoryboard><Storyboard><DoubleAnimation Storyboard.TargetProperty="Opacity" To="1" BeginTime="0:0:0.15" Duration="0:0:0.3"/></Storyboard></BeginStoryboard>
+                                                                </DataTrigger.EnterActions>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Border.Style>
+                                                <TextBlock Style="{StaticResource MonoFont}" FontSize="12" Foreground="{StaticResource Text0Brush}" TextWrapping="NoWrap">
+                                                    <Run Text="{Binding LabelUpper, Mode=OneWay}"/><Run Text=" · OK"/>
+                                                </TextBlock>
+                                            </Border>
+                                            <Border Canvas.Right="34" Canvas.Top="-13" Background="#B30A0716" BorderThickness="0,0,2,0"
+                                                    BorderBrush="{Binding AccentBrush}" Padding="8,4"
+                                                    Visibility="{Binding Flip, Converter={StaticResource BoolToVis}}">
+                                                <Border.Style>
+                                                    <Style TargetType="Border">
+                                                        <Setter Property="Opacity" Value="0"/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsDetected}" Value="True">
+                                                                <DataTrigger.EnterActions>
+                                                                    <BeginStoryboard><Storyboard><DoubleAnimation Storyboard.TargetProperty="Opacity" To="1" BeginTime="0:0:0.15" Duration="0:0:0.3"/></Storyboard></BeginStoryboard>
+                                                                </DataTrigger.EnterActions>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Border.Style>
+                                                <TextBlock Style="{StaticResource MonoFont}" FontSize="12" Foreground="{StaticResource Text0Brush}" TextWrapping="NoWrap">
+                                                    <Run Text="{Binding LabelUpper, Mode=OneWay}"/><Run Text=" · OK"/>
+                                                </TextBlock>
+                                            </Border>
+                                        </Canvas>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
                         </Grid>
 
                         <!-- Log area at bottom left -->
@@ -461,10 +613,15 @@
                                         <Grid Margin="0,2">
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="40"/>
+                                                <ColumnDefinition Width="22"/>
                                                 <ColumnDefinition Width="*"/>
                                             </Grid.ColumnDefinitions>
                                             <TextBlock Text="{Binding Time}" edit:Editable.IsOn="False" Style="{StaticResource MonoFont}" Foreground="{StaticResource Text3Brush}" FontSize="14" Grid.Column="0"/>
-                                            <TextBlock Text="{Binding Step}" edit:Editable.IsOn="False" Style="{StaticResource MonoFont}" Foreground="{Binding Color, Converter={StaticResource StringBrushConverter}}" FontSize="14" Grid.Column="1" Margin="14,0,0,0"/>
+                                            <!-- Icono del componente (solo en líneas READ con id). -->
+                                            <Path Grid.Column="1" Data="{Binding IconData}" Fill="{Binding AccentBrush}" Stretch="Uniform"
+                                                  Width="16" Height="16" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                  Visibility="{Binding HasIcon, Converter={StaticResource BoolToVis}}"/>
+                                            <TextBlock Text="{Binding Step}" edit:Editable.IsOn="False" Style="{StaticResource MonoFont}" Foreground="{Binding Color, Converter={StaticResource StringBrushConverter}}" FontSize="14" Grid.Column="2" Margin="8,0,0,0"/>
                                         </Grid>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
@@ -483,8 +640,11 @@
                 </Grid>
 
                 <!-- ====== SCREEN 2: MAIN HUD ====== -->
-                <Grid x:Name="Screen2_Main" Visibility="Collapsed" Opacity="0">
-                    
+                <Grid x:Name="Screen2_Main" Visibility="Collapsed" Opacity="0" RenderTransformOrigin="0.5,0.5">
+                    <Grid.RenderTransform>
+                        <ScaleTransform x:Name="MainRevealScale" ScaleX="1" ScaleY="1"/>
+                    </Grid.RenderTransform>
+
                     <!-- IDENTITY BLOCK — left column at top:180 -->
                     <StackPanel HorizontalAlignment="Left" VerticalAlignment="Top" Width="440" Margin="120,180,0,0">
                       <StackPanel Orientation="Horizontal" Margin="0,0,0,22">
@@ -519,7 +679,8 @@
                       </TextBlock>
                     
                       <StackPanel Orientation="Horizontal" Margin="0,32,0,0">
-                        <Border Background="#0AFFFFFF" BorderBrush="{StaticResource Line2Brush}" BorderThickness="1" Padding="10,8" Margin="0,0,12,0">
+                        <Border Background="#0AFFFFFF" BorderBrush="{StaticResource Line2Brush}" BorderThickness="1" Padding="10,8" Margin="0,0,12,0"
+                                Visibility="{Binding ShowRefurbished, Converter={StaticResource BoolToVis}}">
                           <StackPanel Orientation="Horizontal">
                             <Ellipse Width="8" Height="8" Fill="{StaticResource OkBrush}" VerticalAlignment="Center" Margin="0,0,8,0">
                                 <Ellipse.Effect>
@@ -530,7 +691,7 @@
                           </StackPanel>
                         </Border>
                         <Border Background="#0AFFFFFF" BorderBrush="{StaticResource Line2Brush}" BorderThickness="1" Padding="10,8">
-                          <TextBlock Text="{Binding Texts[hud.badgeWarranty]}" Style="{StaticResource MonoFont}" FontSize="11" Foreground="{StaticResource Text1Brush}"/>
+                          <TextBlock Text="{Binding WarrantyText}" edit:Editable.IsOn="False" Style="{StaticResource MonoFont}" FontSize="11" Foreground="{StaticResource Text1Brush}"/>
                         </Border>
                       </StackPanel>
                     </StackPanel>
@@ -540,7 +701,67 @@
                     <StackPanel HorizontalAlignment="Left" VerticalAlignment="Top" Width="780" Margin="600,150,0,0">
                         <TextBlock Text="{Binding Texts[hud.productView]}" Style="{StaticResource MonoFont}" FontSize="13" Foreground="{StaticResource Text2Brush}" Margin="0,0,0,14"/>
                         <Grid Height="430">
-                            <Border Background="#46140B24" BorderBrush="{StaticResource Line1Brush}" BorderThickness="1"/>
+                            <Border x:Name="SpotlightFrame" Background="#46140B24" BorderBrush="{StaticResource Line1Brush}" BorderThickness="1"/>
+
+                            <!-- Tratamiento "Retícula + barrido" (spot-a del mockup): aro discontinuo que gira
+                                 lento + haz horizontal que barre de arriba abajo, ambos con el acento del
+                                 componente activo. Detrás del contenido y recortados al marco del bay. -->
+                            <Grid ClipToBounds="True" DataContext="{Binding ActiveSpec}" IsHitTestVisible="False">
+                                <!-- Retícula: aro discontinuo (300) + aro interior + 4 puntos cardinales; gira 14s.
+                                     Subida ~38px para quedar centrada DETRÁS de la imagen del spec (que vive en la
+                                     fila superior del contenido, por encima del centro del bay), no del marco. -->
+                                <Grid Width="300" Height="300" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                      Margin="0,-38,0,0" Opacity="0.55" RenderTransformOrigin="0.5,0.5">
+                                    <Grid.RenderTransform><RotateTransform x:Name="SpotReticleRotate"/></Grid.RenderTransform>
+                                    <Grid.Triggers>
+                                        <EventTrigger RoutedEvent="Loaded">
+                                            <BeginStoryboard>
+                                                <Storyboard>
+                                                    <DoubleAnimation Storyboard.TargetName="SpotReticleRotate" Storyboard.TargetProperty="Angle"
+                                                                     From="0" To="360" Duration="0:0:14" RepeatBehavior="Forever"/>
+                                                </Storyboard>
+                                            </BeginStoryboard>
+                                        </EventTrigger>
+                                    </Grid.Triggers>
+                                    <Ellipse Stroke="{Binding AccentBrush, FallbackValue={StaticResource CyanBrush}}" StrokeThickness="1" StrokeDashArray="2 4"/>
+                                    <Ellipse Margin="26" Stroke="{Binding AccentBrush, FallbackValue={StaticResource CyanBrush}}" StrokeThickness="1" Opacity="0.5"/>
+                                    <Ellipse Width="8" Height="8" Fill="{Binding AccentBrush, FallbackValue={StaticResource CyanBrush}}" HorizontalAlignment="Center" VerticalAlignment="Top"    Margin="0,-4,0,0"/>
+                                    <Ellipse Width="8" Height="8" Fill="{Binding AccentBrush, FallbackValue={StaticResource CyanBrush}}" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,-4"/>
+                                    <Ellipse Width="8" Height="8" Fill="{Binding AccentBrush, FallbackValue={StaticResource CyanBrush}}" HorizontalAlignment="Left"   VerticalAlignment="Center" Margin="-4,0,0,0"/>
+                                    <Ellipse Width="8" Height="8" Fill="{Binding AccentBrush, FallbackValue={StaticResource CyanBrush}}" HorizontalAlignment="Right"  VerticalAlignment="Center" Margin="0,0,-4,0"/>
+                                </Grid>
+
+                                <!-- Haz de barrido: banda horizontal (90px) que cae de arriba abajo (3.4s) con
+                                     pausa al final (ritmo del mockup: baja en el 55% y espera). Línea superior
+                                     más marcada del acento. Funde a alpha-0 negro (no Transparent=blanco). -->
+                                <Grid Height="90" VerticalAlignment="Top">
+                                    <Grid.RenderTransform><TranslateTransform x:Name="SpotBeamTranslate" Y="-90"/></Grid.RenderTransform>
+                                    <Grid.Triggers>
+                                        <EventTrigger RoutedEvent="Loaded">
+                                            <BeginStoryboard>
+                                                <Storyboard>
+                                                    <DoubleAnimationUsingKeyFrames Storyboard.TargetName="SpotBeamTranslate" Storyboard.TargetProperty="Y" Duration="0:0:3.4" RepeatBehavior="Forever">
+                                                        <LinearDoubleKeyFrame Value="-90" KeyTime="0%"/>
+                                                        <LinearDoubleKeyFrame Value="430" KeyTime="55%"/>
+                                                        <LinearDoubleKeyFrame Value="430" KeyTime="100%"/>
+                                                    </DoubleAnimationUsingKeyFrames>
+                                                </Storyboard>
+                                            </BeginStoryboard>
+                                        </EventTrigger>
+                                    </Grid.Triggers>
+                                    <Rectangle Opacity="0.22">
+                                        <Rectangle.Fill>
+                                            <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                                <GradientStop Color="#00000000" Offset="0"/>
+                                                <GradientStop Color="{Binding AccentColor, FallbackValue={StaticResource CyanColor}}" Offset="0.5"/>
+                                                <GradientStop Color="#00000000" Offset="1"/>
+                                            </LinearGradientBrush>
+                                        </Rectangle.Fill>
+                                    </Rectangle>
+                                    <Rectangle Height="1" VerticalAlignment="Top" Fill="{Binding AccentBrush, FallbackValue={StaticResource CyanBrush}}" Opacity="0.5"/>
+                                </Grid>
+                            </Grid>
+
                             <!-- contenido del componente activo. Anima (fade + slide-up) cada vez que cambia
                                  ActiveSpec: el binding del icono notifica TargetUpdated y dispara el storyboard. -->
                             <Grid x:Name="SpotlightContent" DataContext="{Binding ActiveSpec}" Margin="48,34" RenderTransformOrigin="0.5,0.5">
@@ -567,7 +788,7 @@
                                 </Grid.RowDefinitions>
                                 <!-- Visual del componente activo: foto real si existe, si no el icono vectorial.
                                      NotifyOnTargetUpdated en el icono mantiene vivo el fade+slide del bloque entero. -->
-                                <Grid Grid.Row="0" Margin="0,0,0,22">
+                                <Grid x:Name="SpotlightIcon" Grid.Row="0" Margin="0,0,0,22">
                                     <Path Data="{Binding IconData, FallbackValue='M 0,0', NotifyOnTargetUpdated=True}"
                                           Fill="{Binding AccentBrush, FallbackValue={StaticResource CyanBrush}}"
                                           Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center"
@@ -628,7 +849,7 @@
                          Bajado para dar más alto al spotlight y cerrar el hueco inferior. -->
                     <StackPanel HorizontalAlignment="Left" VerticalAlignment="Top" Width="1260" Margin="120,628,0,0">
                         <TextBlock Text="{Binding Texts[hud.components]}" Style="{StaticResource MonoFont}" FontSize="13" Foreground="{StaticResource Text2Brush}" Margin="0,0,0,16"/>
-                        <ItemsControl ItemsSource="{Binding Specs}">
+                        <ItemsControl x:Name="SpecTiles" ItemsSource="{Binding Specs}">
                             <ItemsControl.ItemsPanel>
                                 <ItemsPanelTemplate>
                                     <UniformGrid Columns="5"/>
@@ -756,11 +977,17 @@
                                 
                                 <Border Margin="0,22,0,0" Padding="12,14" Background="#0AFFFFFF" BorderBrush="{StaticResource Line1Brush}" BorderThickness="1">
                                     <StackPanel>
-                                        <TextBlock Text="{Binding Texts[price.installments]}" Style="{StaticResource MonoFont}" FontSize="11" Foreground="{StaticResource Text2Brush}"/>
+                                        <Grid>
+                                            <TextBlock Text="{Binding Texts[price.installments]}" Style="{StaticResource MonoFont}" FontSize="11" Foreground="{StaticResource Text2Brush}" VerticalAlignment="Center"/>
+                                            <!-- Alterna el plazo de cuotas 6 ⇄ 12 meses -->
+                                            <Button HorizontalAlignment="Right" Padding="8,3" Background="#1AFFFFFF" BorderBrush="{StaticResource Line2Brush}" BorderThickness="1"
+                                                    Cursor="Hand" Click="InstallmentsToggle_Click" edit:Editable.IsOn="False">
+                                                <TextBlock Text="{Binding InstallmentsToggleText}" Style="{StaticResource MonoFont}" FontSize="10" Foreground="{StaticResource CyanBrush}"/>
+                                            </Button>
+                                        </Grid>
                                         <StackPanel Orientation="Horizontal" Margin="0,2,0,0" VerticalAlignment="Bottom">
-                                            <TextBlock Text="{Binding Texts[price.installmentsPrefix]}" Style="{StaticResource DisplayFont}" FontSize="22" Foreground="{StaticResource Text0Brush}"/>
+                                            <TextBlock Text="{Binding InstallmentsPrefix}" edit:Editable.IsOn="False" Style="{StaticResource DisplayFont}" FontSize="22" Foreground="{StaticResource Text0Brush}"/>
                                             <TextBlock Text="{Binding FormattedMonthly}" edit:Editable.IsOn="False" Style="{StaticResource DisplayFont}" FontSize="22" Foreground="{StaticResource Text0Brush}"/>
-                                            <TextBlock Text="€" edit:Editable.IsOn="False" Style="{StaticResource DisplayFont}" FontSize="22" Foreground="{StaticResource Text0Brush}"/>
                                             <TextBlock Text="{Binding Texts[price.noInterest]}" Style="{StaticResource MonoFont}" FontSize="12" Foreground="{StaticResource Text2Brush}" Margin="8,0,0,2" VerticalAlignment="Bottom"/>
                                         </StackPanel>
                                     </StackPanel>
@@ -835,8 +1062,9 @@
                         <!-- nombre amigable (chip secundario): pequeño, oculto si no aporta nada al cliente -->
                         <TextBlock Text="{Binding DetailSubtitle}" edit:Editable.IsOn="False" Style="{StaticResource MonoFont}" FontSize="15" Foreground="{StaticResource Text2Brush}" TextWrapping="NoWrap" Margin="0,0,0,28" Visibility="{Binding HasDetailSubtitle, Converter={StaticResource BoolToVis}}"/>
 
-                        <!-- StatStrip: Detail parsed into framed cells -->
-                        <Border BorderBrush="{StaticResource Line1Brush}" BorderThickness="1" Background="#05FFFFFF" HorizontalAlignment="Left">
+                        <!-- StatStrip: Detail parsed into framed cells. Oculto si no hay detalle real. -->
+                        <Border BorderBrush="{StaticResource Line1Brush}" BorderThickness="1" Background="#05FFFFFF" HorizontalAlignment="Left"
+                                Visibility="{Binding HasDetail, Converter={StaticResource BoolToVis}}">
                           <ItemsControl ItemsSource="{Binding DetailTokens}">
                             <ItemsControl.ItemsPanel>
                               <ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate>
@@ -906,7 +1134,69 @@
                     </Grid>
 
                     <!-- RIGHT -->
-                    <StackPanel Grid.Column="1" Margin="0,200,120,0">
+                    <StackPanel Grid.Column="1" Margin="0,138,120,0">
+                        <!-- PHOTO HERO (.d-photo del mockup): foto real del componente (ImagePath) si existe;
+                             si no, el icono vectorial enmarcado. Corchetes de esquina + etiqueta. Faltaba:
+                             la columna derecha saltaba directa al bloque "QUÉ SIGNIFICA". El glow radial
+                             funde a alpha-0 NEGRO (no a Transparent=blanco) para evitar halo lechoso. -->
+                        <Border Height="264" BorderBrush="{StaticResource Line1Brush}" BorderThickness="1"
+                                Background="#800A0716" ClipToBounds="True" Margin="0,0,0,26">
+                          <Grid>
+                            <!-- radial(70% 90% at 50% 30%, accent 14%) -->
+                            <Rectangle Opacity="0.14">
+                              <Rectangle.Fill>
+                                <RadialGradientBrush Center="0.5,0.3" GradientOrigin="0.5,0.3" RadiusX="0.7" RadiusY="0.9">
+                                  <GradientStop Color="{Binding AccentColor, FallbackValue={StaticResource CyanColor}}" Offset="0"/>
+                                  <GradientStop Color="#00000000" Offset="0.7"/>
+                                </RadialGradientBrush>
+                              </Rectangle.Fill>
+                            </Rectangle>
+
+                            <!-- icono vectorial enmarcado (sin foto) -->
+                            <Border Width="160" Height="160" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                    BorderThickness="1" Visibility="{Binding HasImage, Converter={StaticResource InverseBoolToVis}}">
+                              <Border.BorderBrush>
+                                <SolidColorBrush Color="{Binding AccentColor, FallbackValue={StaticResource CyanColor}}" Opacity="0.38"/>
+                              </Border.BorderBrush>
+                              <Border.Background>
+                                <RadialGradientBrush>
+                                  <GradientStop Color="{Binding AccentColor, FallbackValue={StaticResource CyanColor}}" Offset="0"/>
+                                  <GradientStop Color="#00000000" Offset="0.72"/>
+                                </RadialGradientBrush>
+                              </Border.Background>
+                              <Path Data="{Binding IconData, FallbackValue='M 0,0'}" Fill="{Binding AccentBrush, FallbackValue={StaticResource CyanBrush}}"
+                                    Width="84" Height="84" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                <Path.Effect><DropShadowEffect Color="{Binding AccentColor, FallbackValue={StaticResource CyanColor}}" BlurRadius="16" ShadowDepth="0" Opacity="0.9"/></Path.Effect>
+                              </Path>
+                            </Border>
+
+                            <!-- foto real del componente -->
+                            <Image Source="{Binding ImagePath, Converter={StaticResource OptionalImage}}"
+                                   Visibility="{Binding HasImage, Converter={StaticResource BoolToVis}}"
+                                   Stretch="Uniform" MaxHeight="236" Margin="40,20"
+                                   RenderOptions.BitmapScalingMode="HighQuality" HorizontalAlignment="Center" VerticalAlignment="Center">
+                              <Image.Effect><DropShadowEffect Color="#000000" BlurRadius="40" ShadowDepth="16" Opacity="0.6"/></Image.Effect>
+                            </Image>
+
+                            <!-- corchetes de esquina (24×24 acento, inset 10) -->
+                            <Path Data="M 0,24 L 0,0 L 24,0" Stroke="{Binding AccentBrush, FallbackValue={StaticResource CyanBrush}}" StrokeThickness="2" HorizontalAlignment="Left"  VerticalAlignment="Top"    Margin="10"/>
+                            <Path Data="M 0,0 L 24,0 L 24,24" Stroke="{Binding AccentBrush, FallbackValue={StaticResource CyanBrush}}" StrokeThickness="2" HorizontalAlignment="Right" VerticalAlignment="Top"    Margin="10"/>
+                            <Path Data="M 0,0 L 0,24 L 24,24" Stroke="{Binding AccentBrush, FallbackValue={StaticResource CyanBrush}}" StrokeThickness="2" HorizontalAlignment="Left"  VerticalAlignment="Bottom" Margin="10"/>
+                            <Path Data="M 0,24 L 24,24 L 24,0" Stroke="{Binding AccentBrush, FallbackValue={StaticResource CyanBrush}}" StrokeThickness="2" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="10"/>
+
+                            <!-- etiqueta: COMPONENTE REAL (foto) / ESQUEMA · {family} (icono) -->
+                            <Border HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="16,0,0,14"
+                                    Background="#990A0716" BorderBrush="{Binding AccentBrush, FallbackValue={StaticResource CyanBrush}}" BorderThickness="2,0,0,0" Padding="9,5">
+                              <Grid>
+                                <TextBlock Style="{StaticResource MonoFont}" FontSize="11" Foreground="{StaticResource Text2Brush}" Text="COMPONENTE REAL"
+                                           edit:Editable.IsOn="False" Visibility="{Binding HasImage, Converter={StaticResource BoolToVis}}"/>
+                                <TextBlock Style="{StaticResource MonoFont}" FontSize="11" Foreground="{StaticResource Text2Brush}"
+                                           edit:Editable.IsOn="False" Visibility="{Binding HasImage, Converter={StaticResource InverseBoolToVis}}"><Run Text="ESQUEMA · "/><Run Text="{Binding Family}"/></TextBlock>
+                              </Grid>
+                            </Border>
+                          </Grid>
+                        </Border>
+
                         <Border Background="#120A0A1A" BorderBrush="{StaticResource Line1Brush}" BorderThickness="1" Padding="36" CornerRadius="0">
                           <StackPanel>
                             <TextBlock Text="// QUÉ SIGNIFICA" Style="{StaticResource MonoFont}" FontSize="12" Foreground="{Binding AccentBrush, FallbackValue={StaticResource CyanBrush}}" Margin="0,0,0,18"/>
@@ -974,6 +1264,38 @@
 
             </Grid>
 
+            <!-- ================= MORPH OVERLAY (shared-element tarjeta→spotlight) ================= -->
+            <!-- Encima de las pantallas (z>0) y por debajo del chrome (z40). El clon de la tarjeta
+                 seleccionada vuela/escala aquí hasta el marco del spotlight. -->
+            <Canvas x:Name="MorphLayer" Panel.ZIndex="30" IsHitTestVisible="False">
+                <Border x:Name="MorphGhost" Visibility="Collapsed" IsHitTestVisible="False" RenderTransformOrigin="0,0">
+                    <Border.RenderTransform>
+                        <TransformGroup>
+                            <ScaleTransform x:Name="MorphGhostScale" ScaleX="1" ScaleY="1"/>
+                            <TranslateTransform x:Name="MorphGhostTranslate" X="0" Y="0"/>
+                        </TransformGroup>
+                    </Border.RenderTransform>
+                </Border>
+            </Canvas>
+
+            <!-- ================= ENTRANCE OVERLAY (animación de entrada a Main) ================= -->
+            <!-- Por encima del chrome para que el logo "vuele" sobre todo; se oculta al terminar. -->
+            <Grid x:Name="EntranceLayer" Panel.ZIndex="45" IsHitTestVisible="False">
+                <!-- Logo de entrada (variantes Iris/ZoomThrough): centrado, escala/viaja, luego se oculta -->
+                <Image x:Name="EntranceLogo" Source="Assets/clinicapc-logo.png" Height="72" Visibility="Hidden" Opacity="0"
+                       HorizontalAlignment="Center" VerticalAlignment="Center" RenderTransformOrigin="0.5,0.5">
+                    <Image.RenderTransform>
+                        <TransformGroup>
+                            <ScaleTransform x:Name="EntranceLogoScale" ScaleX="1" ScaleY="1"/>
+                            <TranslateTransform x:Name="EntranceLogoTranslate" X="0" Y="0"/>
+                        </TransformGroup>
+                    </Image.RenderTransform>
+                    <Image.Effect>
+                        <DropShadowEffect x:Name="EntranceLogoGlow" Color="{StaticResource CyanColor}" BlurRadius="40" ShadowDepth="0" Opacity="0.85"/>
+                    </Image.Effect>
+                </Image>
+            </Grid>
+
             <!-- ================= CHROME & BRACKETS (transparent overlay) ================= -->
             <Grid x:Name="ForegroundChrome" IsHitTestVisible="{Binding EditMode.IsActive}" Panel.ZIndex="40">
                 <!-- Corner brackets: 44×44 L-shapes at 24px from each corner -->
@@ -995,9 +1317,15 @@
                 <!-- TOP CHROME ROW: top 36, padding-x 64, transparent (no gradient bar) -->
                 <Grid VerticalAlignment="Top" Margin="64,32,64,0" Height="84">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Left">
-                        <Image Source="Assets/clinicapc-logo.png" Height="72" Margin="0,0,14,0">
+                        <Image x:Name="HeaderLogo" Source="Assets/clinicapc-logo.png" Height="72" Margin="0,0,14,0" RenderTransformOrigin="0.5,0.5">
+                            <Image.RenderTransform>
+                                <TransformGroup>
+                                    <ScaleTransform x:Name="HeaderLogoScale" ScaleX="1" ScaleY="1"/>
+                                    <TranslateTransform x:Name="HeaderLogoTranslate" X="0" Y="0"/>
+                                </TransformGroup>
+                            </Image.RenderTransform>
                             <Image.Effect>
-                                <DropShadowEffect Color="{StaticResource CyanColor}" BlurRadius="20" ShadowDepth="0" Opacity="0.75"/>
+                                <DropShadowEffect x:Name="HeaderLogoGlow" Color="{StaticResource CyanColor}" BlurRadius="20" ShadowDepth="0" Opacity="0.75"/>
                             </Image.Effect>
                         </Image>
                     </StackPanel>

@@ -23,6 +23,29 @@ const FRIENDLY = {
 
 const ORDER = ["cpu", "gpu", "ram", "storage", "screen", "battery", "wifi", "camera", "ports", "os"];
 
+// Etiqueta canónica por componente. El kiosko ya no manda la etiqueta cuando es la estándar
+// (ahorra bytes en el QR): si el payload no trae `l`, la deducimos aquí del id. Debe coincidir
+// con los labels por defecto de Core/SpecCatalog.cs. Solo viaja `l` si el comercio la personalizó.
+const LABELS = {
+  cpu: "Procesador",
+  gpu: "Tarjeta gráfica",
+  ram: "Memoria RAM",
+  storage: "Almacenamiento",
+  screen: "Pantalla",
+  battery: "Batería",
+  wifi: "Conectividad WiFi",
+  camera: "Cámara",
+  ports: "Puertos",
+  os: "Sistema operativo"
+};
+
+// Datos de tienda (fijos). No viajan en el QR si son los estándar: la web los pone por defecto.
+// Debe coincidir con el valor por defecto de ShopAddress en MainViewModel.cs. Solo viaja `ad`
+// si el comercio la ha personalizado (y entonces tiene prioridad sobre este valor).
+const SHOP = {
+  address: "Calle Sevilla 54, Málaga"
+};
+
 function setStatus(msg, isError) {
   const el = document.getElementById("status");
   el.textContent = msg;
@@ -92,7 +115,7 @@ function render(data) {
     const explain = FRIENDLY[c.i] ? `<div class="explain">${escapeHtml(FRIENDLY[c.i])}</div>` : "";
     const detail = c.d ? `<div class="detail">${escapeHtml(c.d)}</div>` : "";
     return `<tr>
-      <td class="c-label">${escapeHtml(c.l || c.i || "")}</td>
+      <td class="c-label">${escapeHtml(c.l || LABELS[c.i] || c.i || "")}</td>
       <td class="c-value">
         <div class="value">${escapeHtml(c.v || "")}</div>
         ${detail}${explain}
@@ -102,7 +125,7 @@ function render(data) {
 
   // Footer
   document.getElementById("shopline").textContent =
-    [data.sh, data.ad].filter(Boolean).join(" · ");
+    [data.sh, data.ad || SHOP.address].filter(Boolean).join(" · ");
   document.getElementById("generated").textContent =
     "Generado el " + new Date().toLocaleDateString("es-ES") + " · specs reales detectadas en tienda";
 

@@ -15,6 +15,15 @@ namespace KioskClinicaPC.Core
         public int AutoScanSeconds { get; set; } = 18;
         public double SlideIntervalSeconds { get; set; } = 5.2;
 
+        /// <summary>Animación de entrada a la pantalla Main tras el escaneo.
+        /// Valores: "Iris", "ZoomThrough" o "Cycle" (alterna las dos en cada entrada).</summary>
+        public string MainEntranceStyle { get; set; } = "Cycle";
+
+        /// <summary>Nivel de efectos gráficos. "Auto" (por defecto) degrada blurs/partículas solo en
+        /// equipos con render por software o GPU sin aceleración completa; "High" fuerza calidad máxima;
+        /// "Low" fuerza modo ligero en cualquier equipo. Ver <see cref="GraphicsQuality"/>.</summary>
+        public string GraphicsMode { get; set; } = "Auto";
+
         public static KioskSettings Load(string path)
         {
             try

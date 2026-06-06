@@ -26,7 +26,9 @@ namespace KioskClinicaPC.Windows
             this.ConfigData = new AppConfig
             {
                 Price = PriceTextBox.Text,
-                DiscountedPrice = DiscountedPriceTextBox.Text
+                DiscountedPrice = DiscountedPriceTextBox.Text,
+                Condition = NewRadio.IsChecked == true ? Warranty.New : Warranty.Used,
+                ShowRefurbished = RefurbishedCheckBox.IsChecked == true
             };
             
             this.DialogResult = true;

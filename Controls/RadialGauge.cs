@@ -46,7 +46,9 @@ namespace KioskClinicaPC.Controls
             _track.StrokeThickness = 12;
             _track.StrokeStartLineCap = PenLineCap.Round;
             _track.StrokeEndLineCap = PenLineCap.Round;
-            _track.Stroke = new SolidColorBrush(Color.FromArgb(0x12, 0xFF, 0xFF, 0xFF));
+            var trackBrush = new SolidColorBrush(Color.FromArgb(0x12, 0xFF, 0xFF, 0xFF));
+            trackBrush.Freeze();
+            _track.Stroke = trackBrush;
 
             _value.StrokeThickness = 12;
             _value.StrokeStartLineCap = PenLineCap.Round;
@@ -87,8 +89,11 @@ namespace KioskClinicaPC.Controls
             _value.Data = BuildArc(cx, r, StartAngle, SweepAngle * (v / 100.0));
 
             var accent = new SolidColorBrush(AccentColor);
+            accent.Freeze();
             _value.Stroke = accent;
-            _value.Effect = new DropShadowEffect { Color = AccentColor, BlurRadius = 14, ShadowDepth = 0, Opacity = 0.85 };
+            var glow = new DropShadowEffect { Color = AccentColor, BlurRadius = 14, ShadowDepth = 0, Opacity = 0.85 };
+            glow.Freeze();
+            _value.Effect = glow;
             _number.Foreground = accent;
             _numberRun.Text = Math.Round(v).ToString("0");
         }

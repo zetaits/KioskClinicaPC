@@ -2,7 +2,7 @@
 using System.IO;
 using System.Threading;
 using System.Windows;
-using KioskClinicaPC.Core; 
+using KioskClinicaPC.Core;
 using KioskClinicaPC.Windows; 
 using Newtonsoft.Json; 
 using Serilog;

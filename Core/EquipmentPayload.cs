@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
+using System.Linq;
 using System.Text;
 using Newtonsoft.Json;
 
@@ -62,7 +63,9 @@ namespace KioskClinicaPC.Core
                 Price = NullIfEmpty(config.Price),
                 DiscountedPrice = NullIfEmpty(config.DiscountedPrice),
                 Shop = NullIfEmpty(shopName),
-                Address = NullIfEmpty(config.ShopAddress)
+                // La dirección estándar la pone la web (docs/app.js → SHOP.address): no la mandamos.
+                // Solo viaja si el comercio la ha personalizado.
+                Address = IsDefaultAddress(config.ShopAddress) ? null : NullIfEmpty(config.ShopAddress)
             };
 
             foreach (var s in specs)
@@ -70,7 +73,9 @@ namespace KioskClinicaPC.Core
                 dto.Components.Add(new Comp
                 {
                     Id = s.Id,
-                    Label = NullIfEmpty(s.Label),
+                    // La etiqueta estándar la conoce la web por el id (docs/app.js → LABELS): no la
+                    // mandamos para aligerar el QR. Solo viaja si el comercio la ha personalizado.
+                    Label = IsDefaultLabel(s.Id, s.Label) ? null : NullIfEmpty(s.Label),
                     Value = NullIfEmpty(s.Value),
                     Detail = NullIfEmpty(s.Detail)
                 });
@@ -87,6 +92,26 @@ namespace KioskClinicaPC.Core
         }
 
         private static string? NullIfEmpty(string? s) => string.IsNullOrWhiteSpace(s) ? null : s.Trim();
+
+        // Etiquetas canónicas por id (mismas que docs/app.js → LABELS). Fuente única: SpecCatalog.
+        private static readonly Dictionary<string, string> DefaultLabels =
+            SpecCatalog.DefaultMarketing()
+                .Where(m => !string.IsNullOrWhiteSpace(m.Id) && !string.IsNullOrWhiteSpace(m.Label))
+                .ToDictionary(m => m.Id!, m => m.Label!, StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>True si la etiqueta coincide con la estándar del componente: en ese caso no hace
+        /// falta enviarla (la web la deduce del id), encogiendo el QR.</summary>
+        private static bool IsDefaultLabel(string? id, string? label)
+        {
+            if (string.IsNullOrWhiteSpace(id) || string.IsNullOrWhiteSpace(label)) return false;
+            return DefaultLabels.TryGetValue(id!, out var def)
+                && string.Equals(def.Trim(), label!.Trim(), StringComparison.OrdinalIgnoreCase);
+        }
+
+        /// <summary>True si la dirección es la estándar: la web la conoce, no hace falta mandarla.</summary>
+        private static bool IsDefaultAddress(string? address) =>
+            !string.IsNullOrWhiteSpace(address) &&
+            string.Equals(address!.Trim(), AppConfig.DefaultShopAddress, StringComparison.OrdinalIgnoreCase);
 
         private static byte[] Gzip(string text)
         {

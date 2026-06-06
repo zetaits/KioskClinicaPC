@@ -35,12 +35,13 @@ namespace KioskClinicaPC.Core
             return "";
         }
 
-        /// <summary>Cuota mensual a 12 meses del precio efectivo dado. "" si no es número.</summary>
-        public static string Monthly(string? effectivePrice)
+        /// <summary>Cuota mensual del precio efectivo repartido en <paramref name="months"/> meses (por
+        /// defecto 6). "" si no es número o los meses no son válidos.</summary>
+        public static string Monthly(string? effectivePrice, int months = 6)
         {
-            if (string.IsNullOrWhiteSpace(effectivePrice)) return "";
+            if (string.IsNullOrWhiteSpace(effectivePrice) || months <= 0) return "";
             if (double.TryParse(effectivePrice, NumberStyles.Any, CultureInfo.InvariantCulture, out double p))
-                return (p / 12).ToString("C2", EsCulture);
+                return (p / months).ToString("C2", EsCulture);
             return "";
         }
     }

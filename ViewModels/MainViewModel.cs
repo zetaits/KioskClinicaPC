@@ -57,6 +57,8 @@ namespace KioskClinicaPC.ViewModels
                     OnPropertyChanged(nameof(HasDiscount));
                     OnPropertyChanged(nameof(BrandLogoPath));
                     OnPropertyChanged(nameof(HasBrandLogo));
+                    OnPropertyChanged(nameof(ShowRefurbished));
+                    OnPropertyChanged(nameof(WarrantyText));
                 }
             }
         }
@@ -67,6 +69,9 @@ namespace KioskClinicaPC.ViewModels
 
         public ObservableCollection<SpecItem> Specs { get; } = new ObservableCollection<SpecItem>();
         public ObservableCollection<ScanLogItem> ScanLogs { get; } = new ObservableCollection<ScanLogItem>();
+
+        // Blips del radar de Scan (variación lock-on). Hasta 8, ligados a los primeros componentes.
+        public ObservableCollection<RadarBlip> RadarBlips { get; } = new ObservableCollection<RadarBlip>();
 
         private SpecItem _selectedSpec;
         public SpecItem SelectedSpec
@@ -96,8 +101,36 @@ namespace KioskClinicaPC.ViewModels
         public string FormattedPrice => PriceFormatter.Format(DisplayConfig?.DiscountedPrice ?? DisplayConfig?.Price);
         public string FormattedOriginalPrice => PriceFormatter.Format(DisplayConfig?.Price);
         public string FormattedDiscount => PriceFormatter.Discount(DisplayConfig?.Price, DisplayConfig?.DiscountedPrice);
-        public string FormattedMonthly => PriceFormatter.Monthly(DisplayConfig?.DiscountedPrice ?? DisplayConfig?.Price);
+        public string FormattedMonthly => PriceFormatter.Monthly(DisplayConfig?.DiscountedPrice ?? DisplayConfig?.Price, InstallmentMonths);
         public bool HasDiscount => !string.IsNullOrWhiteSpace(DisplayConfig?.DiscountedPrice);
+
+        // Distintivo "Reacondicionado" y garantía derivada del estado del equipo (Nuevo/Ocasión).
+        public bool ShowRefurbished => DisplayConfig?.ShowRefurbished ?? true;
+        public string WarrantyText => Warranty.Label(DisplayConfig?.Condition);
+
+        // Pago en cuotas: por defecto 6 meses; el botón de la ficha alterna a 12 y vuelve.
+        private int _installmentMonths = 6;
+        public int InstallmentMonths
+        {
+            get => _installmentMonths;
+            set
+            {
+                if (SetProperty(ref _installmentMonths, value))
+                {
+                    OnPropertyChanged(nameof(FormattedMonthly));
+                    OnPropertyChanged(nameof(InstallmentsPrefix));
+                    OnPropertyChanged(nameof(InstallmentsToggleText));
+                }
+            }
+        }
+
+        // Prefijo "6 × " / "12 × " junto a la cuota.
+        public string InstallmentsPrefix => $"{InstallmentMonths} × ";
+        // Texto del botón que alterna el plazo: muestra el plazo alternativo al actual.
+        public string InstallmentsToggleText => InstallmentMonths == 6 ? "VER 12 MESES" : "VER 6 MESES";
+
+        /// <summary>Alterna el plazo de cuotas entre 6 y 12 meses.</summary>
+        public void ToggleInstallments() => InstallmentMonths = InstallmentMonths == 6 ? 12 : 6;
 
         // Attract screen slides
         public ObservableCollection<AttractSlide> Slides { get; } = new ObservableCollection<AttractSlide>();
@@ -203,6 +236,8 @@ namespace KioskClinicaPC.ViewModels
                     savedConfig.Cpu = savedConfig.Cores = savedConfig.Ram = savedConfig.Gpu = savedConfig.Storage = savedConfig.Screen = savedConfig.Os = null;
                     savedConfig.Battery = savedConfig.Wifi = savedConfig.Camera = savedConfig.Ports = null;
                     savedConfig.ChassisName = savedConfig.ModelName = savedConfig.Family = savedConfig.Sku = null;
+                    savedConfig.RamDetail = savedConfig.StorageDetail = savedConfig.ScreenDetail = savedConfig.BatteryDetail = null;
+                    savedConfig.GpuDetail = savedConfig.WifiDetail = savedConfig.CameraDetail = savedConfig.PortsDetail = savedConfig.OsDetail = null;
                     JsonStore.WriteAtomic(App.ConfigFilePath, JsonConvert.SerializeObject(savedConfig, Formatting.Indented));
                 }
             }
@@ -281,6 +316,16 @@ namespace KioskClinicaPC.ViewModels
                 Wifi = ConfigMerger.Display(_savedConfig.Wifi, _detectedSpecs.Wifi),
                 Camera = ConfigMerger.Display(_savedConfig.Camera, _detectedSpecs.Camera),
                 Ports = ConfigMerger.Display(_savedConfig.Ports, _detectedSpecs.Ports),
+                // Detalle técnico (StatStrip): override manual de Settings o lo detectado por WMI.
+                RamDetail = ConfigMerger.Display(_savedConfig.RamDetail, _detectedSpecs.RamDetail),
+                StorageDetail = ConfigMerger.Display(_savedConfig.StorageDetail, _detectedSpecs.StorageDetail),
+                ScreenDetail = ConfigMerger.Display(_savedConfig.ScreenDetail, _detectedSpecs.ScreenDetail),
+                BatteryDetail = ConfigMerger.Display(_savedConfig.BatteryDetail, _detectedSpecs.BatteryDetail),
+                GpuDetail = ConfigMerger.Display(_savedConfig.GpuDetail, _detectedSpecs.GpuDetail),
+                WifiDetail = ConfigMerger.Display(_savedConfig.WifiDetail, _detectedSpecs.WifiDetail),
+                CameraDetail = ConfigMerger.Display(_savedConfig.CameraDetail, _detectedSpecs.CameraDetail),
+                PortsDetail = ConfigMerger.Display(_savedConfig.PortsDetail, _detectedSpecs.PortsDetail),
+                OsDetail = ConfigMerger.Display(_savedConfig.OsDetail, _detectedSpecs.OsDetail),
                 Price = _savedConfig.Price,
                 DiscountedPrice = _savedConfig.DiscountedPrice,
                 // Identidad real detectada (sin hardcode). null si la detección no la aporta → editable en Settings.
@@ -288,7 +333,7 @@ namespace KioskClinicaPC.ViewModels
                 ModelName = ConfigMerger.Display(_savedConfig.ModelName, _detectedSpecs.ModelName),
                 Family = ConfigMerger.Display(_savedConfig.Family, _detectedSpecs.Family),
                 Sku = ConfigMerger.Display(_savedConfig.Sku, _detectedSpecs.Sku),
-                ShopAddress = ConfigMerger.Display(_savedConfig.ShopAddress, "Calle Sevilla 54, Málaga"),
+                ShopAddress = ConfigMerger.Display(_savedConfig.ShopAddress, AppConfig.DefaultShopAddress),
                 ShopServices = ConfigMerger.Display(_savedConfig.ShopServices, "Asistencia · Cambio · Reparación · Reacondicionado"),
                 ProductImagePath = _savedConfig.ProductImagePath,
                 MarketingData = _savedConfig.MarketingData
@@ -375,6 +420,9 @@ namespace KioskClinicaPC.ViewModels
                 // Titular amigable + técnico secundario (p.ej. "WiFi 6E" + "Intel AX211").
                 var fmt = SpecFormatter.Format(m.Id, raw);
 
+                // Potencia y gama calculadas desde el hardware real (no constantes inventadas).
+                int score = PerformanceScorer.Score(m.Id, DisplayConfig);
+
                 var item = new SpecItem
                 {
                     Id = m.Id,
@@ -385,7 +433,8 @@ namespace KioskClinicaPC.ViewModels
                     IsPresent = present,
                     Detail = detail,
                     Summary = m.Summary,
-                    BenchScore = m.BenchScore,
+                    BenchScore = score,
+                    Tier = PerformanceScorer.TierLabel(m.Id, score),
                     BenchLabel = m.BenchLabel,
                     Pros = m.Pros.Select((p, i) => new ProItem { Index = (i + 1).ToString("D2"), Text = p }).ToList(),
                     IconData = icons.ContainsKey(m.Id) ? icons[m.Id] : "",
@@ -421,6 +470,44 @@ namespace KioskClinicaPC.ViewModels
             }
 
             ActiveSpec = Specs.Count > 0 ? Specs[0] : null;
+
+            BuildRadarBlips();
+        }
+
+        // Posiciones del radar de Scan (variación lock-on), copiadas del mockup (RADAR_POS en
+        // components.jsx): radar 760×760, centro (380,380), x=380+cos(a)·r, y=380+sin(a)·r,
+        // flip si x>380, pd=((a+360)%360)/360·1.7s. Mapeo por id para reproducir el layout exacto.
+        private static readonly Dictionary<string, (double X, double Y, bool Flip, double Pd)> RadarLayout = new()
+        {
+            [ComponentIds.Cpu]     = (485.6, 153.4, true,  1.393),
+            [ComponentIds.Gpu]     = (680.7, 270.6, true,  1.606),
+            [ComponentIds.Ram]     = (543.8, 494.7, true,  0.165),
+            [ComponentIds.Storage] = (432.1, 675.4, true,  0.378),
+            [ComponentIds.Screen]  = (225.7, 563.8, false, 0.614),
+            [ComponentIds.Battery] = ( 91.0, 405.3, false, 0.826),
+            [ComponentIds.Wifi]    = (224.1, 290.0, false, 0.992),
+            [ComponentIds.Camera]  = (333.6, 237.4, false, 1.190),
+        };
+
+        private void BuildRadarBlips()
+        {
+            RadarBlips.Clear();
+            foreach (var spec in Specs)
+            {
+                if (!RadarLayout.TryGetValue(spec.Id, out var p)) continue;
+                RadarBlips.Add(new RadarBlip
+                {
+                    Id = spec.Id,
+                    X = p.X,
+                    Y = p.Y,
+                    Flip = p.Flip,
+                    PingDelaySeconds = p.Pd,
+                    IconData = spec.IconData,
+                    AccentBrush = spec.AccentBrush,
+                    AccentColor = spec.AccentColor,
+                    Label = spec.Label,
+                });
+            }
         }
 
         private string GetValueForId(string id)
@@ -441,13 +528,25 @@ namespace KioskClinicaPC.ViewModels
             };
         }
 
+        // Detalle técnico del StatStrip por componente: override manual / detectado (ya fusionados en
+        // DisplayConfig.*Detail; el CPU usa Cores) y, si no hay nada real, el genérico del catálogo (hoy "").
         private string GetDetailForId(string id, string defaultDetail)
         {
-            return id.ToLowerInvariant() switch
+            string? detail = id.ToLowerInvariant() switch
             {
-                ComponentIds.Cpu => DisplayConfig.Cores ?? defaultDetail,
-                _ => defaultDetail
+                ComponentIds.Cpu => DisplayConfig.Cores,
+                ComponentIds.Ram => DisplayConfig.RamDetail,
+                ComponentIds.Storage => DisplayConfig.StorageDetail,
+                ComponentIds.Screen => DisplayConfig.ScreenDetail,
+                ComponentIds.Battery => DisplayConfig.BatteryDetail,
+                ComponentIds.Gpu => DisplayConfig.GpuDetail,
+                ComponentIds.Wifi => DisplayConfig.WifiDetail,
+                ComponentIds.Camera => DisplayConfig.CameraDetail,
+                ComponentIds.Ports => DisplayConfig.PortsDetail,
+                ComponentIds.Os => DisplayConfig.OsDetail,
+                _ => null
             };
+            return !string.IsNullOrWhiteSpace(detail) ? detail : (defaultDetail ?? "");
         }
 
         // Etiquetas por defecto antiguas → nuevas. Solo se aplican si coinciden exactamente con la antigua
@@ -514,6 +613,17 @@ namespace KioskClinicaPC.ViewModels
                 _savedConfig.Wifi = ConfigMerger.NoPlaceholder(DisplayConfig.Wifi);
                 _savedConfig.Camera = ConfigMerger.NoPlaceholder(DisplayConfig.Camera);
                 _savedConfig.Ports = ConfigMerger.NoPlaceholder(DisplayConfig.Ports);
+
+                // Overrides de detalle técnico: guardar solo si difieren de lo detectado.
+                _savedConfig.RamDetail = ConfigMerger.Override(DisplayConfig.RamDetail, _detectedSpecs.RamDetail);
+                _savedConfig.StorageDetail = ConfigMerger.Override(DisplayConfig.StorageDetail, _detectedSpecs.StorageDetail);
+                _savedConfig.ScreenDetail = ConfigMerger.Override(DisplayConfig.ScreenDetail, _detectedSpecs.ScreenDetail);
+                _savedConfig.BatteryDetail = ConfigMerger.Override(DisplayConfig.BatteryDetail, _detectedSpecs.BatteryDetail);
+                _savedConfig.GpuDetail = ConfigMerger.Override(DisplayConfig.GpuDetail, _detectedSpecs.GpuDetail);
+                _savedConfig.WifiDetail = ConfigMerger.Override(DisplayConfig.WifiDetail, _detectedSpecs.WifiDetail);
+                _savedConfig.CameraDetail = ConfigMerger.Override(DisplayConfig.CameraDetail, _detectedSpecs.CameraDetail);
+                _savedConfig.PortsDetail = ConfigMerger.Override(DisplayConfig.PortsDetail, _detectedSpecs.PortsDetail);
+                _savedConfig.OsDetail = ConfigMerger.Override(DisplayConfig.OsDetail, _detectedSpecs.OsDetail);
 
                 _savedConfig.ChassisName = DisplayConfig.ChassisName;
                 _savedConfig.ModelName = DisplayConfig.ModelName;

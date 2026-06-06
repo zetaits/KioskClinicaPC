@@ -1,12 +1,15 @@
 using System;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
 using Microsoft.Win32;
 using System.IO;
 using System.Diagnostics;
 using System.Globalization;
+using System.Linq;
 using System.Reflection;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using KioskClinicaPC.Core;
 using KioskClinicaPC;
 using Newtonsoft.Json;
@@ -18,6 +21,9 @@ namespace KioskClinicaPC.Windows
         private AppConfig _savedConfig;
         private readonly AppConfig _detectedSpecs;
         private KioskSettings _settings = new KioskSettings();
+
+        // Slides del Attract editables (añadir/eliminar/editar). Se ligan al ItemsControl por nombre.
+        private readonly ObservableCollection<AttractSlide> _attractSlides = new ObservableCollection<AttractSlide>();
 
         /// <summary>Indica a MainWindow que debe entrar en modo edición al cerrar.</summary>
         public bool LaunchEditMode { get; private set; }
@@ -73,6 +79,39 @@ namespace KioskClinicaPC.Windows
             CameraTextBox.Text = _savedConfig.Camera;
             PortsTextBox.Text = _savedConfig.Ports;
             SkuTextBox.Text = _savedConfig.Sku;
+
+            // Detalle técnico (StatStrip): override manual o lo detectado por WMI.
+            RamDetailTextBox.Text = ConfigMerger.Display(_savedConfig.RamDetail, _detectedSpecs.RamDetail);
+            StorageDetailTextBox.Text = ConfigMerger.Display(_savedConfig.StorageDetail, _detectedSpecs.StorageDetail);
+            ScreenDetailTextBox.Text = ConfigMerger.Display(_savedConfig.ScreenDetail, _detectedSpecs.ScreenDetail);
+            BatteryDetailTextBox.Text = ConfigMerger.Display(_savedConfig.BatteryDetail, _detectedSpecs.BatteryDetail);
+            GpuDetailTextBox.Text = ConfigMerger.Display(_savedConfig.GpuDetail, _detectedSpecs.GpuDetail);
+            WifiDetailTextBox.Text = ConfigMerger.Display(_savedConfig.WifiDetail, _detectedSpecs.WifiDetail);
+            CameraDetailTextBox.Text = ConfigMerger.Display(_savedConfig.CameraDetail, _detectedSpecs.CameraDetail);
+            PortsDetailTextBox.Text = ConfigMerger.Display(_savedConfig.PortsDetail, _detectedSpecs.PortsDetail);
+            OsDetailTextBox.Text = ConfigMerger.Display(_savedConfig.OsDetail, _detectedSpecs.OsDetail);
+
+            // Estado del equipo + distintivo "Reacondicionado".
+            RefurbishedCheckBox.IsChecked = _savedConfig.ShowRefurbished;
+            if (Warranty.IsNew(_savedConfig.Condition)) NewRadio.IsChecked = true;
+            else UsedRadio.IsChecked = true;
+
+            // Slides del Attract: copia editable (clona para no mutar _savedConfig hasta Guardar).
+            _attractSlides.Clear();
+            foreach (var s in _savedConfig.AttractSlides ?? new List<AttractSlide>())
+                _attractSlides.Add(new AttractSlide { Eyebrow = s.Eyebrow, Title1 = s.Title1, Title2 = s.Title2, Subtitle = s.Subtitle });
+            SlidesItemsControl.ItemsSource = _attractSlides;
+        }
+
+        private void AddSlide_Click(object sender, RoutedEventArgs e)
+        {
+            _attractSlides.Add(new AttractSlide { Eyebrow = "NUEVO", Title1 = "TITULAR", Title2 = "SECUNDARIO", Subtitle = "Subtítulo" });
+        }
+
+        private void RemoveSlide_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is FrameworkElement fe && fe.Tag is AttractSlide slide)
+                _attractSlides.Remove(slide);
         }
 
         private void LoadSettings()
@@ -106,6 +145,27 @@ namespace KioskClinicaPC.Windows
                 _savedConfig.Camera = ConfigMerger.NoPlaceholder(CameraTextBox.Text);
                 _savedConfig.Ports = ConfigMerger.NoPlaceholder(PortsTextBox.Text);
                 _savedConfig.Sku = string.IsNullOrWhiteSpace(SkuTextBox.Text) ? null : SkuTextBox.Text;
+
+                // Detalle técnico: guardar override solo si difiere de lo detectado.
+                _savedConfig.RamDetail = ConfigMerger.Override(RamDetailTextBox.Text, _detectedSpecs.RamDetail);
+                _savedConfig.StorageDetail = ConfigMerger.Override(StorageDetailTextBox.Text, _detectedSpecs.StorageDetail);
+                _savedConfig.ScreenDetail = ConfigMerger.Override(ScreenDetailTextBox.Text, _detectedSpecs.ScreenDetail);
+                _savedConfig.BatteryDetail = ConfigMerger.Override(BatteryDetailTextBox.Text, _detectedSpecs.BatteryDetail);
+                _savedConfig.GpuDetail = ConfigMerger.Override(GpuDetailTextBox.Text, _detectedSpecs.GpuDetail);
+                _savedConfig.WifiDetail = ConfigMerger.Override(WifiDetailTextBox.Text, _detectedSpecs.WifiDetail);
+                _savedConfig.CameraDetail = ConfigMerger.Override(CameraDetailTextBox.Text, _detectedSpecs.CameraDetail);
+                _savedConfig.PortsDetail = ConfigMerger.Override(PortsDetailTextBox.Text, _detectedSpecs.PortsDetail);
+                _savedConfig.OsDetail = ConfigMerger.Override(OsDetailTextBox.Text, _detectedSpecs.OsDetail);
+
+                _savedConfig.ShowRefurbished = RefurbishedCheckBox.IsChecked == true;
+                _savedConfig.Condition = NewRadio.IsChecked == true ? Warranty.New : Warranty.Used;
+
+                // Slides del Attract: descarta los completamente vacíos; conserva el resto en orden.
+                _savedConfig.AttractSlides = _attractSlides
+                    .Where(s => !(string.IsNullOrWhiteSpace(s.Eyebrow) && string.IsNullOrWhiteSpace(s.Title1)
+                                  && string.IsNullOrWhiteSpace(s.Title2) && string.IsNullOrWhiteSpace(s.Subtitle)))
+                    .Select(s => new AttractSlide { Eyebrow = s.Eyebrow, Title1 = s.Title1, Title2 = s.Title2, Subtitle = s.Subtitle })
+                    .ToList();
 
                 string json = JsonConvert.SerializeObject(_savedConfig, Formatting.Indented);
                 JsonStore.WriteAtomic(App.ConfigFilePath, json);

@@ -107,6 +107,69 @@
                                 <TextBox x:Name="DiscountedPriceTextBox" Style="{StaticResource ConfigTextBox}"/>
                             </StackPanel>
                         </Grid>
+
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="ESTADO DEL EQUIPO (DETERMINA LA GARANTÍA)" Margin="2,6,0,6"/>
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                            <RadioButton x:Name="NewRadio" Content="Nuevo · 3 años garantía" GroupName="Condition"
+                                         Foreground="White" FontSize="13" Margin="0,0,24,0"/>
+                            <RadioButton x:Name="UsedRadio" Content="De ocasión · 1 año garantía" GroupName="Condition"
+                                         Foreground="White" FontSize="13"/>
+                        </StackPanel>
+                        <CheckBox x:Name="RefurbishedCheckBox" Content="Mostrar distintivo «Reacondicionado» en la ficha"
+                                  Foreground="White" FontSize="13"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Pantalla Attract · textos rotativos -->
+                <Border Style="{StaticResource SectionCard}">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource SectionTitle}" Text="Pantalla de espera (Attract) · Textos"/>
+                        <TextBlock Style="{StaticResource SectionHint}" Text="Mensajes que van rotando en la pantalla inicial. Añade o elimina los que quieras."/>
+                        <ItemsControl x:Name="SlidesItemsControl">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Background="#0AFFFFFF" BorderBrush="{StaticResource Line1Brush}" BorderThickness="1" Padding="14" Margin="0,0,0,12">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0">
+                                                <TextBlock Style="{StaticResource FieldLabel}" Text="ANTETÍTULO (pequeño, arriba)"/>
+                                                <TextBox Style="{StaticResource ConfigTextBox}" Margin="0,0,0,8"
+                                                         Text="{Binding Eyebrow, UpdateSourceTrigger=PropertyChanged}"/>
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="12"/>
+                                                        <ColumnDefinition Width="*"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel Grid.Column="0">
+                                                        <TextBlock Style="{StaticResource FieldLabel}" Text="TITULAR 1"/>
+                                                        <TextBox Style="{StaticResource ConfigTextBox}" Margin="0,0,0,8"
+                                                                 Text="{Binding Title1, UpdateSourceTrigger=PropertyChanged}"/>
+                                                    </StackPanel>
+                                                    <StackPanel Grid.Column="2">
+                                                        <TextBlock Style="{StaticResource FieldLabel}" Text="TITULAR 2 (acento)"/>
+                                                        <TextBox Style="{StaticResource ConfigTextBox}" Margin="0,0,0,8"
+                                                                 Text="{Binding Title2, UpdateSourceTrigger=PropertyChanged}"/>
+                                                    </StackPanel>
+                                                </Grid>
+                                                <TextBlock Style="{StaticResource FieldLabel}" Text="SUBTÍTULO"/>
+                                                <TextBox Style="{StaticResource ConfigTextBox}"
+                                                         Text="{Binding Subtitle, UpdateSourceTrigger=PropertyChanged}"/>
+                                            </StackPanel>
+                                            <Button Grid.Column="1" Content="✕ Quitar" VerticalAlignment="Top" Margin="12,18,0,0"
+                                                    Padding="10,6" Background="#1AFF5252" Foreground="#FFFF8A8A" BorderThickness="0"
+                                                    Cursor="Hand" Tag="{Binding}" Click="RemoveSlide_Click"/>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <Button Content="+ Añadir texto" HorizontalAlignment="Left" Margin="0,4,0,0"
+                                Padding="14,8" Background="#1A00F0FF" Foreground="{StaticResource CyanBrush}" BorderThickness="0"
+                                Cursor="Hand" Click="AddSlide_Click"/>
                     </StackPanel>
                 </Border>
 
@@ -182,6 +245,69 @@
                             <StackPanel Grid.Row="5" Grid.Column="2" Style="{StaticResource Field}">
                                 <TextBlock Style="{StaticResource FieldLabel}" Text="SKU"/>
                                 <TextBox x:Name="SkuTextBox" Style="{StaticResource ConfigTextBox}"/>
+                            </StackPanel>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <!-- Detalle técnico (fila de tokens del StatStrip en la página de specs) -->
+                <Border Style="{StaticResource SectionCard}">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource SectionTitle}" Text="Detalle técnico (ficha de specs)"/>
+                        <TextBlock Style="{StaticResource SectionHint}" Text="Tokens separados por &#183; (p.ej. &quot;4800 MHz &#183; DDR5 &#183; 2 m&#243;dulos&quot;). En blanco usa lo detectado; si no hay detecci&#243;n, no se muestra nada."/>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="18"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <StackPanel Grid.Row="0" Grid.Column="0" Style="{StaticResource Field}">
+                                <TextBlock Style="{StaticResource FieldLabel}" Text="RAM · DETALLE"/>
+                                <TextBox x:Name="RamDetailTextBox" Style="{StaticResource ConfigTextBox}"/>
+                            </StackPanel>
+                            <StackPanel Grid.Row="0" Grid.Column="2" Style="{StaticResource Field}">
+                                <TextBlock Style="{StaticResource FieldLabel}" Text="ALMACENAMIENTO · DETALLE"/>
+                                <TextBox x:Name="StorageDetailTextBox" Style="{StaticResource ConfigTextBox}"/>
+                            </StackPanel>
+
+                            <StackPanel Grid.Row="1" Grid.Column="0" Style="{StaticResource Field}">
+                                <TextBlock Style="{StaticResource FieldLabel}" Text="PANTALLA · DETALLE"/>
+                                <TextBox x:Name="ScreenDetailTextBox" Style="{StaticResource ConfigTextBox}"/>
+                            </StackPanel>
+                            <StackPanel Grid.Row="1" Grid.Column="2" Style="{StaticResource Field}">
+                                <TextBlock Style="{StaticResource FieldLabel}" Text="BATERÍA · DETALLE"/>
+                                <TextBox x:Name="BatteryDetailTextBox" Style="{StaticResource ConfigTextBox}"/>
+                            </StackPanel>
+
+                            <StackPanel Grid.Row="2" Grid.Column="0" Style="{StaticResource Field}">
+                                <TextBlock Style="{StaticResource FieldLabel}" Text="GRÁFICOS · DETALLE"/>
+                                <TextBox x:Name="GpuDetailTextBox" Style="{StaticResource ConfigTextBox}"/>
+                            </StackPanel>
+                            <StackPanel Grid.Row="2" Grid.Column="2" Style="{StaticResource Field}">
+                                <TextBlock Style="{StaticResource FieldLabel}" Text="CONECTIVIDAD · DETALLE"/>
+                                <TextBox x:Name="WifiDetailTextBox" Style="{StaticResource ConfigTextBox}"/>
+                            </StackPanel>
+
+                            <StackPanel Grid.Row="3" Grid.Column="0" Style="{StaticResource Field}">
+                                <TextBlock Style="{StaticResource FieldLabel}" Text="CÁMARA · DETALLE"/>
+                                <TextBox x:Name="CameraDetailTextBox" Style="{StaticResource ConfigTextBox}"/>
+                            </StackPanel>
+                            <StackPanel Grid.Row="3" Grid.Column="2" Style="{StaticResource Field}">
+                                <TextBlock Style="{StaticResource FieldLabel}" Text="PUERTOS · DETALLE"/>
+                                <TextBox x:Name="PortsDetailTextBox" Style="{StaticResource ConfigTextBox}"/>
+                            </StackPanel>
+
+                            <StackPanel Grid.Row="4" Grid.Column="0" Style="{StaticResource Field}">
+                                <TextBlock Style="{StaticResource FieldLabel}" Text="SISTEMA · DETALLE"/>
+                                <TextBox x:Name="OsDetailTextBox" Style="{StaticResource ConfigTextBox}"/>
                             </StackPanel>
                         </Grid>
                     </StackPanel>

@@ -48,9 +48,23 @@ namespace KioskClinicaPC.Tests
         }
 
         [Fact]
-        public void Monthly_DivideEntreDoce()
+        public void Monthly_PorDefecto_DivideEntreSeis()
         {
-            Assert.Equal("100,00€", NoSpaces(PriceFormatter.Monthly("1200")));
+            Assert.Equal("200,00€", NoSpaces(PriceFormatter.Monthly("1200")));
+        }
+
+        [Fact]
+        public void Monthly_DoceMeses_DivideEntreDoce()
+        {
+            Assert.Equal("100,00€", NoSpaces(PriceFormatter.Monthly("1200", 12)));
+        }
+
+        [Theory]
+        [InlineData(0)]
+        [InlineData(-3)]
+        public void Monthly_MesesNoValidos_DevuelveCadenaVacia(int months)
+        {
+            Assert.Equal("", PriceFormatter.Monthly("1200", months));
         }
 
         [Fact]

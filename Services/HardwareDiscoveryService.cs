@@ -22,10 +22,15 @@ namespace KioskClinicaPC.Services
             {
                 config.Cpu = GetCpuName();
                 config.Cores = GetCpuCores();
-                config.Ram = GetRamDetails();
+                var ram = GetRamDetails();
+                config.Ram = ram.Value;
+                config.RamDetail = ram.Detail;
                 config.Gpu = GetGpuName();
-                config.Storage = GetStorageDetails();
+                var storage = GetStorageDetails();
+                config.Storage = storage.Value;
+                config.StorageDetail = storage.Detail;
                 config.Screen = screen;
+                config.ScreenDetail = GetScreenDetail(screen);
                 config.Os = $"{GetOsName()} ({GetPcName()})";
 
                 // Identidad real del equipo (sustituye el hardcode "ASUS ROG").
@@ -35,7 +40,9 @@ namespace KioskClinicaPC.Services
                 config.Family = GetChassisFamily();
 
                 // Componentes opcionales: null si el equipo no los tiene (no se muestran).
-                config.Battery = GetBatteryInfo();
+                var battery = GetBatteryInfo();
+                config.Battery = battery.Value;
+                config.BatteryDetail = battery.Detail;
                 config.Wifi = GetWifiAdapter();
                 config.Camera = GetCameraName();
                 // Puertos no se detectan de forma fiable por WMI: se deja como override manual (Settings).
@@ -123,23 +130,32 @@ namespace KioskClinicaPC.Services
             return null;
         }
 
-        /// <summary>Capacidad/presencia de batería. null en sobremesa (sin batería).</summary>
-        private string? GetBatteryInfo()
+        /// <summary>Capacidad/presencia de batería. Value null en sobremesa (sin batería).
+        /// Detail = química de la celda (Li-ion / Li-polímero) si WMI la reporta.</summary>
+        private (string? Value, string? Detail) GetBatteryInfo()
         {
             try
             {
                 using var searcher = new ManagementObjectSearcher("select EstimatedChargeRemaining, Chemistry from Win32_Battery");
                 var battery = searcher.Get().OfType<ManagementObject>().FirstOrDefault();
-                if (battery == null) return null; // sobremesa: sin batería
+                if (battery == null) return (null, null); // sobremesa: sin batería
 
                 // Capacidad de diseño en Wh desde root\wmi (más fiable que Win32_Battery).
                 double wh = GetBatteryDesignWh();
-                return wh > 0 ? $"{Math.Round(wh)} Wh" : "Batería integrada";
+                string value = wh > 0 ? $"{Math.Round(wh)} Wh" : "Batería integrada";
+
+                string? detail = null;
+                // Win32_Battery.Chemistry: 6 = Li-ion, 8 = Li-polímero (resto poco común en portátiles).
+                if (battery["Chemistry"] != null && int.TryParse(battery["Chemistry"].ToString(), out int chem))
+                {
+                    detail = chem switch { 6 => "Li-ion", 8 => "Li-polímero", _ => null };
+                }
+                return (value, detail);
             }
             catch (Exception ex)
             {
                 Log.Error(ex, "Error al detectar la batería.");
-                return null;
+                return (null, null);
             }
         }
 
@@ -302,7 +318,7 @@ namespace KioskClinicaPC.Services
             return $"{cores} Núcleos / {threads} Hilos";
         }
 
-        private string GetRamDetails()
+        private (string Value, string? Detail) GetRamDetails()
         {
             try
             {
@@ -312,12 +328,14 @@ namespace KioskClinicaPC.Services
                 try
                 {
                     ulong totalBytes = 0;
+                    int moduleCount = 0;
                     foreach (var module in modules)
                     {
                         // Algunos BIOS OEM no reportan Capacity: saltar ese módulo en vez de
                         // abortar (un null desboxeado tiraba toda la detección de RAM).
                         if (module["Capacity"] is null) continue;
                         totalBytes += Convert.ToUInt64(module["Capacity"]);
+                        moduleCount++;
                     }
 
                     double totalGB = Math.Round(totalBytes / (1024.0 * 1024.0 * 1024.0), 1);
@@ -337,10 +355,19 @@ namespace KioskClinicaPC.Services
                         string ddr = GetDdrGeneration(firstModule, speed);
                         string gen = string.IsNullOrEmpty(ddr) ? "" : $" {ddr}";
                         // Formato: "32 GB DDR5 (Kingston KF... @ 4800 MHz)" → el formatter parte titular/técnico.
-                        return $"{totalGB} GB{gen} ({manufacturer} {partNumber} @ {speed} MHz)";
+                        string value = $"{totalGB} GB{gen} ({manufacturer} {partNumber} @ {speed} MHz)";
+
+                        // Detalle real (StatStrip): velocidad · generación · nº de módulos. Sin claims inventados.
+                        var tokens = new List<string>();
+                        if (!string.IsNullOrEmpty(speed) && speed != "N/A") tokens.Add($"{speed} MHz");
+                        if (!string.IsNullOrEmpty(ddr)) tokens.Add(ddr);
+                        if (moduleCount > 0) tokens.Add(moduleCount == 1 ? "1 módulo" : $"{moduleCount} módulos");
+                        string? detail = tokens.Count > 0 ? string.Join(" · ", tokens) : null;
+
+                        return (value, detail);
                     }
 
-                    return $"{totalGB} GB";
+                    return ($"{totalGB} GB", null);
                 }
                 finally
                 {
@@ -350,7 +377,7 @@ namespace KioskClinicaPC.Services
             catch (Exception ex)
             {
                 Log.Error(ex, "Error al obtener detalles de la RAM");
-                return "RAM No disponible";
+                return ("RAM No disponible", null);
             }
         }
 
@@ -385,13 +412,14 @@ namespace KioskClinicaPC.Services
             return "";
         }
 
-        private string GetStorageDetails()
+        private (string Value, string? Detail) GetStorageDetails()
         {
             try
             {
                 using var searcher = new ManagementObjectSearcher("SELECT * FROM Win32_DiskDrive");
                 using var collection = searcher.Get();
                 var driveStrings = new List<string>();
+                var detailTokens = new List<string>();
 
                 foreach (ManagementObject mo in collection)
                 {
@@ -413,17 +441,59 @@ namespace KioskClinicaPC.Services
                         }
 
                         driveStrings.Add($"{model} ({totalGB} GB {mediaType})");
+
+                        // Detalle real (StatStrip): "NVMe · 1 TB" por unidad. NVMe se distingue por modelo.
+                        string ifaceType = model.ToUpperInvariant().Contains("NVME") ? "NVMe" : mediaType;
+                        if (ifaceType.Equals("Desconocido", StringComparison.OrdinalIgnoreCase)) ifaceType = "";
+                        string size = totalGB >= 1000
+                            ? $"{Math.Round(totalGB / 1024.0, totalGB % 1024 == 0 ? 0 : 1)} TB"
+                            : $"{totalGB} GB";
+                        detailTokens.Add(string.IsNullOrEmpty(ifaceType) ? size : $"{ifaceType} {size}");
                     }
                 }
 
-                if (driveStrings.Count == 1) return driveStrings[0];
-                return string.Join(" + ", driveStrings);
+                string value = driveStrings.Count == 1 ? driveStrings[0] : string.Join(" + ", driveStrings);
+                string? detail = detailTokens.Count > 0 ? string.Join(" · ", detailTokens) : null;
+                return (value, detail);
             }
             catch (Exception ex)
             {
                 Log.Error(ex, "Error al obtener detalles del almacenamiento");
-                return "Almacenamiento No disponible";
+                return ("Almacenamiento No disponible", null);
             }
+        }
+
+        /// <summary>Detalle real de pantalla: "2560×1600 · 165 Hz". Hz best-effort (omitido si no se lee).</summary>
+        private string? GetScreenDetail(string resolution)
+        {
+            var tokens = new List<string>();
+            var m = System.Text.RegularExpressions.Regex.Match(resolution ?? "", @"(?<w>\d{3,5})\D+(?<h>\d{3,5})");
+            if (m.Success) tokens.Add($"{m.Groups["w"].Value}×{m.Groups["h"].Value}");
+
+            int hz = GetScreenRefreshHz();
+            if (hz > 0) tokens.Add($"{hz} Hz");
+
+            return tokens.Count > 0 ? string.Join(" · ", tokens) : null;
+        }
+
+        /// <summary>Frecuencia de refresco del monitor principal (Hz) vía Win32_VideoController. 0 si no se lee.</summary>
+        private int GetScreenRefreshHz()
+        {
+            try
+            {
+                using var searcher = new ManagementObjectSearcher(
+                    "select CurrentRefreshRate from Win32_VideoController where CurrentRefreshRate is not null");
+                foreach (var ctrl in searcher.Get().OfType<ManagementObject>())
+                {
+                    if (ctrl["CurrentRefreshRate"] != null && int.TryParse(ctrl["CurrentRefreshRate"].ToString(), out int hz) && hz > 0)
+                        return hz;
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Error al obtener la frecuencia de refresco.");
+            }
+            return 0;
         }
 
         private string GetMediaTypeString(string mediaTypeCode, string modelName)
