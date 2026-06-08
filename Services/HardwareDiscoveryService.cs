@@ -204,7 +204,25 @@ namespace KioskClinicaPC.Services
             return null;
         }
 
-        /// <summary>Nombre de la cámara (crudo). Descarta cámaras virtuales. null si no hay.</summary>
+        // Palabras que delatan que un dispositivo NO es una webcam real: impresoras/escáneres
+        // multifunción (que se registran bajo PNPClass 'Image') y cámaras virtuales.
+        private static readonly string[] NonCameraKeywords =
+        {
+            "scanner", "scan", "printer", "fax", "mfp", "multifunction",
+            "obs", "virtual", "droidcam", "manycam", "splitcam", "xsplit", "epoccam",
+            // Marcas/series típicas de impresora-escáner multifunción (PNPClass 'Image').
+            "brother", "epson", "canon", "officejet", "deskjet", "pixma", "imageclass",
+            "ecotank", "workforce", "laserjet", "dcp-", "mfc-",
+        };
+
+        // Señales positivas de que un dispositivo PNPClass 'Image' (clase heredada y ambigua)
+        // es realmente una cámara y no un escáner/impresora.
+        private static readonly string[] CameraKeywords =
+        {
+            "cam", "webcam", "facetime", "integrated camera", "uvc", "video",
+        };
+
+        /// <summary>Nombre de la cámara (crudo). Descarta escáneres/impresoras y cámaras virtuales. null si no hay.</summary>
         private string? GetCameraName()
         {
             try
@@ -215,11 +233,25 @@ namespace KioskClinicaPC.Services
                 {
                     string name = device["Name"]?.ToString()?.Trim() ?? "";
                     if (string.IsNullOrWhiteSpace(name)) continue;
+                    string pnpClass = device["PNPClass"]?.ToString()?.Trim() ?? "";
                     string lower = name.ToLowerInvariant();
-                    // Excluye escáneres (PNPClass 'Image') y cámaras virtuales.
-                    if (lower.Contains("scanner") || lower.Contains("obs") || lower.Contains("virtual")
-                        || lower.Contains("droidcam") || lower.Contains("manycam"))
+
+                    // Denylist: descarta escáneres/impresoras multifunción y cámaras virtuales.
+                    if (NonCameraKeywords.Any(k => lower.Contains(k)))
+                    {
+                        Log.Debug("Descartado como cámara (denylist): {Name} [{Class}]", name, pnpClass);
                         continue;
+                    }
+
+                    // PNPClass 'Camera' es fiable. 'Image' es la clase heredada y ambigua
+                    // (escáneres, faxes, MFP): solo se acepta con señal positiva de cámara.
+                    if (pnpClass.Equals("Image", StringComparison.OrdinalIgnoreCase)
+                        && !CameraKeywords.Any(k => lower.Contains(k)))
+                    {
+                        Log.Debug("PNPClass 'Image' sin señal de cámara, descartado: {Name}", name);
+                        continue;
+                    }
+
                     return name;
                 }
             }

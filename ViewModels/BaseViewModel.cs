@@ -1,23 +1,10 @@
-using System.ComponentModel;
-using System.Runtime.CompilerServices;
+using KioskClinicaPC.Core;
 
 namespace KioskClinicaPC.ViewModels
 {
-    public abstract class BaseViewModel : INotifyPropertyChanged
+    /// <summary>Base de los ViewModels. Toda la maquinaria observable vive en <see cref="ObservableObject"/>;
+    /// este tipo existe para que los VM declaren intención (y poder añadir helpers solo de VM en el futuro).</summary>
+    public abstract class BaseViewModel : ObservableObject
     {
-        public event PropertyChangedEventHandler PropertyChanged;
-
-        protected virtual void OnPropertyChanged([CallerMemberName] string propertyName = null)
-        {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-        }
-
-        protected bool SetProperty<T>(ref T storage, T value, [CallerMemberName] string propertyName = null)
-        {
-            if (Equals(storage, value)) return false;
-            storage = value;
-            OnPropertyChanged(propertyName);
-            return true;
-        }
     }
 }

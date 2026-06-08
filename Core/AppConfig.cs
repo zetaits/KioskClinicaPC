@@ -1,10 +1,8 @@
 using System.Collections.Generic;
-using System.ComponentModel;
-using System.Runtime.CompilerServices;
 
 namespace KioskClinicaPC.Core
 {
-    public class AppConfig : INotifyPropertyChanged
+    public class AppConfig : ObservableObject
     {
         /// <summary>Versión del esquema de configuración actual. Súbela al cambiar la forma del
         /// JSON (renombrar/mover/cambiar tipos) y añade el paso correspondiente en ConfigMigrator.</summary>
@@ -13,16 +11,6 @@ namespace KioskClinicaPC.Core
         /// <summary>Versión del esquema con que se guardó este archivo. Los archivos previos al
         /// versionado no la traen → se deserializa como 0 y ConfigMigrator la actualiza.</summary>
         public int SchemaVersion { get; set; }
-
-        public event PropertyChangedEventHandler? PropertyChanged;
-
-        protected bool SetProperty<T>(ref T storage, T value, [CallerMemberName] string? propertyName = null)
-        {
-            if (EqualityComparer<T>.Default.Equals(storage, value)) return false;
-            storage = value;
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-            return true;
-        }
 
         private string? _price;
         public string? Price { get => _price; set => SetProperty(ref _price, value); }

@@ -1,24 +1,13 @@
 using System;
 using System.Collections.Generic;
-using System.ComponentModel;
 using System.Linq;
-using System.Runtime.CompilerServices;
 using System.Windows.Media;
+using KioskClinicaPC.Core;
 
 namespace KioskClinicaPC.Models
 {
-    public class SpecItem : INotifyPropertyChanged
+    public class SpecItem : ObservableObject
     {
-        public event PropertyChangedEventHandler PropertyChanged;
-
-        private bool SetProperty<T>(ref T storage, T value, [CallerMemberName] string propertyName = null)
-        {
-            if (EqualityComparer<T>.Default.Equals(storage, value)) return false;
-            storage = value;
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-            return true;
-        }
-
         public string Id { get; set; }          // key: "cpu", "gpu" …
 
         private string _family;
@@ -37,9 +26,9 @@ namespace KioskClinicaPC.Models
             {
                 if (SetProperty(ref _value, value))
                 {
-                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(DetailTitle)));
-                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(DetailSubtitle)));
-                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(HasDetailSubtitle)));
+                    OnPropertyChanged(nameof(DetailTitle));
+                    OnPropertyChanged(nameof(DetailSubtitle));
+                    OnPropertyChanged(nameof(HasDetailSubtitle));
                 }
             }
         }
@@ -52,8 +41,8 @@ namespace KioskClinicaPC.Models
             {
                 if (SetProperty(ref _detail, value))
                 {
-                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(DetailTokens)));
-                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(HasDetail)));
+                    OnPropertyChanged(nameof(DetailTokens));
+                    OnPropertyChanged(nameof(HasDetail));
                 }
             }
         }
@@ -67,10 +56,10 @@ namespace KioskClinicaPC.Models
             {
                 if (SetProperty(ref _techDetail, value))
                 {
-                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(HasTechDetail)));
-                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(DetailTitle)));
-                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(DetailSubtitle)));
-                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(HasDetailSubtitle)));
+                    OnPropertyChanged(nameof(HasTechDetail));
+                    OnPropertyChanged(nameof(DetailTitle));
+                    OnPropertyChanged(nameof(DetailSubtitle));
+                    OnPropertyChanged(nameof(HasDetailSubtitle));
                 }
             }
         }
@@ -139,55 +128,28 @@ namespace KioskClinicaPC.Models
             set
             {
                 if (SetProperty(ref _imagePath, value))
-                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(HasImage)));
+                    OnPropertyChanged(nameof(HasImage));
             }
         }
         public bool HasImage => !string.IsNullOrWhiteSpace(_imagePath);
 
         private bool _isHighlighted;
-        public bool IsHighlighted
-        {
-            get => _isHighlighted;
-            set
-            {
-                _isHighlighted = value;
-                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsHighlighted)));
-            }
-        }
+        public bool IsHighlighted { get => _isHighlighted; set => SetProperty(ref _isHighlighted, value); }
 
         // True for the spec currently open in the Detail screen (drives the navigator highlight).
         private bool _isCurrentDetail;
-        public bool IsCurrentDetail
-        {
-            get => _isCurrentDetail;
-            set
-            {
-                _isCurrentDetail = value;
-                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsCurrentDetail)));
-            }
-        }
+        public bool IsCurrentDetail { get => _isCurrentDetail; set => SetProperty(ref _isCurrentDetail, value); }
 
         public SolidColorBrush AccentBrush { get; set; }
         public Color AccentColor { get; set; }
     }
 
-    public class ProItem : INotifyPropertyChanged
+    public class ProItem : ObservableObject
     {
-        public event PropertyChangedEventHandler PropertyChanged;
-
         public string Index { get; set; }
 
         private string _text;
-        public string Text
-        {
-            get => _text;
-            set
-            {
-                if (_text == value) return;
-                _text = value;
-                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Text)));
-            }
-        }
+        public string Text { get => _text; set => SetProperty(ref _text, value); }
     }
 
     public class ScanLogItem
@@ -206,10 +168,8 @@ namespace KioskClinicaPC.Models
     // Punto del radar de Scan (variación lock-on): ligado a un componente real, posicionado en
     // coordenadas px del radar 760×760. IsDetected lo activa la secuencia de escaneo y dispara el
     // ping/lock-on de ese blip. Concern separado de SpecItem.IsHighlighted (que lo usa Main).
-    public class RadarBlip : INotifyPropertyChanged
+    public class RadarBlip : ObservableObject
     {
-        public event PropertyChangedEventHandler PropertyChanged;
-
         public string Id { get; set; }
         public double X { get; set; }
         public double Y { get; set; }
@@ -229,15 +189,6 @@ namespace KioskClinicaPC.Models
         public double LockonTop => Y;
 
         private bool _isDetected;
-        public bool IsDetected
-        {
-            get => _isDetected;
-            set
-            {
-                if (_isDetected == value) return;
-                _isDetected = value;
-                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsDetected)));
-            }
-        }
+        public bool IsDetected { get => _isDetected; set => SetProperty(ref _isDetected, value); }
     }
 }
