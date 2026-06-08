@@ -171,10 +171,10 @@ namespace KioskClinicaPC.ViewModels
             bootstrap.Start();
         }
 
+        /// <summary>Orquesta el arranque: carga config (migra/respalda), detecta hardware, ofrece
+        /// actualizar si cambió, siembra defaults y reconstruye la vista. Cada paso es un método con nombre.</summary>
         public async Task LoadHardwareAndConfigAsync()
         {
-            // Config (crítico): el repositorio migra el esquema y, si el archivo está dañado, lo respalda
-            // y devuelve valores por defecto marcando WasCorrupt para que avisemos sin perder nada en silencio.
             var load = await _configRepo.LoadConfigAsync();
             var savedConfig = load.Config;
             if (load.WasCorrupt)
@@ -182,26 +182,11 @@ namespace KioskClinicaPC.ViewModels
                     "El archivo de configuración estaba dañado. Se ha guardado una copia (.corrupt) y se han restaurado los valores por defecto.",
                     "Configuración");
 
-            // Hardware: último detectado (no crítico) + detección en vivo.
             var lastDetectedSpecs = await _configRepo.LoadLastHardwareAsync();
+            await DetectHardwareAsync();
 
-            try
-            {
-                _detectedSpecs = await _hardwareService.GetHardwareInfoAsync();
-            }
-            catch (Exception ex)
-            {
-                Log.Error(ex, "Error durante la detección de hardware en vivo.");
-            }
-
-            static bool IsDiff(string? s1, string? s2)
-                => !string.IsNullOrWhiteSpace(s1) && !string.Equals(s1, s2, StringComparison.OrdinalIgnoreCase);
-
-            bool newHardwareDetected = IsDiff(lastDetectedSpecs.Cpu, _detectedSpecs.Cpu)
-                || IsDiff(lastDetectedSpecs.Gpu, _detectedSpecs.Gpu)
-                || IsDiff(lastDetectedSpecs.Ram, _detectedSpecs.Ram);
-
-            if (newHardwareDetected && _dialogs.Confirm("Se ha detectado hardware nuevo.\n¿Actualizar valores detectados?", "Hardware"))
+            if (IsNewHardware(lastDetectedSpecs)
+                && _dialogs.Confirm("Se ha detectado hardware nuevo.\n¿Actualizar valores detectados?", "Hardware"))
             {
                 ClearDetectedOverrides(savedConfig);
                 _configRepo.SaveConfig(savedConfig);
@@ -211,38 +196,72 @@ namespace KioskClinicaPC.ViewModels
 
             _savedConfig = savedConfig;
 
-            // Persiste la migración de esquema (sello de versión + campos reubicados).
+            // Persiste si migró el esquema o si hubo que sembrar contenido por defecto.
             bool needsSeedSave = load.Migrated;
+            needsSeedSave |= SeedDefaults(_savedConfig);
+            if (needsSeedSave) TrySaveConfig();
 
-            if (_savedConfig.MarketingData == null || _savedConfig.MarketingData.Count == 0)
+            ApplyConfig();
+        }
+
+        /// <summary>Detección de hardware en vivo (no crítica: si falla, se conserva lo que hubiera).</summary>
+        private async Task DetectHardwareAsync()
+        {
+            try
             {
-                _savedConfig.MarketingData = GetDefaultMarketingData();
-                needsSeedSave = true;
+                _detectedSpecs = await _hardwareService.GetHardwareInfoAsync();
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Error durante la detección de hardware en vivo.");
+            }
+        }
+
+        /// <summary>¿El hardware en vivo difiere del último detectado (CPU/GPU/RAM)?</summary>
+        private bool IsNewHardware(AppConfig lastDetected)
+        {
+            static bool IsDiff(string? s1, string? s2)
+                => !string.IsNullOrWhiteSpace(s1) && !string.Equals(s1, s2, StringComparison.OrdinalIgnoreCase);
+
+            return IsDiff(lastDetected.Cpu, _detectedSpecs.Cpu)
+                || IsDiff(lastDetected.Gpu, _detectedSpecs.Gpu)
+                || IsDiff(lastDetected.Ram, _detectedSpecs.Ram);
+        }
+
+        /// <summary>Siembra marketing/slides por defecto si faltan y migra etiquetas obsoletas.
+        /// Devuelve true si cambió algo (y por tanto hay que persistir).</summary>
+        private bool SeedDefaults(AppConfig config)
+        {
+            bool changed = false;
+
+            if (config.MarketingData == null || config.MarketingData.Count == 0)
+            {
+                config.MarketingData = GetDefaultMarketingData();
+                changed = true;
             }
 
-            if (_savedConfig.AttractSlides == null || _savedConfig.AttractSlides.Count == 0)
+            if (config.AttractSlides == null || config.AttractSlides.Count == 0)
             {
-                _savedConfig.AttractSlides = GetDefaultSlides();
-                needsSeedSave = true;
+                config.AttractSlides = GetDefaultSlides();
+                changed = true;
             }
 
             // Migra etiquetas por defecto obsoletas a las nuevas (solo si el usuario no las ha personalizado).
-            if (UpgradeStaleLabels(_savedConfig.MarketingData))
-                needsSeedSave = true;
+            changed |= UpgradeStaleLabels(config.MarketingData);
+            return changed;
+        }
 
-            if (needsSeedSave)
+        /// <summary>Persiste la configuración registrando (sin propagar) cualquier fallo de E/S.</summary>
+        private void TrySaveConfig()
+        {
+            try
             {
-                try
-                {
-                    _configRepo.SaveConfig(_savedConfig);
-                }
-                catch (Exception ex)
-                {
-                    Log.Error(ex, "Error al guardar la configuración con datos por defecto.");
-                }
+                _configRepo.SaveConfig(_savedConfig);
             }
-
-            ApplyConfig();
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Error al guardar la configuración con datos por defecto.");
+            }
         }
 
         /// <summary>Olvida los overrides manuales de identidad/componentes para que el equipo recién
