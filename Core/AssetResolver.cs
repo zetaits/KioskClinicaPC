@@ -17,7 +17,7 @@ namespace KioskClinicaPC.Core
         private static readonly string[] Extensions = { ".png", ".jpg", ".jpeg", ".webp", ".bmp" };
 
         /// <summary>Minúsculas + solo letras/dígitos: "ASUSTeK Computer Inc." → "asustekcomputerinc".</summary>
-        public static string Normalize(string s)
+        public static string Normalize(string? s)
         {
             if (string.IsNullOrWhiteSpace(s)) return "";
             var sb = new StringBuilder(s.Length);
@@ -27,7 +27,7 @@ namespace KioskClinicaPC.Core
         }
 
         /// <summary>Logo de marca: archivo cuyo slug está contenido en la marca o viceversa.</summary>
-        public static string ResolveBrandLogo(string brand)
+        public static string? ResolveBrandLogo(string? brand)
         {
             string norm = Normalize(brand);
             if (norm.Length == 0) return null;
@@ -40,7 +40,7 @@ namespace KioskClinicaPC.Core
         /// y devuelve el archivo cuyo slug esté contenido en alguno. Gana el nombre de archivo más largo
         /// (más específico): "intelcorei51135g7.png" vence a "intelcorei5.png".
         /// </summary>
-        public static string ResolveSpecImage(params string[] candidates)
+        public static string? ResolveSpecImage(params string?[] candidates)
         {
             var norms = candidates.Select(Normalize).Where(n => n.Length > 0).ToList();
             if (norms.Count == 0) return null;
@@ -49,20 +49,20 @@ namespace KioskClinicaPC.Core
         }
 
         /// <summary>Recorre las carpetas en orden: la primera que dé match gana (override antes que empaquetado).</summary>
-        private static string BestMatch(System.Func<string, bool> matches, params string[] dirs)
+        private static string? BestMatch(System.Func<string, bool> matches, params string[] dirs)
         {
             foreach (var dir in dirs)
             {
-                string hit = BestMatchInDir(dir, matches);
+                string? hit = BestMatchInDir(dir, matches);
                 if (hit != null) return hit;
             }
             return null;
         }
 
-        private static string BestMatchInDir(string dir, System.Func<string, bool> matches)
+        private static string? BestMatchInDir(string dir, System.Func<string, bool> matches)
         {
             if (!Directory.Exists(dir)) return null;
-            string best = null; int bestLen = 0;
+            string? best = null; int bestLen = 0;
             foreach (var file in EnumerateImages(dir))
             {
                 string fileNorm = Normalize(Path.GetFileNameWithoutExtension(file));

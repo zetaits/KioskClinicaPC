@@ -41,7 +41,7 @@ namespace KioskClinicaPC.ViewModels
             set => SetProperty(ref _currentScreenName, value);
         }
 
-        private AppConfig _displayConfig;
+        private AppConfig _displayConfig = null!; // late-init en ApplyConfig (siempre antes de cualquier acceso)
         public AppConfig DisplayConfig
         {
             get => _displayConfig;
@@ -63,7 +63,7 @@ namespace KioskClinicaPC.ViewModels
         }
 
         // Logo de la marca detectada (ChassisName = fabricante). Si no hay archivo → texto de siempre.
-        public string BrandLogoPath => Core.AssetResolver.ResolveBrandLogo(DisplayConfig?.ChassisName);
+        public string? BrandLogoPath => Core.AssetResolver.ResolveBrandLogo(DisplayConfig?.ChassisName);
         public bool HasBrandLogo => !string.IsNullOrWhiteSpace(BrandLogoPath);
 
         public ObservableCollection<SpecItem> Specs { get; } = new ObservableCollection<SpecItem>();
@@ -72,8 +72,8 @@ namespace KioskClinicaPC.ViewModels
         // Blips del radar de Scan (variación lock-on). Hasta 8, ligados a los primeros componentes.
         public ObservableCollection<RadarBlip> RadarBlips { get; } = new ObservableCollection<RadarBlip>();
 
-        private SpecItem _selectedSpec;
-        public SpecItem SelectedSpec
+        private SpecItem? _selectedSpec;
+        public SpecItem? SelectedSpec
         {
             get => _selectedSpec;
             set
@@ -90,8 +90,8 @@ namespace KioskClinicaPC.ViewModels
         }
 
         // Componente "en foco" en la pantalla Main: el spotlight central lo sigue (icono + nombre + valor).
-        private SpecItem _activeSpec;
-        public SpecItem ActiveSpec
+        private SpecItem? _activeSpec;
+        public SpecItem? ActiveSpec
         {
             get => _activeSpec;
             set => SetProperty(ref _activeSpec, value);
@@ -372,7 +372,9 @@ namespace KioskClinicaPC.ViewModels
 
             foreach (var m in marketingList)
             {
-                string raw = GetValueForId(m.Id);
+                if (m.Id is null) continue; // entrada de marketing sin id no es accionable
+
+                string? raw = GetValueForId(m.Id);
                 string detail = GetDetailForId(m.Id, m.DefaultDetail);
 
                 // Ocultar componentes ausentes: un opcional sin valor detectado ni override no se muestra.
@@ -415,7 +417,8 @@ namespace KioskClinicaPC.ViewModels
                 items[i].Index = i;
                 items[i].IndexText = (i + 1).ToString("D2");
                 items[i].IndexLabelFull = $"{(i + 1):D2} / {total:D2} · {items[i].Label}";
-                items[i].LabelShort = items[i].Label.Length > 6 ? items[i].Label.Substring(0, 6) : items[i].Label;
+                string label = items[i].Label ?? "";
+                items[i].LabelShort = label.Length > 6 ? label.Substring(0, 6) : label;
                 items[i].BenchBarWidth = items[i].BenchScore * 6.4; // 100% → 640px
                 items[i].HasBench = items[i].BenchScore > 0;
                 double rad = items[i].Angle * (Math.PI / 180);
@@ -456,7 +459,7 @@ namespace KioskClinicaPC.ViewModels
             RadarBlips.Clear();
             foreach (var spec in Specs)
             {
-                if (!RadarLayout.TryGetValue(spec.Id, out var p)) continue;
+                if (spec.Id == null || !RadarLayout.TryGetValue(spec.Id, out var p)) continue;
                 RadarBlips.Add(new RadarBlip
                 {
                     Id = spec.Id,
@@ -472,42 +475,14 @@ namespace KioskClinicaPC.ViewModels
             }
         }
 
-        private string GetValueForId(string id)
-        {
-            return id.ToLowerInvariant() switch
-            {
-                ComponentIds.Cpu => DisplayConfig.Cpu,
-                ComponentIds.Gpu => DisplayConfig.Gpu,
-                ComponentIds.Ram => DisplayConfig.Ram,
-                ComponentIds.Storage => DisplayConfig.Storage,
-                ComponentIds.Screen => DisplayConfig.Screen,
-                ComponentIds.Battery => DisplayConfig.Battery,
-                ComponentIds.Wifi => DisplayConfig.Wifi,
-                ComponentIds.Camera => DisplayConfig.Camera,
-                ComponentIds.Ports => DisplayConfig.Ports,
-                ComponentIds.Os => DisplayConfig.Os,
-                _ => null
-            };
-        }
+        private string? GetValueForId(string? id)
+            => ComponentRegistry.TryGet(id, out var accessor) ? accessor.GetValue(DisplayConfig) : null;
 
         // Detalle técnico del StatStrip por componente: override manual / detectado (ya fusionados en
         // DisplayConfig.*Detail; el CPU usa Cores) y, si no hay nada real, el genérico del catálogo (hoy "").
-        private string GetDetailForId(string id, string defaultDetail)
+        private string GetDetailForId(string? id, string? defaultDetail)
         {
-            string? detail = id.ToLowerInvariant() switch
-            {
-                ComponentIds.Cpu => DisplayConfig.Cores,
-                ComponentIds.Ram => DisplayConfig.RamDetail,
-                ComponentIds.Storage => DisplayConfig.StorageDetail,
-                ComponentIds.Screen => DisplayConfig.ScreenDetail,
-                ComponentIds.Battery => DisplayConfig.BatteryDetail,
-                ComponentIds.Gpu => DisplayConfig.GpuDetail,
-                ComponentIds.Wifi => DisplayConfig.WifiDetail,
-                ComponentIds.Camera => DisplayConfig.CameraDetail,
-                ComponentIds.Ports => DisplayConfig.PortsDetail,
-                ComponentIds.Os => DisplayConfig.OsDetail,
-                _ => null
-            };
+            string? detail = ComponentRegistry.TryGet(id, out var accessor) ? accessor.GetDetail(DisplayConfig) : null;
             return !string.IsNullOrWhiteSpace(detail) ? detail : (defaultDetail ?? "");
         }
 
@@ -558,7 +533,7 @@ namespace KioskClinicaPC.ViewModels
                         m.Label = spec.Label;
                         m.Summary = spec.Summary;
                         m.BenchLabel = spec.BenchLabel;
-                        m.Pros = spec.Pros?.Select(p => p.Text).ToList() ?? new List<string>();
+                        m.Pros = spec.Pros?.Select(p => p.Text ?? "").ToList() ?? new List<string>();
                     }
                 }
 
@@ -636,19 +611,7 @@ namespace KioskClinicaPC.ViewModels
 
         private void SetDisplayValueById(string? id, string? value)
         {
-            switch (id?.ToLowerInvariant())
-            {
-                case "cpu": DisplayConfig.Cpu = value; break;
-                case "gpu": DisplayConfig.Gpu = value; break;
-                case "ram": DisplayConfig.Ram = value; break;
-                case "storage": DisplayConfig.Storage = value; break;
-                case "screen": DisplayConfig.Screen = value; break;
-                case "battery": DisplayConfig.Battery = value; break;
-                case "wifi": DisplayConfig.Wifi = value; break;
-                case "camera": DisplayConfig.Camera = value; break;
-                case "ports": DisplayConfig.Ports = value; break;
-                case "os": DisplayConfig.Os = value; break;
-            }
+            if (ComponentRegistry.TryGet(id, out var accessor)) accessor.SetValue(DisplayConfig, value);
         }
 
     }

@@ -19,7 +19,7 @@ namespace KioskClinicaPC.Windows
 {
     public partial class SettingsWindow : Window
     {
-        private AppConfig _savedConfig;
+        private AppConfig _savedConfig = new AppConfig();
         private readonly AppConfig _detectedSpecs;
         private KioskSettings _settings = new KioskSettings();
 
@@ -49,7 +49,7 @@ namespace KioskClinicaPC.Windows
                 if (File.Exists(App.ConfigFilePath))
                 {
                     string json = File.ReadAllText(App.ConfigFilePath);
-                    _savedConfig = JsonConvert.DeserializeObject<AppConfig>(json);
+                    _savedConfig = JsonConvert.DeserializeObject<AppConfig>(json) ?? new AppConfig();
                 }
             }
             catch (Exception ex)
@@ -228,7 +228,7 @@ namespace KioskClinicaPC.Windows
             if (!KioskDialog.Confirm(this, "Reiniciar app", "¿Reiniciar la aplicación?", "Reiniciar")) return;
             try
             {
-                string exe = Process.GetCurrentProcess().MainModule?.FileName;
+                string? exe = Process.GetCurrentProcess().MainModule?.FileName;
                 if (!string.IsNullOrEmpty(exe))
                     Process.Start(new ProcessStartInfo(exe) { UseShellExecute = true });
             }
@@ -305,7 +305,7 @@ namespace KioskClinicaPC.Windows
                 if (!KioskDialog.Confirm(this, "Desinstalar", "Se eliminará la configuración y el inicio automático, y la app se cerrará. ¿Continuar?", "Desinstalar", danger: true))
                     return;
 
-                string currentExeName = Path.GetFileName(Assembly.GetEntryAssembly().Location);
+                string? currentExeName = Path.GetFileName(Assembly.GetEntryAssembly()?.Location);
                 if (string.IsNullOrEmpty(currentExeName))
                 {
                     KioskDialog.Alert(this, "Error", "No se pudo determinar el nombre del ejecutable actual.", danger: true);
@@ -316,13 +316,13 @@ namespace KioskClinicaPC.Windows
                 var keysToDelete = new List<string>();
                 bool configFolderDeleted = false;
 
-                using (RegistryKey key = Registry.CurrentUser.OpenSubKey(registryKeyPath, true))
+                using (RegistryKey? key = Registry.CurrentUser.OpenSubKey(registryKeyPath, true))
                 {
                     if (key != null)
                     {
                         foreach (string valueName in key.GetValueNames())
                         {
-                            string path = key.GetValue(valueName) as string;
+                            string? path = key.GetValue(valueName) as string;
                             if (!string.IsNullOrEmpty(path))
                             {
                                 string cleanPath = path.Trim('\"');

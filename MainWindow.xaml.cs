@@ -155,7 +155,7 @@ namespace KioskClinicaPC
             var cfg = _viewModel.DisplayConfig;
             // Líneas del log (espejo de SCAN_LINES del mockup). El id liga la línea READ a su componente
             // para teñir el icono y enganchar la retícula lock-on de ese blip al detectarse.
-            var logLines = new System.Collections.Generic.List<(string Step, string Color, string Id)> {
+            var logLines = new System.Collections.Generic.List<(string Step, string Color, string? Id)> {
                 ("INIT · ClinicaPC diagnostic v3.2.1", "Text1Brush", null),
                 ("PROBE bios · OK", "Text1Brush", null),
                 ($"DETECT chassis · {cfg.ChassisName} {cfg.ModelName}", "Text1Brush", null),

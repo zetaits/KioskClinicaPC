@@ -99,9 +99,8 @@ namespace KioskClinicaPC
                 var configDialog = new FirstRunConfigWindow();
                 bool? result = configDialog.ShowDialog();
 
-                if (result == true)
+                if (result == true && configDialog.ConfigData is { } config)
                 {
-                    var config = configDialog.ConfigData;
                     config.SchemaVersion = AppConfig.CurrentSchemaVersion; // nace en el esquema actual
                     string json = JsonConvert.SerializeObject(config, Formatting.Indented);
                     JsonStore.WriteAtomic(ConfigFilePath, json);

@@ -74,9 +74,9 @@ namespace KioskClinicaPC
         private IntPtr SetHook(LowLevelKeyboardProc proc)
         {
             using (Process curProcess = Process.GetCurrentProcess())
-            using (ProcessModule curModule = curProcess.MainModule)
+            using (ProcessModule? curModule = curProcess.MainModule)
             {
-                return SetWindowsHookEx(WH_KEYBOARD_LL, proc, GetModuleHandle(curModule.ModuleName), 0);
+                return SetWindowsHookEx(WH_KEYBOARD_LL, proc, GetModuleHandle(curModule!.ModuleName), 0);
             }
         }
 
@@ -84,7 +84,7 @@ namespace KioskClinicaPC
         {
             if (nCode >= 0 && (wParam == (IntPtr)WM_KEYDOWN || wParam == (IntPtr)WM_SYSKEYDOWN))
             {
-                var kbdStruct = (KBDLLHOOKSTRUCT)Marshal.PtrToStructure(lParam, typeof(KBDLLHOOKSTRUCT));
+                var kbdStruct = Marshal.PtrToStructure<KBDLLHOOKSTRUCT>(lParam);
                 int vkCode = (int)kbdStruct.vkCode;
                 uint flags = kbdStruct.flags;
 

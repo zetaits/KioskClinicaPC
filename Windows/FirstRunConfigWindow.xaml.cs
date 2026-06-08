@@ -5,7 +5,7 @@ namespace KioskClinicaPC.Windows
 {
     public partial class FirstRunConfigWindow : Window
     {
-        public AppConfig ConfigData { get; private set; }
+        public AppConfig? ConfigData { get; private set; }
         
         public FirstRunConfigWindow()
         {

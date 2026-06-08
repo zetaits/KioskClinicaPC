@@ -154,9 +154,9 @@ namespace KioskClinicaPC
         // Movimiento de la tarjeta volando al spotlight. Desactivado a petición (cambio = crossfade seco).
         private const bool EnableCardMorph = false;
         private bool _morphActive;
-        private FrameworkElement _morphCard;
-        private DispatcherTimer _morphRevealTimer;
-        private SpecItem _morphPendingSpec;
+        private FrameworkElement? _morphCard;
+        private DispatcherTimer? _morphRevealTimer;
+        private SpecItem? _morphPendingSpec;
 
         /// <summary>Anima un clon congelado de la tarjeta seleccionada trasladándose y escalándose
         /// desde la cuadrícula inferior hasta el marco del spotlight. Devuelve false si no procede
@@ -291,7 +291,7 @@ namespace KioskClinicaPC
 
         #region Main entrance (animación de entrada al HUD)
 
-        private static DoubleAnimation Anim(double from, double to, double seconds, IEasingFunction ease = null, double beginSeconds = 0)
+        private static DoubleAnimation Anim(double from, double to, double seconds, IEasingFunction? ease = null, double beginSeconds = 0)
         {
             var a = new DoubleAnimation(from, to, TimeSpan.FromSeconds(seconds));
             if (ease != null) a.EasingFunction = ease;
