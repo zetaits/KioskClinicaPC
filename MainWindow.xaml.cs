@@ -35,19 +35,13 @@ namespace KioskClinicaPC
         private readonly KeyboardHook _hook;
         private readonly MainViewModel _viewModel;
         
-        private DispatcherTimer _inactivityTimer;
-        private DispatcherTimer _attractTimer;
-        private DispatcherTimer _attractAutoScanTimer;
-        private DispatcherTimer _highlightTimer;
-        private DispatcherTimer _orbEpisodeTimer;   // dispara los "episodios" de giro del orbe en Attract
-        
+        private readonly KioskTimers _timers = new KioskTimers();
+
         private int _highlightIndex = 0;
         private int _attractSlideIndex = 0;
-        private const int InactivityTimeoutSeconds = 90;
 
         private KioskSettings _settings = new KioskSettings();
         private int _hotspotClicks = 0;
-        private readonly DispatcherTimer _hotspotResetTimer;
 
         public MainWindow()
         {
@@ -57,27 +51,18 @@ namespace KioskClinicaPC
             DataContext = _viewModel;
 
             _hook = new KeyboardHook();
-            _inactivityTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(InactivityTimeoutSeconds) };
-            _inactivityTimer.Tick += InactivityTimer_Tick;
 
-            _attractTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(5.2) };
-            _attractTimer.Tick += AttractTimer_Tick;
-
-            _attractAutoScanTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(18) };
-            _attractAutoScanTimer.Tick += (s, e) =>
+            // Toda la lógica de DispatcherTimer (intervalos, arranque/paro, one-shot) vive en KioskTimers.
+            // Aquí solo se cablea QUÉ hace cada tick; KioskTimers decide CUÁNDO/CÓMO.
+            _timers.Inactivity = () => NavigateToScreen(0);
+            _timers.AttractAdvance = AdvanceAttractSlide;
+            _timers.AutoScan = () =>
             {
-                _attractAutoScanTimer.Stop();
                 if (_viewModel.CurrentScreen == 0 && !EditModeService.Instance.IsActive) StartScanSequence();
             };
-
-            _highlightTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(4.5) };
-            _highlightTimer.Tick += HighlightTimer_Tick;
-
-            _orbEpisodeTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(11) };
-            _orbEpisodeTimer.Tick += (s, e) => PlayOrbEpisode();
-
-            _hotspotResetTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1.5) };
-            _hotspotResetTimer.Tick += (s, e) => { _hotspotResetTimer.Stop(); _hotspotClicks = 0; };
+            _timers.Highlight = () => ApplyHighlight(_highlightIndex, animateMorph: true);
+            _timers.OrbEpisode = PlayOrbEpisode;
+            _timers.HotspotReset = () => _hotspotClicks = 0;
         }
 
         private async void Window_Loaded(object sender, RoutedEventArgs e)
@@ -95,8 +80,8 @@ namespace KioskClinicaPC
             await _viewModel.LoadHardwareAndConfigAsync();
             RefreshQr();
             UpdateSlideDots(0);
-            _attractTimer.Start();
-            _attractAutoScanTimer.Start();
+            _timers.Start(KioskTimer.AttractAdvance);
+            _timers.Start(KioskTimer.AutoScan);
         }
 
         /// <summary>
@@ -107,7 +92,7 @@ namespace KioskClinicaPC
         /// </summary>
         private void StartAmbientMotion()
         {
-            _orbEpisodeTimer.Start();
+            _timers.Start(KioskTimer.OrbEpisode);
 
             if (GraphicsQuality.IsLow) return;   // blob estático en equipos débiles
 
@@ -225,12 +210,7 @@ namespace KioskClinicaPC
             ScanProgressRing.Data = geo;
         }
 
-        private void ApplyTimerIntervals()
-        {
-            _inactivityTimer.Interval = TimeSpan.FromSeconds(Math.Max(5, _settings.InactivitySeconds));
-            _attractTimer.Interval = TimeSpan.FromSeconds(Math.Max(1, _settings.SlideIntervalSeconds));
-            _attractAutoScanTimer.Interval = TimeSpan.FromSeconds(Math.Max(3, _settings.AutoScanSeconds));
-        }
+        private void ApplyTimerIntervals() => _timers.ApplyIntervals(_settings);
 
         /// <summary>URL de la web (GitHub Pages) que genera el PDF de la ficha. El QR apunta a "{url}#{datos}".</summary>
         private const string FichaPdfBaseUrl = "https://zetaits.github.io/KioskClinicaPC/";
@@ -286,8 +266,8 @@ namespace KioskClinicaPC
             _scanning = true;
             try
             {
-            _attractTimer.Stop();
-            _attractAutoScanTimer.Stop();
+            _timers.Stop(KioskTimer.AttractAdvance);
+            _timers.Stop(KioskTimer.AutoScan);
             NavigateToScreen(1); // Scan
             _viewModel.ScanLogs.Clear();
             ScanProgressText.Text = "000";
@@ -421,7 +401,7 @@ namespace KioskClinicaPC
             // dejaba otra invisible. Capturamos 'from' y serializamos las transiciones.
             if (_isNavigating) return;
             _isNavigating = true;
-            _inactivityTimer.Stop();
+            _timers.Stop(KioskTimer.Inactivity);
             FinalizeMorph();           // cancela cualquier morph en vuelo antes de cambiar de pantalla
             ResetEntranceVisuals();    // restaura el logo/scanline si una entrada quedó a medias
 
@@ -439,12 +419,12 @@ namespace KioskClinicaPC
                 if (target != 2)
                     screens[target].BeginAnimation(OpacityProperty, new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(300)));
                 _viewModel.CurrentScreen = target;
-                if (target > 0) { _inactivityTimer.Start(); _attractAutoScanTimer.Stop(); }
-                else { _attractTimer.Start(); _attractAutoScanTimer.Stop(); _attractAutoScanTimer.Start(); }
+                if (target > 0) { _timers.Start(KioskTimer.Inactivity); _timers.Stop(KioskTimer.AutoScan); }
+                else { _timers.Start(KioskTimer.AttractAdvance); _timers.Restart(KioskTimer.AutoScan); }
 
                 if (target == 2)
                 {
-                    _highlightTimer.Stop();
+                    _timers.Stop(KioskTimer.Highlight);
                     if (EditModeService.Instance.IsActive)
                     {
                         // En edición: HUD visible y estático, sin animación de entrada ni morph.
@@ -458,16 +438,16 @@ namespace KioskClinicaPC
                         _highlightIndex = 0;
                         ApplyHighlight(0, animateMorph: false); // 1ª tarjeta ya resaltada al entrar (fix selección)
                         PlayMainEntrance();
-                        _highlightTimer.Start();
+                        _timers.Start(KioskTimer.Highlight);
                     }
                 }
-                else _highlightTimer.Stop();
+                else _timers.Stop(KioskTimer.Highlight);
 
                 if (EditModeService.Instance.IsActive)
                 {
-                    _inactivityTimer.Stop();
-                    _attractTimer.Stop();
-                    _attractAutoScanTimer.Stop();
+                    _timers.Stop(KioskTimer.Inactivity);
+                    _timers.Stop(KioskTimer.AttractAdvance);
+                    _timers.Stop(KioskTimer.AutoScan);
                     RefreshEditHighlights();
                 }
 
@@ -480,23 +460,14 @@ namespace KioskClinicaPC
         {
             if (EditModeService.Instance.IsActive) return;
             if (_viewModel.CurrentScreen > 0)
-            {
-                _inactivityTimer.Stop();
-                _inactivityTimer.Start();
-            }
-        }
-
-        private void InactivityTimer_Tick(object sender, EventArgs e)
-        {
-            _inactivityTimer.Stop();
-            NavigateToScreen(0);
+                _timers.Restart(KioskTimer.Inactivity);
         }
 
         #endregion
 
         #region Timers & Loops
 
-        private void AttractTimer_Tick(object sender, EventArgs e)
+        private void AdvanceAttractSlide()
         {
             if (_viewModel.Slides.Count == 0) return;
             _attractSlideIndex = (_attractSlideIndex + 1) % _viewModel.Slides.Count;
@@ -528,11 +499,6 @@ namespace KioskClinicaPC
                     dots[i].Effect = null;
                 }
             }
-        }
-
-        private void HighlightTimer_Tick(object sender, EventArgs e)
-        {
-            ApplyHighlight(_highlightIndex, animateMorph: true);
         }
 
         /// <summary>Resalta la tarjeta <paramref name="index"/> y actualiza el spotlight central.
@@ -817,7 +783,7 @@ namespace KioskClinicaPC
         private void Window_Closing(object sender, CancelEventArgs e)
         {
             if (!_isExitingSafely) e.Cancel = true;
-            else { _hook.Stop(); _inactivityTimer.Stop(); _highlightTimer.Stop(); _attractTimer.Stop(); _attractAutoScanTimer.Stop(); }
+            else { _hook.Stop(); _timers.StopAll(); }
         }
 
         public void ShutdownKiosk()
@@ -859,12 +825,11 @@ namespace KioskClinicaPC
         {
             if (EditModeService.Instance.IsActive) return;
             _hotspotClicks++;
-            _hotspotResetTimer.Stop();
-            _hotspotResetTimer.Start();
+            _timers.Restart(KioskTimer.HotspotReset);
             if (_hotspotClicks >= 3)
             {
                 _hotspotClicks = 0;
-                _hotspotResetTimer.Stop();
+                _timers.Stop(KioskTimer.HotspotReset);
                 OpenSettingsDialog();
             }
         }
@@ -886,10 +851,10 @@ namespace KioskClinicaPC
 
         private void EnterEditMode()
         {
-            _inactivityTimer.Stop();
-            _attractTimer.Stop();
-            _attractAutoScanTimer.Stop();
-            _highlightTimer.Stop();
+            _timers.Stop(KioskTimer.Inactivity);
+            _timers.Stop(KioskTimer.AttractAdvance);
+            _timers.Stop(KioskTimer.AutoScan);
+            _timers.Stop(KioskTimer.Highlight);
             foreach (var s in _viewModel.Specs) s.IsHighlighted = false;
 
             EditModeService.Instance.IsDirty = false;
@@ -903,9 +868,9 @@ namespace KioskClinicaPC
             InlineEditController.SetHighlights(RootGrid, false);
             EditModeService.Instance.IsActive = false;
 
-            if (_viewModel.CurrentScreen == 0) { _attractTimer.Start(); _attractAutoScanTimer.Start(); }
-            else { _inactivityTimer.Start(); }
-            if (_viewModel.CurrentScreen == 2) _highlightTimer.Start();
+            if (_viewModel.CurrentScreen == 0) { _timers.Start(KioskTimer.AttractAdvance); _timers.Start(KioskTimer.AutoScan); }
+            else { _timers.Start(KioskTimer.Inactivity); }
+            if (_viewModel.CurrentScreen == 2) _timers.Start(KioskTimer.Highlight);
 
             RefreshQr(); // los datos editados (precio, specs) pueden haber cambiado
         }
