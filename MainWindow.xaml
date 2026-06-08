@@ -645,18 +645,14 @@
                         <ScaleTransform x:Name="MainRevealScale" ScaleX="1" ScaleY="1"/>
                     </Grid.RenderTransform>
 
-                    <!-- IDENTITY BLOCK — left column at top:180 -->
+                    <!-- IDENTITY BLOCK — left column at top:180. Ancho 440 = deja hueco al spotlight (x=600). -->
                     <StackPanel HorizontalAlignment="Left" VerticalAlignment="Top" Width="440" Margin="120,180,0,0">
-                      <StackPanel Orientation="Horizontal" Margin="0,0,0,22">
-                        <Rectangle Width="28" Height="1" Fill="{StaticResource CyanBrush}" VerticalAlignment="Center" Margin="0,0,14,0"/>
-                        <TextBlock Text="{Binding Texts[hud.detected]}" Style="{StaticResource MonoFont}" FontSize="13" Foreground="{StaticResource CyanBrush}"/>
-                      </StackPanel>
-
-                      <!-- Marca: logo si existe (Brands\<marca>.png); si no, el texto de siempre. -->
+                      <!-- Marca del equipo: logo si existe (Brands\<marca>.png); si no, el texto de siempre.
+                           DownOnly: nunca amplía el PNG (evita pixelado); solo encoge si no cabe. -->
                       <Image Source="{Binding BrandLogoPath, Converter={StaticResource OptionalImage}}"
                              Visibility="{Binding HasBrandLogo, Converter={StaticResource BoolToVis}}"
                              HorizontalAlignment="Left" Stretch="Uniform" StretchDirection="DownOnly"
-                             MaxHeight="96" MaxWidth="440" Margin="0,0,0,12">
+                             MaxHeight="120" MaxWidth="440" Margin="0,0,0,12">
                         <Image.Effect>
                           <DropShadowEffect Color="{StaticResource CyanColor}" BlurRadius="22" ShadowDepth="0" Opacity="0.35"/>
                         </Image.Effect>
@@ -1315,9 +1311,9 @@
                 </Canvas>
 
                 <!-- TOP CHROME ROW: top 36, padding-x 64, transparent (no gradient bar) -->
-                <Grid VerticalAlignment="Top" Margin="64,32,64,0" Height="84">
+                <Grid VerticalAlignment="Top" Margin="64,32,64,0" Height="120">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Left">
-                        <Image x:Name="HeaderLogo" Source="Assets/clinicapc-logo.png" Height="72" Margin="0,0,14,0" RenderTransformOrigin="0.5,0.5">
+                        <Image x:Name="HeaderLogo" Source="Assets/clinicapc-logo.png" Height="112" Margin="0,0,14,0" RenderTransformOrigin="0.5,0.5">
                             <Image.RenderTransform>
                                 <TransformGroup>
                                     <ScaleTransform x:Name="HeaderLogoScale" ScaleX="1" ScaleY="1"/>

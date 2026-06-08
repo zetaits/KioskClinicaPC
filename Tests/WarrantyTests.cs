@@ -17,10 +17,10 @@ namespace KioskClinicaPC.Tests
         }
 
         [Fact]
-        public void Label_FormateaMeses()
+        public void Label_FormateaAnios()
         {
-            Assert.Equal("36 MESES DE GARANTÍA", Warranty.Label("Nuevo"));
-            Assert.Equal("12 MESES DE GARANTÍA", Warranty.Label("Ocasion"));
+            Assert.Equal("3 AÑOS DE GARANTÍA", Warranty.Label("Nuevo"));
+            Assert.Equal("1 AÑO DE GARANTÍA", Warranty.Label("Ocasion"));
         }
     }
 }

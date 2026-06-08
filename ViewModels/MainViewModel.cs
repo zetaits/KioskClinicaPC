@@ -3,7 +3,6 @@ using System.Collections.ObjectModel;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using System.Windows;
 using System.Windows.Threading;
 using KioskClinicaPC.Core;
 using KioskClinicaPC.Services;
@@ -292,7 +291,7 @@ namespace KioskClinicaPC.ViewModels
                 Family = ConfigMerger.Display(_savedConfig.Family, _detectedSpecs.Family),
                 Sku = ConfigMerger.Display(_savedConfig.Sku, _detectedSpecs.Sku),
                 ShopAddress = ConfigMerger.Display(_savedConfig.ShopAddress, AppConfig.DefaultShopAddress),
-                ShopServices = ConfigMerger.Display(_savedConfig.ShopServices, "Asistencia · Cambio · Reparación · Reacondicionado"),
+                ShopServices = ConfigMerger.Display(_savedConfig.ShopServices, "Asistencia · Cambio · Reparación"),
                 ProductImagePath = _savedConfig.ProductImagePath,
                 MarketingData = _savedConfig.MarketingData,
                 // Distintivo "Reacondicionado" + estado (garantía): se copian directos. Omitirlos dejaba
@@ -315,58 +314,6 @@ namespace KioskClinicaPC.ViewModels
         {
             Specs.Clear();
 
-            // TryFindResource (no FindResource): si faltara una clave de tema, FindResource lanza
-            // y aborta toda la creación de specs. Con fallback al color real del tema, degrada en
-            // vez de romper. El color resuelto sirve de respaldo para su brush, manteniéndolos coherentes.
-            System.Windows.Media.Color Col(string key, string hex)
-                => Application.Current.TryFindResource(key) is System.Windows.Media.Color c
-                    ? c
-                    : (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(hex);
-            System.Windows.Media.SolidColorBrush Br(string key, System.Windows.Media.Color fb)
-                => Application.Current.TryFindResource(key) as System.Windows.Media.SolidColorBrush
-                    ?? new System.Windows.Media.SolidColorBrush(fb);
-
-            var cyanColor = Col("CyanColor", "#F37A4A");
-            var cyanBrush = Br("CyanBrush", cyanColor);
-            var magentaColor = Col("MagentaColor", "#FFB069");
-            var magentaBrush = Br("MagentaBrush", magentaColor);
-            var limeColor = Col("OkColor", "#F0D26B");
-            var limeBrush = Br("OkBrush", limeColor);
-            var amberColor = Col("AmberColor", "#FFA75C");
-            var amberBrush = Br("AmberBrush", amberColor);
-
-            const string IconCpu = "M 9,9 L 23,9 L 23,23 L 9,23 Z M 13,13 L 19,13 L 19,19 L 13,19 Z M 12,9 L 12,6 M 15,9 L 15,6 M 18,9 L 18,6 M 21,9 L 21,6 M 12,23 L 12,26 M 15,23 L 15,26 M 18,23 L 18,26 M 21,23 L 21,26 M 9,12 L 6,12 M 9,15 L 6,15 M 9,18 L 6,18 M 9,21 L 6,21 M 23,12 L 26,12 M 23,15 L 26,15 M 23,18 L 26,18 M 23,21 L 26,21";
-            const string IconGpu = "M 4,11 L 28,11 L 28,22 L 4,22 Z M 11,14 A 2.6,2.6 0 1,0 11,19 A 2.6,2.6 0 1,0 11,14 M 21,14 A 2.6,2.6 0 1,0 21,19 A 2.6,2.6 0 1,0 21,14 M 4,22 L 2,25 M 28,22 L 30,25";
-            const string IconRam = "M 4,10 L 28,10 L 28,20 L 4,20 Z M 9,10 L 9,20 M 14,10 L 14,20 M 19,10 L 19,20 M 24,10 L 24,20 M 6,22 L 6,25 M 26,22 L 26,25";
-            const string IconStorage = "M 5,6 L 27,6 L 27,12 L 5,12 Z M 5,14 L 27,14 L 27,20 L 5,20 Z M 5,22 L 27,22 L 27,28 L 5,28 Z M 23,9 A 0.6,0.6 0 1,0 23,9.01 M 23,17 A 0.6,0.6 0 1,0 23,17.01 M 23,25 A 0.6,0.6 0 1,0 23,25.01";
-            const string IconScreen = "M 3,6 L 29,6 L 29,22 L 3,22 Z M 11,26 L 21,26 M 16,22 L 16,26";
-            const string IconBattery = "M 3,10 L 27,10 L 27,22 L 3,22 Z M 27,13 L 29,13 L 29,19 L 27,19 Z M 6,13 L 20,13 L 20,19 L 6,19 Z";
-            // Iconos se renderizan con Fill (no Stroke): el wifi debe ser formas CERRADAS.
-            // Antes eran arcos abiertos → al rellenarse formaban medias lunas ("AI slop").
-            // Ahora: dos bandas anulares (sector exterior+interior cerrado) + punto sólido.
-            const string IconWifi = "M 0.24,13.68 A 20,20 0 0,1 31.76,13.68 L 28.61,16.14 A 16,16 0 0,0 3.39,16.14 Z M 5.76,17.99 A 13,13 0 0,1 26.24,17.99 L 23.09,20.46 A 9,9 0 0,0 8.91,20.46 Z M 13.8,26 A 2.2,2.2 0 1,1 18.2,26 A 2.2,2.2 0 1,1 13.8,26 Z";
-            const string IconCamera = "M 3,8 L 29,8 L 29,24 L 3,24 Z M 16,11.5 A 4.5,4.5 0 1,0 16,20.5 A 4.5,4.5 0 1,0 16,11.5 M 20,5 L 26,5 L 26,8 L 20,8 Z";
-            const string IconPorts = "M 3,13 L 12,13 L 12,19 L 3,19 Z M 14,11 L 20,11 L 20,21 L 14,21 Z M 22,14 L 29,14 L 29,18 L 22,18 Z";
-            const string IconOs = "M 4,5 L 15,5 L 15,15 L 4,15 Z M 17,5 L 28,5 L 28,15 L 17,15 Z M 4,17 L 15,17 L 15,27 L 4,27 Z M 17,17 L 28,17 L 28,27 L 17,27 Z";
-
-            var icons = new Dictionary<string, string> {
-                {"cpu", IconCpu}, {"gpu", IconGpu}, {"ram", IconRam}, {"storage", IconStorage},
-                {"screen", IconScreen}, {"battery", IconBattery}, {"wifi", IconWifi},
-                {"camera", IconCamera}, {"ports", IconPorts}, {"os", IconOs}
-            };
-            
-            var brushes = new Dictionary<string, (System.Windows.Media.SolidColorBrush Brush, System.Windows.Media.Color Color)> {
-                {"cpu", (cyanBrush, cyanColor)}, {"gpu", (magentaBrush, magentaColor)}, {"ram", (cyanBrush, cyanColor)},
-                {"storage", (limeBrush, limeColor)}, {"screen", (cyanBrush, cyanColor)}, {"battery", (limeBrush, limeColor)},
-                {"wifi", (magentaBrush, magentaColor)}, {"camera", (cyanBrush, cyanColor)}, {"ports", (amberBrush, amberColor)},
-                {"os", (cyanBrush, cyanColor)}
-            };
-
-            var angles = new Dictionary<string, int> {
-                {"cpu", 8}, {"gpu", 50}, {"ram", 92}, {"storage", 134}, {"screen", 176},
-                {"battery", 218}, {"wifi", 260}, {"camera", 302}, {"ports", 344}, {"os", 26}
-            };
-
             var items = new List<SpecItem>();
             var marketingList = DisplayConfig.MarketingData ?? GetDefaultMarketingData();
 
@@ -387,6 +334,9 @@ namespace KioskClinicaPC.ViewModels
                 // Potencia y gama calculadas desde el hardware real (no constantes inventadas).
                 int score = PerformanceScorer.Score(m.Id, DisplayConfig);
 
+                // Identidad visual (icono/acento/ángulo): tabla de presentación fuera del VM.
+                var vis = ComponentVisuals.For(m.Id);
+
                 var item = new SpecItem
                 {
                     Id = m.Id,
@@ -401,10 +351,10 @@ namespace KioskClinicaPC.ViewModels
                     Tier = PerformanceScorer.TierLabel(m.Id, score),
                     BenchLabel = m.BenchLabel,
                     Pros = m.Pros.Select((p, i) => new ProItem { Index = (i + 1).ToString("D2"), Text = p }).ToList(),
-                    IconData = icons.ContainsKey(m.Id) ? icons[m.Id] : "",
-                    AccentBrush = brushes.ContainsKey(m.Id) ? brushes[m.Id].Brush : cyanBrush,
-                    AccentColor = brushes.ContainsKey(m.Id) ? brushes[m.Id].Color : cyanColor,
-                    Angle = angles.ContainsKey(m.Id) ? angles[m.Id] : 0
+                    IconData = vis.IconData,
+                    AccentBrush = vis.AccentBrush,
+                    AccentColor = vis.AccentColor,
+                    Angle = vis.Angle
                 };
                 // Foto real del componente: empareja modelo concreto / valor con archivo en SpecImages.
                 item.ImagePath = Core.AssetResolver.ResolveSpecImage(item.TechDetail, item.Value);
