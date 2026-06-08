@@ -13,6 +13,7 @@ using System.Collections.ObjectModel;
 using KioskClinicaPC.Core;
 using KioskClinicaPC;
 using Newtonsoft.Json;
+using Serilog;
 
 namespace KioskClinicaPC.Windows
 {
@@ -342,6 +343,7 @@ namespace KioskClinicaPC.Windows
                 if (Directory.Exists(App.AppDataFolderPath))
                 {
                     KioskManager.Release(); // Restore system before deleting files
+                    Log.CloseAndFlush(); // Release the Serilog log file handle before deleting the folder
                     Directory.Delete(App.AppDataFolderPath, true);
                     configFolderDeleted = true;
                 }

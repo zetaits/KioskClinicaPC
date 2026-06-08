@@ -30,7 +30,7 @@ namespace KioskClinicaPC.Core
 
         public static List<AttractSlide> DefaultSlides() => new List<AttractSlide>
         {
-            new AttractSlide { Eyebrow = "CLINICAPC · ANÁLISIS EN VIVO", Title1 = "ESTE EQUIPO", Title2 = "TE ESTÁ OBSERVANDO", Subtitle = "Conéctate · escanea · descubre cada componente en 30 segundos" },
+            new AttractSlide { Eyebrow = "CLINICAPC", Title1 = "ESTE EQUIPO", Title2 = "TE ESTÁ OBSERVANDO", Subtitle = "Conéctate · escanea · descubre cada componente en 30 segundos" },
             new AttractSlide { Eyebrow = "SIN TECNICISMOS", Title1 = "LO ENTIENDES", Title2 = "AUNQUE NO SEAS TÉCNICO", Subtitle = "Te traducimos cada spec a lenguaje de calle" },
             new AttractSlide { Eyebrow = "REACONDICIONADOS CON CABEZA", Title1 = "HASTA 60% MENOS", Title2 = "QUE COMPRARLO NUEVO", Subtitle = "Probado, limpiado y con 24 meses de garantía" }
         };

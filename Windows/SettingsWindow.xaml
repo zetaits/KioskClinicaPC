@@ -107,16 +107,41 @@
                                 <TextBox x:Name="DiscountedPriceTextBox" Style="{StaticResource ConfigTextBox}"/>
                             </StackPanel>
                         </Grid>
+                    </StackPanel>
+                </Border>
 
-                        <TextBlock Style="{StaticResource FieldLabel}" Text="ESTADO DEL EQUIPO (DETERMINA LA GARANTÍA)" Margin="2,6,0,6"/>
-                        <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
-                            <RadioButton x:Name="NewRadio" Content="Nuevo · 3 años garantía" GroupName="Condition"
-                                         Foreground="White" FontSize="13" Margin="0,0,24,0"/>
-                            <RadioButton x:Name="UsedRadio" Content="De ocasión · 1 año garantía" GroupName="Condition"
-                                         Foreground="White" FontSize="13"/>
-                        </StackPanel>
-                        <CheckBox x:Name="RefurbishedCheckBox" Content="Mostrar distintivo «Reacondicionado» en la ficha"
-                                  Foreground="White" FontSize="13"/>
+                <!-- Estado y garantía -->
+                <Border Style="{StaticResource SectionCard}">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource SectionTitle}" Text="Estado y garantía"/>
+                        <TextBlock Style="{StaticResource SectionHint}" Text="El estado del equipo determina los años de garantía que se muestran en la ficha."/>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="12"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <RadioButton x:Name="NewRadio" Grid.Column="0" Style="{StaticResource ChoiceCard}" GroupName="Condition"
+                                         Content="Nuevo" Tag="3 años de garantía"/>
+                            <RadioButton x:Name="UsedRadio" Grid.Column="2" Style="{StaticResource ChoiceCard}" GroupName="Condition"
+                                         Content="De ocasión" Tag="1 año de garantía"/>
+                        </Grid>
+
+                        <Border Background="{StaticResource Bg1Brush}" BorderBrush="{StaticResource Line1Brush}" BorderThickness="1"
+                                CornerRadius="10" Padding="16,12" Margin="0,14,0,0">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                    <TextBlock Text="Reacondicionado" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource Text0Brush}"/>
+                                    <TextBlock Text="Muestra el sello en la ficha del producto." FontSize="11"
+                                               FontFamily="{StaticResource JetBrainsMono}" Foreground="{StaticResource Text2Brush}" Margin="0,3,0,0"/>
+                                </StackPanel>
+                                <CheckBox x:Name="RefurbishedCheckBox" Grid.Column="1" Style="{StaticResource ToggleSwitch}" VerticalAlignment="Center"/>
+                            </Grid>
+                        </Border>
                     </StackPanel>
                 </Border>
 

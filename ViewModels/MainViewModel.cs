@@ -336,7 +336,11 @@ namespace KioskClinicaPC.ViewModels
                 ShopAddress = ConfigMerger.Display(_savedConfig.ShopAddress, AppConfig.DefaultShopAddress),
                 ShopServices = ConfigMerger.Display(_savedConfig.ShopServices, "Asistencia · Cambio · Reparación · Reacondicionado"),
                 ProductImagePath = _savedConfig.ProductImagePath,
-                MarketingData = _savedConfig.MarketingData
+                MarketingData = _savedConfig.MarketingData,
+                // Distintivo "Reacondicionado" + estado (garantía): se copian directos. Omitirlos dejaba
+                // ShowRefurbished/Condition en sus defaults (true / "Ocasion"), ignorando lo guardado.
+                ShowRefurbished = _savedConfig.ShowRefurbished,
+                Condition = _savedConfig.Condition
             };
 
             Texts = new EditableContent(new Dictionary<string, string>(_savedConfig.UiTexts ?? new Dictionary<string, string>()));
