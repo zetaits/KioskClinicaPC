@@ -8,18 +8,18 @@ namespace KioskClinicaPC.Models
 {
     public class SpecItem : ObservableObject
     {
-        public string Id { get; set; }          // key: "cpu", "gpu" …
+        public string? Id { get; set; }          // key: "cpu", "gpu" …
 
-        private string _family;
-        public string Family { get => _family; set => SetProperty(ref _family, value); }      // display family
+        private string? _family;
+        public string? Family { get => _family; set => SetProperty(ref _family, value); }      // display family
 
-        private string _label;
-        public string Label { get => _label; set => SetProperty(ref _label, value); }       // Spanish label
+        private string? _label;
+        public string? Label { get => _label; set => SetProperty(ref _label, value); }       // Spanish label
 
-        public string LabelShort { get; set; }  // first 6 chars for mini-thumbs
+        public string? LabelShort { get; set; }  // first 6 chars for mini-thumbs
 
-        private string _value;
-        public string Value
+        private string? _value;
+        public string? Value
         {
             get => _value;
             set
@@ -33,8 +33,8 @@ namespace KioskClinicaPC.Models
             }
         }
 
-        private string _detail;
-        public string Detail
+        private string? _detail;
+        public string? Detail
         {
             get => _detail;
             set
@@ -48,8 +48,8 @@ namespace KioskClinicaPC.Models
         }
 
         // Nombre técnico/chip secundario (p.ej. "Intel AX211"). Vacío si no aporta. Se muestra pequeño.
-        private string _techDetail;
-        public string TechDetail
+        private string? _techDetail;
+        public string? TechDetail
         {
             get => _techDetail;
             set
@@ -67,19 +67,19 @@ namespace KioskClinicaPC.Models
 
         // Pantalla Detail: el modelo concreto manda como título; el nombre amigable pasa a subtítulo.
         // Si no hay modelo concreto, el título cae al nombre amigable y no se muestra subtítulo.
-        public string DetailTitle => HasTechDetail ? _techDetail : _value;
-        public string DetailSubtitle => HasTechDetail ? _value : string.Empty;
+        public string DetailTitle => (HasTechDetail ? _techDetail : _value) ?? string.Empty;
+        public string DetailSubtitle => (HasTechDetail ? _value : string.Empty) ?? string.Empty;
         public bool HasDetailSubtitle => HasTechDetail && !string.IsNullOrWhiteSpace(_value);
 
         // El equipo tiene este componente (detectado o forzado manualmente). Los ausentes no se muestran.
         public bool IsPresent { get; set; } = true;
 
-        private string _summary;
-        public string Summary { get => _summary; set => SetProperty(ref _summary, value); }
+        private string? _summary;
+        public string? Summary { get => _summary; set => SetProperty(ref _summary, value); }
 
         public int Index { get; set; }
-        public string IndexText { get; set; }
-        public string IndexLabelFull { get; set; } // "01 / 10 · Procesador"
+        public string? IndexText { get; set; }
+        public string? IndexLabelFull { get; set; } // "01 / 10 · Procesador"
         public double Angle { get; set; }
         public double NodeX { get; set; }
         public double NodeY { get; set; }
@@ -90,8 +90,8 @@ namespace KioskClinicaPC.Models
         public TimeSpan NodeAnimDelay { get; set; }
         public int BenchScore { get; set; }
 
-        private string _benchLabel;
-        public string BenchLabel { get => _benchLabel; set => SetProperty(ref _benchLabel, value); }
+        private string? _benchLabel;
+        public string? BenchLabel { get => _benchLabel; set => SetProperty(ref _benchLabel, value); }
 
         public string BenchScoreText => $"{BenchScore}%";
         public double BenchBarWidth { get; set; }
@@ -116,13 +116,13 @@ namespace KioskClinicaPC.Models
 
         // Marker position on the 0–640px honest scale (reuses the benchmark width math).
         public double BenchMarkerLeft => BenchBarWidth;
-        public List<ProItem> Pros { get; set; }
-        public string IconData { get; set; }
+        public List<ProItem> Pros { get; set; } = new List<ProItem>();
+        public string IconData { get; set; } = "";
 
         // Foto real del componente (p.ej. "Intel Core i5"). Resuelta desde %LOCALAPPDATA%\…\SpecImages.
         // Si está vacía, el spotlight cae al icono vectorial de siempre.
-        private string _imagePath;
-        public string ImagePath
+        private string? _imagePath;
+        public string? ImagePath
         {
             get => _imagePath;
             set
@@ -140,28 +140,28 @@ namespace KioskClinicaPC.Models
         private bool _isCurrentDetail;
         public bool IsCurrentDetail { get => _isCurrentDetail; set => SetProperty(ref _isCurrentDetail, value); }
 
-        public SolidColorBrush AccentBrush { get; set; }
+        public SolidColorBrush? AccentBrush { get; set; }
         public Color AccentColor { get; set; }
     }
 
     public class ProItem : ObservableObject
     {
-        public string Index { get; set; }
+        public string? Index { get; set; }
 
-        private string _text;
-        public string Text { get => _text; set => SetProperty(ref _text, value); }
+        private string? _text;
+        public string? Text { get => _text; set => SetProperty(ref _text, value); }
     }
 
     public class ScanLogItem
     {
-        public string Time { get; set; }
-        public string Step { get; set; }
-        public string Color { get; set; }
+        public string? Time { get; set; }
+        public string? Step { get; set; }
+        public string? Color { get; set; }
 
         // Icono vectorial del componente al que pertenece la línea (vacío en INIT/PROBE/VERIFY/…).
-        public string IconData { get; set; }
+        public string? IconData { get; set; }
         // Color de acento del componente para teñir el icono; null en líneas sin componente.
-        public Brush AccentBrush { get; set; }
+        public Brush? AccentBrush { get; set; }
         public bool HasIcon => !string.IsNullOrWhiteSpace(IconData);
     }
 
@@ -170,16 +170,16 @@ namespace KioskClinicaPC.Models
     // ping/lock-on de ese blip. Concern separado de SpecItem.IsHighlighted (que lo usa Main).
     public class RadarBlip : ObservableObject
     {
-        public string Id { get; set; }
+        public string? Id { get; set; }
         public double X { get; set; }
         public double Y { get; set; }
         public bool Flip { get; set; }          // tag a la izquierda si el blip cae a la derecha del centro
-        public string IconData { get; set; }
-        public Brush AccentBrush { get; set; }
+        public string? IconData { get; set; }
+        public Brush? AccentBrush { get; set; }
         public Color AccentColor { get; set; }
-        public string Label { get; set; }
+        public string? Label { get; set; }
         // El tag del lock-on va en MAYÚSCULAS como el mockup (`label.toUpperCase() · OK`).
-        public string LabelUpper => Label?.ToUpperInvariant();
+        public string? LabelUpper => Label?.ToUpperInvariant();
         public double PingDelaySeconds { get; set; }  // desfase del anillo de ping (--pd del mockup)
 
         // Posiciones ya descentradas para colocar directamente con Canvas.Left/Top.
