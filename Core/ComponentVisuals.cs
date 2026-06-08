@@ -5,14 +5,13 @@ using System.Windows.Media;
 
 namespace KioskClinicaPC.Core
 {
-    /// <summary>Identidad visual de un componente: icono vectorial, acento (brush + color) y ángulo
-    /// en el anillo. Datos puramente de presentación.</summary>
+    /// <summary>Identidad visual de un componente: icono vectorial y acento (brush + color).
+    /// Datos puramente de presentación.</summary>
     public sealed class ComponentVisual
     {
         public string IconData { get; init; } = "";
         public SolidColorBrush AccentBrush { get; init; } = Brushes.Transparent;
         public Color AccentColor { get; init; }
-        public int Angle { get; init; }
     }
 
     /// <summary>
@@ -59,13 +58,6 @@ namespace KioskClinicaPC.Core
             [ComponentIds.Os] = Cyan
         };
 
-        private static readonly Dictionary<string, int> Angles = new()
-        {
-            [ComponentIds.Cpu] = 8, [ComponentIds.Gpu] = 50, [ComponentIds.Ram] = 92, [ComponentIds.Storage] = 134,
-            [ComponentIds.Screen] = 176, [ComponentIds.Battery] = 218, [ComponentIds.Wifi] = 260,
-            [ComponentIds.Camera] = 302, [ComponentIds.Ports] = 344, [ComponentIds.Os] = 26
-        };
-
         /// <summary>Identidad visual de un componente por id. Acento desconocido → cian (igual que antes).</summary>
         public static ComponentVisual For(string id)
         {
@@ -76,8 +68,7 @@ namespace KioskClinicaPC.Core
             {
                 IconData = Icons.TryGetValue(key, out var icon) ? icon : "",
                 AccentColor = color,
-                AccentBrush = ResolveBrush(accent.BrushKey, color),
-                Angle = Angles.TryGetValue(key, out var angle) ? angle : 0
+                AccentBrush = ResolveBrush(accent.BrushKey, color)
             };
         }
 

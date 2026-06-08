@@ -372,8 +372,7 @@ namespace KioskClinicaPC.ViewModels
                     Pros = m.Pros.Select((p, i) => new ProItem { Index = (i + 1).ToString("D2"), Text = p }).ToList(),
                     IconData = vis.IconData,
                     AccentBrush = vis.AccentBrush,
-                    AccentColor = vis.AccentColor,
-                    Angle = vis.Angle
+                    AccentColor = vis.AccentColor
                 };
                 // Foto real del componente: empareja modelo concreto / valor con archivo en SpecImages.
                 item.ImagePath = Core.AssetResolver.ResolveSpecImage(item.TechDetail, item.Value);
@@ -390,15 +389,6 @@ namespace KioskClinicaPC.ViewModels
                 items[i].LabelShort = label.Length > 6 ? label.Substring(0, 6) : label;
                 items[i].BenchBarWidth = items[i].BenchScore * 6.4; // 100% → 640px
                 items[i].HasBench = items[i].BenchScore > 0;
-                double rad = items[i].Angle * (Math.PI / 180);
-                double r = 360;
-                items[i].NodeX = 450 + Math.Cos(rad) * r - 84;
-                items[i].NodeY = 450 + Math.Sin(rad) * r - 46;
-                items[i].ConnectorOnRight = items[i].NodeX < 450 - 84;
-                items[i].ConnectorX = items[i].ConnectorOnRight ? items[i].NodeX + 168 : items[i].NodeX - 28;
-                items[i].ConnectorY = items[i].NodeY + 46;
-                items[i].ConnectorLeft = items[i].ConnectorOnRight ? 168 : -28;
-                items[i].NodeAnimDelay = TimeSpan.FromSeconds(0.05 * i);
 
                 Specs.Add(items[i]);
             }

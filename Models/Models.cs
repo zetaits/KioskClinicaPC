@@ -80,14 +80,6 @@ namespace KioskClinicaPC.Models
         public int Index { get; set; }
         public string? IndexText { get; set; }
         public string? IndexLabelFull { get; set; } // "01 / 10 · Procesador"
-        public double Angle { get; set; }
-        public double NodeX { get; set; }
-        public double NodeY { get; set; }
-        public double ConnectorLeft { get; set; } // legacy
-        public bool ConnectorOnRight { get; set; }
-        public double ConnectorX { get; set; }
-        public double ConnectorY { get; set; }
-        public TimeSpan NodeAnimDelay { get; set; }
         public int BenchScore { get; set; }
 
         private string? _benchLabel;
