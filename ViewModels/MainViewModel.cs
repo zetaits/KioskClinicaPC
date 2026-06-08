@@ -1,8 +1,6 @@
 using System;
 using System.Collections.ObjectModel;
 using System.Collections.Generic;
-using System.Globalization;
-using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
@@ -10,7 +8,6 @@ using System.Windows.Threading;
 using KioskClinicaPC.Core;
 using KioskClinicaPC.Services;
 using KioskClinicaPC.Models;
-using Newtonsoft.Json;
 using Serilog;
 
 namespace KioskClinicaPC.ViewModels
@@ -18,6 +15,8 @@ namespace KioskClinicaPC.ViewModels
     public class MainViewModel : BaseViewModel
     {
         private readonly IHardwareService _hardwareService;
+        private readonly IConfigRepository _configRepo;
+        private readonly IDialogService _dialogs;
         private AppConfig _detectedSpecs = new AppConfig();
         public AppConfig DetectedSpecs => _detectedSpecs;
         private AppConfig _savedConfig = new AppConfig();
@@ -148,9 +147,11 @@ namespace KioskClinicaPC.ViewModels
         private string _currentTimeString = "";
         public string CurrentTimeString { get => _currentTimeString; set => SetProperty(ref _currentTimeString, value); }
 
-        public MainViewModel(IHardwareService hardwareService)
+        public MainViewModel(IHardwareService hardwareService, IConfigRepository configRepo, IDialogService dialogs)
         {
             _hardwareService = hardwareService;
+            _configRepo = configRepo;
+            _dialogs = dialogs;
             StartClock();
         }
 
@@ -173,43 +174,17 @@ namespace KioskClinicaPC.ViewModels
 
         public async Task LoadHardwareAndConfigAsync()
         {
-            AppConfig savedConfig = null;
-            AppConfig lastDetectedSpecs = null;
-            bool configMigrated = false;
+            // Config (crítico): el repositorio migra el esquema y, si el archivo está dañado, lo respalda
+            // y devuelve valores por defecto marcando WasCorrupt para que avisemos sin perder nada en silencio.
+            var load = await _configRepo.LoadConfigAsync();
+            var savedConfig = load.Config;
+            if (load.WasCorrupt)
+                _dialogs.Warn(
+                    "El archivo de configuración estaba dañado. Se ha guardado una copia (.corrupt) y se han restaurado los valores por defecto.",
+                    "Configuración");
 
-            // Config (crítico): si existe pero está dañado, respáldalo y avisa en vez de perderlo en silencio.
-            if (File.Exists(App.ConfigFilePath))
-            {
-                try
-                {
-                    // Migra el esquema si hace falta (campos renombrados/movidos entre versiones) en
-                    // vez de descartarlos en silencio. JObject.Parse lanza solo si el JSON está corrupto.
-                    savedConfig = ConfigMigrator.Migrate(await File.ReadAllTextAsync(App.ConfigFilePath), out configMigrated);
-                    if (configMigrated) Log.Information("KioskConfig.json migrado al esquema v{Version}.", AppConfig.CurrentSchemaVersion);
-                }
-                catch (Exception ex)
-                {
-                    Log.Error(ex, "KioskConfig.json dañado; se respalda y se continúa con valores por defecto.");
-                    BackupCorruptFile(App.ConfigFilePath);
-                    MessageBox.Show(
-                        "El archivo de configuración estaba dañado. Se ha guardado una copia (.corrupt) y se han restaurado los valores por defecto.",
-                        "Configuración", MessageBoxButton.OK, MessageBoxImage.Warning);
-                }
-            }
-
-            // Hardware (no crítico): se re-detecta igualmente si falla la lectura.
-            try
-            {
-                if (File.Exists(App.HardwareFilePath))
-                    lastDetectedSpecs = JsonConvert.DeserializeObject<AppConfig>(await File.ReadAllTextAsync(App.HardwareFilePath));
-            }
-            catch (Exception ex)
-            {
-                Log.Error(ex, "KioskHardware.json no se pudo leer; se re-detecta.");
-            }
-
-            savedConfig ??= new AppConfig();
-            lastDetectedSpecs ??= new AppConfig();
+            // Hardware: último detectado (no crítico) + detección en vivo.
+            var lastDetectedSpecs = await _configRepo.LoadLastHardwareAsync();
 
             try
             {
@@ -220,34 +195,25 @@ namespace KioskClinicaPC.ViewModels
                 Log.Error(ex, "Error durante la detección de hardware en vivo.");
             }
 
-            bool newHardwareDetected = false;
-            Func<string, string, bool> IsDiff = (s1, s2) => !string.IsNullOrWhiteSpace(s1) && !string.Equals(s1, s2, StringComparison.OrdinalIgnoreCase);
+            static bool IsDiff(string? s1, string? s2)
+                => !string.IsNullOrWhiteSpace(s1) && !string.Equals(s1, s2, StringComparison.OrdinalIgnoreCase);
 
-            if (IsDiff(lastDetectedSpecs.Cpu, _detectedSpecs.Cpu) || IsDiff(lastDetectedSpecs.Gpu, _detectedSpecs.Gpu) || IsDiff(lastDetectedSpecs.Ram, _detectedSpecs.Ram))
+            bool newHardwareDetected = IsDiff(lastDetectedSpecs.Cpu, _detectedSpecs.Cpu)
+                || IsDiff(lastDetectedSpecs.Gpu, _detectedSpecs.Gpu)
+                || IsDiff(lastDetectedSpecs.Ram, _detectedSpecs.Ram);
+
+            if (newHardwareDetected && _dialogs.Confirm("Se ha detectado hardware nuevo.\n¿Actualizar valores detectados?", "Hardware"))
             {
-                newHardwareDetected = true;
+                ClearDetectedOverrides(savedConfig);
+                _configRepo.SaveConfig(savedConfig);
             }
 
-            if (newHardwareDetected)
-            {
-                MessageBoxResult result = MessageBox.Show("Se ha detectado hardware nuevo.\n¿Actualizar valores detectados?", "Hardware", MessageBoxButton.YesNo, MessageBoxImage.Question);
-                if (result == MessageBoxResult.Yes)
-                {
-                    savedConfig.Cpu = savedConfig.Cores = savedConfig.Ram = savedConfig.Gpu = savedConfig.Storage = savedConfig.Screen = savedConfig.Os = null;
-                    savedConfig.Battery = savedConfig.Wifi = savedConfig.Camera = savedConfig.Ports = null;
-                    savedConfig.ChassisName = savedConfig.ModelName = savedConfig.Family = savedConfig.Sku = null;
-                    savedConfig.RamDetail = savedConfig.StorageDetail = savedConfig.ScreenDetail = savedConfig.BatteryDetail = null;
-                    savedConfig.GpuDetail = savedConfig.WifiDetail = savedConfig.CameraDetail = savedConfig.PortsDetail = savedConfig.OsDetail = null;
-                    JsonStore.WriteAtomic(App.ConfigFilePath, JsonConvert.SerializeObject(savedConfig, Formatting.Indented));
-                }
-            }
-
-            JsonStore.WriteAtomic(App.HardwareFilePath, JsonConvert.SerializeObject(_detectedSpecs, Formatting.Indented));
+            _configRepo.SaveHardware(_detectedSpecs);
 
             _savedConfig = savedConfig;
 
             // Persiste la migración de esquema (sello de versión + campos reubicados).
-            bool needsSeedSave = configMigrated;
+            bool needsSeedSave = load.Migrated;
 
             if (_savedConfig.MarketingData == null || _savedConfig.MarketingData.Count == 0)
             {
@@ -269,7 +235,7 @@ namespace KioskClinicaPC.ViewModels
             {
                 try
                 {
-                    JsonStore.WriteAtomic(App.ConfigFilePath, JsonConvert.SerializeObject(_savedConfig, Formatting.Indented));
+                    _configRepo.SaveConfig(_savedConfig);
                 }
                 catch (Exception ex)
                 {
@@ -280,23 +246,15 @@ namespace KioskClinicaPC.ViewModels
             ApplyConfig();
         }
 
-        /// <summary>Mueve un archivo dañado a una copia con sello de tiempo para no perder los datos.</summary>
-        private static void BackupCorruptFile(string path)
+        /// <summary>Olvida los overrides manuales de identidad/componentes para que el equipo recién
+        /// detectado se muestre tal cual (el merge en ApplyConfig caerá entonces a lo detectado).</summary>
+        private static void ClearDetectedOverrides(AppConfig config)
         {
-            try
-            {
-                // Sello a segundos + sufijo único: dos corruptos en el mismo segundo no deben
-                // sobrescribir el backup anterior (overwrite:true los perdería).
-                string backup = $"{path}.corrupt-{DateTime.Now:yyyyMMdd-HHmmss}.bak";
-                if (File.Exists(backup))
-                    backup = $"{path}.corrupt-{DateTime.Now:yyyyMMdd-HHmmss}-{Guid.NewGuid():N}.bak";
-                File.Move(path, backup, overwrite: false);
-                Log.Information("Archivo dañado respaldado en {Backup}.", backup);
-            }
-            catch (Exception ex)
-            {
-                Log.Error(ex, "No se pudo respaldar el archivo dañado {Path}.", path);
-            }
+            config.Cpu = config.Cores = config.Ram = config.Gpu = config.Storage = config.Screen = config.Os = null;
+            config.Battery = config.Wifi = config.Camera = config.Ports = null;
+            config.ChassisName = config.ModelName = config.Family = config.Sku = null;
+            config.RamDetail = config.StorageDetail = config.ScreenDetail = config.BatteryDetail = null;
+            config.GpuDetail = config.WifiDetail = config.CameraDetail = config.PortsDetail = config.OsDetail = null;
         }
 
         /// <summary>Reconstruye DisplayConfig/Texts/Slides/Specs desde _savedConfig (sin redetectar hardware).</summary>
@@ -644,7 +602,7 @@ namespace KioskClinicaPC.ViewModels
                     .ToList();
                 _savedConfig.UiTexts = new Dictionary<string, string>(Texts.Overrides);
 
-                JsonStore.WriteAtomic(App.ConfigFilePath, JsonConvert.SerializeObject(_savedConfig, Formatting.Indented));
+                _configRepo.SaveConfig(_savedConfig);
                 EditModeService.Instance.IsDirty = false;
             }
             catch (Exception ex)
@@ -661,7 +619,7 @@ namespace KioskClinicaPC.ViewModels
             _savedConfig.ProductImagePath = path;
             try
             {
-                JsonStore.WriteAtomic(App.ConfigFilePath, JsonConvert.SerializeObject(_savedConfig, Formatting.Indented));
+                _configRepo.SaveConfig(_savedConfig);
             }
             catch (Exception ex)
             {

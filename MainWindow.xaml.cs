@@ -47,7 +47,7 @@ namespace KioskClinicaPC
         {
             InitializeComponent();
 
-            _viewModel = new MainViewModel(new HardwareDiscoveryService());
+            _viewModel = new MainViewModel(new HardwareDiscoveryService(), new JsonConfigRepository(), new MessageBoxDialogService());
             DataContext = _viewModel;
 
             _hook = new KeyboardHook();
