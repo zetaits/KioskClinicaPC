@@ -65,11 +65,12 @@ namespace KioskClinicaPC.Models
         }
         public bool HasTechDetail => !string.IsNullOrWhiteSpace(_techDetail);
 
-        // Pantalla Detail: el modelo concreto manda como título; el nombre amigable pasa a subtítulo.
-        // Si no hay modelo concreto, el título cae al nombre amigable y no se muestra subtítulo.
-        public string DetailTitle => (HasTechDetail ? _techDetail : _value) ?? string.Empty;
-        public string DetailSubtitle => (HasTechDetail ? _value : string.Empty) ?? string.Empty;
-        public bool HasDetailSubtitle => HasTechDetail && !string.IsNullOrWhiteSpace(_value);
+        // Pantalla Detail: manda el titular amigable (Value, "32 GB"/"WiFi 6E") como título grande;
+        // el nombre técnico/chip (TechDetail, "Kingston…"/"Intel AX211") pasa a subtítulo pequeño.
+        // Si no hay nombre técnico, no se muestra subtítulo.
+        public string DetailTitle => _value ?? string.Empty;
+        public string DetailSubtitle => (HasTechDetail ? _techDetail : string.Empty) ?? string.Empty;
+        public bool HasDetailSubtitle => HasTechDetail;
 
         // El equipo tiene este componente (detectado o forzado manualmente). Los ausentes no se muestran.
         public bool IsPresent { get; set; } = true;

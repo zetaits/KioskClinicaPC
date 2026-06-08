@@ -25,8 +25,8 @@
             
             <Color x:Key="Text0Color">#ffffff</Color>
             <Color x:Key="Text1Color">#d6d2e8</Color>
-            <Color x:Key="Text2Color">#8a82a8</Color>
-            <Color x:Key="Text3Color">#4d4767</Color>
+            <Color x:Key="Text2Color">#a59ec2</Color>
+            <Color x:Key="Text3Color">#6f6890</Color>
             
             <Color x:Key="Line1Color">#14FFFFFF</Color>
             <Color x:Key="Line2Color">#29FFFFFF</Color>

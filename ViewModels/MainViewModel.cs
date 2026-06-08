@@ -353,6 +353,12 @@ namespace KioskClinicaPC.ViewModels
                 // Potencia y gama calculadas desde el hardware real (no constantes inventadas).
                 int score = PerformanceScorer.Score(m.Id, DisplayConfig);
 
+                // "Qué significa"/"Para qué te sirve" adaptados al hardware real (p.ej. no decir "última
+                // generación de WiFi" en un WiFi 5). Solo pisa el texto si la tienda no lo editó.
+                var narration = SpecNarrator.Narrate(m.Id, DisplayConfig, score);
+                string? summary = PickSummary(m, narration);
+                List<string> pros = PickPros(m, narration);
+
                 // Identidad visual (icono/acento/ángulo): tabla de presentación fuera del VM.
                 var vis = ComponentVisuals.For(m.Id);
 
@@ -365,11 +371,11 @@ namespace KioskClinicaPC.ViewModels
                     TechDetail = fmt.Tech,
                     IsPresent = present,
                     Detail = detail,
-                    Summary = m.Summary,
+                    Summary = summary,
                     BenchScore = score,
                     Tier = PerformanceScorer.TierLabel(m.Id, score),
                     BenchLabel = m.BenchLabel,
-                    Pros = m.Pros.Select((p, i) => new ProItem { Index = (i + 1).ToString("D2"), Text = p }).ToList(),
+                    Pros = pros.Select((p, i) => new ProItem { Index = (i + 1).ToString("D2"), Text = p }).ToList(),
                     IconData = vis.IconData,
                     AccentBrush = vis.AccentBrush,
                     AccentColor = vis.AccentColor
@@ -472,6 +478,28 @@ namespace KioskClinicaPC.ViewModels
         }
 
         private List<SpecMarketingData> GetDefaultMarketingData() => SpecCatalog.DefaultMarketing();
+
+        // Texto del catálogo por id, para saber si la tienda editó el Summary/Pros de un componente.
+        private static readonly Dictionary<string, SpecMarketingData> DefaultMarketingById =
+            SpecCatalog.DefaultMarketing().Where(d => d.Id != null).ToDictionary(d => d.Id!, d => d);
+
+        // Aplica el Summary narrado solo si sigue siendo el del catálogo (no editado por la tienda).
+        private static string? PickSummary(SpecMarketingData m, SpecNarrator.Narration n)
+        {
+            if (n.Summary == null) return m.Summary;
+            bool untouched = m.Id != null && DefaultMarketingById.TryGetValue(m.Id, out var def)
+                             && string.Equals(m.Summary, def.Summary);
+            return untouched ? n.Summary : m.Summary;
+        }
+
+        // Igual para los Pros: respeta la lista si la tienda la cambió respecto al catálogo.
+        private static List<string> PickPros(SpecMarketingData m, SpecNarrator.Narration n)
+        {
+            if (n.Pros == null) return m.Pros;
+            bool untouched = m.Id != null && DefaultMarketingById.TryGetValue(m.Id, out var def)
+                             && m.Pros.SequenceEqual(def.Pros);
+            return untouched ? n.Pros : m.Pros;
+        }
 
         private List<AttractSlide> GetDefaultSlides() => SpecCatalog.DefaultSlides();
 

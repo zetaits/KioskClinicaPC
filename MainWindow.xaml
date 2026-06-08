@@ -318,7 +318,7 @@
                         <!-- Eyebrow with line decorations -->
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,28">
                             <Rectangle Width="28" Height="1" Fill="{StaticResource CyanBrush}" VerticalAlignment="Center" Margin="0,0,14,0"/>
-                            <TextBlock Text="{Binding CurrentSlide.Eyebrow}" Style="{StaticResource MonoFont}" Foreground="{StaticResource CyanBrush}" FontSize="13"/>
+                            <TextBlock Text="{Binding CurrentSlide.Eyebrow}" Style="{StaticResource MonoFont}" Foreground="{StaticResource CyanBrush}" FontSize="18"/>
                             <Rectangle Width="28" Height="1" Fill="{StaticResource CyanBrush}" VerticalAlignment="Center" Margin="14,0,0,0"/>
                         </StackPanel>
 
@@ -353,7 +353,7 @@
                         </Viewbox>
 
                         <!-- Subtitle -->
-                        <TextBlock Text="{Binding CurrentSlide.Subtitle}" edit:Editable.Multiline="True" Foreground="{StaticResource Text1Brush}" FontSize="22" TextAlignment="Center" Margin="0,38,0,0" MaxWidth="1100" TextWrapping="Wrap"/>
+                        <TextBlock Text="{Binding CurrentSlide.Subtitle}" edit:Editable.Multiline="True" Foreground="{StaticResource Text1Brush}" FontSize="24" TextAlignment="Center" Margin="0,38,0,0" MaxWidth="1100" TextWrapping="Wrap"/>
 
                         <!-- CTA Button (HUD bracket-corner style) -->
                         <Grid HorizontalAlignment="Center" Margin="0,48,0,0">
@@ -414,7 +414,7 @@
                                 <Path.Effect><DropShadowEffect Color="{StaticResource CyanColor}" BlurRadius="6" ShadowDepth="0" Opacity="0.9"/></Path.Effect>
                             </Path>
                         </Grid>
-                        <TextBlock Text="{Binding Texts[attract.hint]}" Style="{StaticResource MonoFont}" Foreground="{StaticResource Text2Brush}" FontSize="13" HorizontalAlignment="Center" Margin="0,22,0,0"/>
+                        <TextBlock Text="{Binding Texts[attract.hint]}" Style="{StaticResource MonoFont}" Foreground="{StaticResource Text2Brush}" FontSize="16" HorizontalAlignment="Center" Margin="0,22,0,0"/>
                     </StackPanel>
 
                     <!-- Slide indicator dots -->
@@ -575,7 +575,7 @@
                                                         </Style.Triggers>
                                                     </Style>
                                                 </Border.Style>
-                                                <TextBlock Style="{StaticResource MonoFont}" FontSize="12" Foreground="{StaticResource Text0Brush}" TextWrapping="NoWrap">
+                                                <TextBlock Style="{StaticResource MonoFont}" FontSize="15" Foreground="{StaticResource Text0Brush}" TextWrapping="NoWrap">
                                                     <Run Text="{Binding LabelUpper, Mode=OneWay}"/><Run Text=" · OK"/>
                                                 </TextBlock>
                                             </Border>
@@ -594,7 +594,7 @@
                                                         </Style.Triggers>
                                                     </Style>
                                                 </Border.Style>
-                                                <TextBlock Style="{StaticResource MonoFont}" FontSize="12" Foreground="{StaticResource Text0Brush}" TextWrapping="NoWrap">
+                                                <TextBlock Style="{StaticResource MonoFont}" FontSize="15" Foreground="{StaticResource Text0Brush}" TextWrapping="NoWrap">
                                                     <Run Text="{Binding LabelUpper, Mode=OneWay}"/><Run Text=" · OK"/>
                                                 </TextBlock>
                                             </Border>
@@ -606,7 +606,7 @@
 
                         <!-- Log area at bottom left -->
                         <StackPanel VerticalAlignment="Bottom" HorizontalAlignment="Left" Margin="120,0,0,120">
-                            <TextBlock Text="{Binding Texts[scan.logTitle]}" Style="{StaticResource MonoFont}" FontSize="13" Foreground="{StaticResource CyanBrush}" Margin="0,0,0,16"/>
+                            <TextBlock Text="{Binding Texts[scan.logTitle]}" Style="{StaticResource MonoFont}" FontSize="16" Foreground="{StaticResource CyanBrush}" Margin="0,0,0,16"/>
                             <ItemsControl x:Name="ScanLogControl" ItemsSource="{Binding ScanLogs}" Width="720">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
@@ -616,12 +616,12 @@
                                                 <ColumnDefinition Width="22"/>
                                                 <ColumnDefinition Width="*"/>
                                             </Grid.ColumnDefinitions>
-                                            <TextBlock Text="{Binding Time}" edit:Editable.IsOn="False" Style="{StaticResource MonoFont}" Foreground="{StaticResource Text3Brush}" FontSize="14" Grid.Column="0"/>
+                                            <TextBlock Text="{Binding Time}" edit:Editable.IsOn="False" Style="{StaticResource MonoFont}" Foreground="{StaticResource Text3Brush}" FontSize="18" Grid.Column="0"/>
                                             <!-- Icono del componente (solo en líneas READ con id). -->
                                             <Path Grid.Column="1" Data="{Binding IconData}" Fill="{Binding AccentBrush}" Stretch="Uniform"
                                                   Width="16" Height="16" HorizontalAlignment="Center" VerticalAlignment="Center"
                                                   Visibility="{Binding HasIcon, Converter={StaticResource BoolToVis}}"/>
-                                            <TextBlock Text="{Binding Step}" edit:Editable.IsOn="False" Style="{StaticResource MonoFont}" Foreground="{Binding Color, Converter={StaticResource StringBrushConverter}}" FontSize="14" Grid.Column="2" Margin="8,0,0,0"/>
+                                            <TextBlock Text="{Binding Step}" edit:Editable.IsOn="False" Style="{StaticResource MonoFont}" Foreground="{Binding Color, Converter={StaticResource StringBrushConverter}}" FontSize="18" Grid.Column="2" Margin="8,0,0,0"/>
                                         </Grid>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
@@ -630,7 +630,7 @@
 
                         <!-- % counter at bottom right -->
                         <StackPanel VerticalAlignment="Bottom" HorizontalAlignment="Right" Margin="0,0,120,120">
-                            <TextBlock Text="{Binding Texts[scan.progress]}" Style="{StaticResource MonoFont}" FontSize="13" Foreground="{StaticResource CyanBrush}" Margin="0,0,0,12" HorizontalAlignment="Right"/>
+                            <TextBlock Text="{Binding Texts[scan.progress]}" Style="{StaticResource MonoFont}" FontSize="16" Foreground="{StaticResource CyanBrush}" Margin="0,0,0,12" HorizontalAlignment="Right"/>
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                                 <TextBlock x:Name="ScanProgressText" Text="000" edit:Editable.IsOn="False" Style="{StaticResource DisplayFont}" FontSize="220" Foreground="{StaticResource Text0Brush}" LineHeight="200"/>
                                 <TextBlock Text="%" Style="{StaticResource DisplayFont}" FontSize="220" Foreground="{StaticResource CyanBrush}" LineHeight="200"/>
@@ -675,19 +675,29 @@
                       </TextBlock>
                     
                       <StackPanel Orientation="Horizontal" Margin="0,32,0,0">
-                        <Border Background="#0AFFFFFF" BorderBrush="{StaticResource Line2Brush}" BorderThickness="1" Padding="10,8" Margin="0,0,12,0"
+                        <!-- Píldora de grado/reacondicionado: borde + tinte dorado, punto luminoso -->
+                        <Border Background="#1FF0D26B" BorderBrush="{StaticResource OkBrush}" BorderThickness="1.5" CornerRadius="8" Padding="14,11" Margin="0,0,12,0"
                                 Visibility="{Binding ShowRefurbished, Converter={StaticResource BoolToVis}}">
                           <StackPanel Orientation="Horizontal">
-                            <Ellipse Width="8" Height="8" Fill="{StaticResource OkBrush}" VerticalAlignment="Center" Margin="0,0,8,0">
+                            <Ellipse Width="11" Height="11" Fill="{StaticResource OkBrush}" VerticalAlignment="Center" Margin="0,0,10,0">
                                 <Ellipse.Effect>
-                                    <DropShadowEffect Color="{StaticResource OkColor}" BlurRadius="10" ShadowDepth="0" Opacity="0.8"/>
+                                    <DropShadowEffect Color="{StaticResource OkColor}" BlurRadius="12" ShadowDepth="0" Opacity="0.9"/>
                                 </Ellipse.Effect>
                             </Ellipse>
-                            <TextBlock Text="{Binding Texts[hud.badgeGrade]}" Style="{StaticResource MonoFont}" FontSize="11" Foreground="{StaticResource OkBrush}"/>
+                            <TextBlock Text="{Binding Texts[hud.badgeGrade]}" Style="{StaticResource MonoFont}" FontSize="18" FontWeight="Medium" Foreground="{StaticResource OkBrush}"/>
                           </StackPanel>
                         </Border>
-                        <Border Background="#0AFFFFFF" BorderBrush="{StaticResource Line2Brush}" BorderThickness="1" Padding="10,8">
-                          <TextBlock Text="{Binding WarrantyText}" edit:Editable.IsOn="False" Style="{StaticResource MonoFont}" FontSize="11" Foreground="{StaticResource Text1Brush}"/>
+                        <!-- Píldora de garantía: borde + tinte ámbar, icono de escudo -->
+                        <Border Background="#1FFFA75C" BorderBrush="{StaticResource AmberBrush}" BorderThickness="1.5" CornerRadius="8" Padding="14,11">
+                          <StackPanel Orientation="Horizontal">
+                            <Path Data="M 12,2 L 21,5 L 21,11 C 21,16.5 17,20.5 12,22 C 7,20.5 3,16.5 3,11 L 3,5 Z M 10.5,14.5 L 8,12 L 9.4,10.6 L 10.5,11.7 L 14.6,7.6 L 16,9 Z"
+                                  Fill="{StaticResource AmberBrush}" Stretch="Uniform" Width="20" Height="20" VerticalAlignment="Center" Margin="0,0,10,0">
+                                <Path.Effect>
+                                    <DropShadowEffect Color="{StaticResource AmberColor}" BlurRadius="12" ShadowDepth="0" Opacity="0.8"/>
+                                </Path.Effect>
+                            </Path>
+                            <TextBlock Text="{Binding WarrantyText}" edit:Editable.IsOn="False" Style="{StaticResource MonoFont}" FontSize="18" FontWeight="Medium" Foreground="{StaticResource AmberBrush}" VerticalAlignment="Center"/>
+                          </StackPanel>
                         </Border>
                       </StackPanel>
                     </StackPanel>
@@ -695,7 +705,7 @@
                     <!-- Component spotlight (centre-top) — sigue al componente resaltado (ActiveSpec):
                          icono grande con glow + nombre + valor. Cambia al ritmo del ciclo de tiles. -->
                     <StackPanel HorizontalAlignment="Left" VerticalAlignment="Top" Width="780" Margin="600,150,0,0">
-                        <TextBlock Text="{Binding Texts[hud.productView]}" Style="{StaticResource MonoFont}" FontSize="13" Foreground="{StaticResource Text2Brush}" Margin="0,0,0,14"/>
+                        <TextBlock Text="{Binding Texts[hud.productView]}" Style="{StaticResource MonoFont}" FontSize="18" Foreground="{StaticResource Text2Brush}" Margin="0,0,0,14"/>
                         <Grid Height="430">
                             <Border x:Name="SpotlightFrame" Background="#46140B24" BorderBrush="{StaticResource Line1Brush}" BorderThickness="1"/>
 
@@ -831,7 +841,7 @@
                                     </Image>
                                 </Grid>
                                 <StackPanel Grid.Row="1" HorizontalAlignment="Center">
-                                    <TextBlock Text="{Binding Label}" edit:Editable.IsOn="False" Style="{StaticResource MonoFont}" FontSize="13" Foreground="{StaticResource Text2Brush}" HorizontalAlignment="Center"/>
+                                    <TextBlock Text="{Binding Label}" edit:Editable.IsOn="False" Style="{StaticResource MonoFont}" FontSize="18" Foreground="{StaticResource Text2Brush}" HorizontalAlignment="Center"/>
                                     <TextBlock Text="{Binding Value}" edit:Editable.IsOn="False" Style="{StaticResource DisplayFont}" FontSize="34" Foreground="{StaticResource Text0Brush}" HorizontalAlignment="Center" Margin="0,6,0,0" TextAlignment="Center" TextTrimming="CharacterEllipsis"/>
                                 </StackPanel>
                             </Grid>
@@ -844,7 +854,7 @@
                     <!-- Component tile grid (bottom) — ordered, tappable, auto-cycling highlight.
                          Bajado para dar más alto al spotlight y cerrar el hueco inferior. -->
                     <StackPanel HorizontalAlignment="Left" VerticalAlignment="Top" Width="1260" Margin="120,628,0,0">
-                        <TextBlock Text="{Binding Texts[hud.components]}" Style="{StaticResource MonoFont}" FontSize="13" Foreground="{StaticResource Text2Brush}" Margin="0,0,0,16"/>
+                        <TextBlock Text="{Binding Texts[hud.components]}" Style="{StaticResource MonoFont}" FontSize="18" Foreground="{StaticResource Text2Brush}" Margin="0,0,0,16"/>
                         <ItemsControl x:Name="SpecTiles" ItemsSource="{Binding Specs}">
                             <ItemsControl.ItemsPanel>
                                 <ItemsPanelTemplate>
@@ -853,7 +863,7 @@
                             </ItemsControl.ItemsPanel>
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
-                                    <Button Click="SpecNode_Click" Height="158" Margin="0,0,14,14"
+                                    <Button Click="SpecNode_Click" Height="176" Margin="0,0,14,14"
                                             Background="#AE140B24" BorderBrush="{StaticResource Line1Brush}" BorderThickness="1"
                                             Foreground="White" Cursor="Hand">
                                         <Button.Template>
@@ -866,7 +876,7 @@
                                                         <DropShadowEffect Color="{StaticResource CyanColor}" BlurRadius="28" ShadowDepth="0" Opacity="0"/>
                                                     </Border.Effect>
                                                     <Border.Clip>
-                                                        <PathGeometry Figures="M 0,0 L 238,0 L 238,146 L 226,158 L 0,158 Z"/>
+                                                        <PathGeometry Figures="M 0,0 L 238,0 L 238,164 L 226,176 L 0,176 Z"/>
                                                     </Border.Clip>
                                                     <Grid>
                                                         <!-- tinte de selección: sutil, concentrado en la parte baja (degradado) -->
@@ -888,15 +898,15 @@
                                                             <!-- top: icon + index -->
                                                             <Grid Grid.Row="0">
                                                                 <Path x:Name="IconPath" Data="{Binding IconData, FallbackValue='M 0,0'}" Fill="{StaticResource Text1Brush}" Width="24" Height="24" Stretch="Uniform" HorizontalAlignment="Left"/>
-                                                                <TextBlock Text="{Binding IndexText}" edit:Editable.IsOn="False" Style="{StaticResource MonoFont}" Foreground="{StaticResource Text3Brush}" FontSize="10" HorizontalAlignment="Right" VerticalAlignment="Top"/>
+                                                                <TextBlock Text="{Binding IndexText}" edit:Editable.IsOn="False" Style="{StaticResource MonoFont}" Foreground="{StaticResource Text3Brush}" FontSize="14" HorizontalAlignment="Right" VerticalAlignment="Top"/>
                                                             </Grid>
                                                             <!-- middle: label + value -->
                                                             <StackPanel Grid.Row="1" VerticalAlignment="Bottom">
-                                                                <TextBlock x:Name="LblTxt" Text="{Binding Label}" Style="{StaticResource MonoFont}" Foreground="{StaticResource Text2Brush}" FontSize="10"/>
-                                                                <TextBlock x:Name="ValTxt" Text="{Binding Value}" Style="{StaticResource DisplayFont}" Foreground="{StaticResource Text0Brush}" FontSize="18" Margin="0,5,0,0" TextWrapping="Wrap" TextTrimming="CharacterEllipsis"/>
+                                                                <TextBlock x:Name="LblTxt" Text="{Binding Label}" Style="{StaticResource MonoFont}" Foreground="{StaticResource Text2Brush}" FontSize="16"/>
+                                                                <TextBlock x:Name="ValTxt" Text="{Binding Value}" Style="{StaticResource DisplayFont}" Foreground="{StaticResource Text0Brush}" FontSize="20" Margin="0,5,0,0" TextWrapping="Wrap" TextTrimming="CharacterEllipsis"/>
                                                             </StackPanel>
                                                             <!-- footer: ver detalle -->
-                                                            <TextBlock x:Name="CtaTxt" Grid.Row="2" Text="{Binding Texts[hud.tileCta], RelativeSource={RelativeSource AncestorType=Window}}" edit:Editable.IsOn="False" Style="{StaticResource MonoFont}" FontSize="10" Foreground="{StaticResource Text3Brush}" Margin="0,10,0,0"/>
+                                                            <TextBlock x:Name="CtaTxt" Grid.Row="2" Text="{Binding Texts[hud.tileCta], RelativeSource={RelativeSource AncestorType=Window}}" edit:Editable.IsOn="False" Style="{StaticResource MonoFont}" FontSize="14" Foreground="{StaticResource Text3Brush}" Margin="0,10,0,0"/>
                                                         </Grid>
                                                         <!-- borde de acento (overlay, aparece en fade al seleccionar) -->
                                                         <Border x:Name="AccentEdge" BorderBrush="{StaticResource CyanBrush}" BorderThickness="1.5" Opacity="0"/>
@@ -962,30 +972,35 @@
                     <StackPanel HorizontalAlignment="Right" VerticalAlignment="Top" Width="380" Margin="0,180,120,0">
                         <Border Background="#120A0A1A" BorderBrush="{StaticResource Line1Brush}" BorderThickness="1" Padding="26,28">
                             <StackPanel>
-                                <TextBlock Text="{Binding Texts[price.label]}" Style="{StaticResource MonoFont}" Foreground="{StaticResource MagentaBrush}"/>
+                                <TextBlock Text="{Binding Texts[price.label]}" Style="{StaticResource MonoFont}" FontSize="16" Foreground="{StaticResource MagentaBrush}"/>
                                 <StackPanel Orientation="Horizontal" Margin="0,12,0,0" VerticalAlignment="Bottom">
                                     <TextBlock Text="{Binding FormattedPrice}" edit:Editable.IsOn="False" Style="{StaticResource DisplayFont}" FontSize="88" Foreground="{StaticResource Text0Brush}" LineHeight="88"/>
                                 </StackPanel>
                                 <StackPanel Orientation="Horizontal" Margin="0,4,0,0" Visibility="{Binding HasDiscount, Converter={StaticResource BoolToVis}}">
-                                    <TextBlock Text="{Binding FormattedOriginalPrice}" edit:Editable.IsOn="False" Foreground="{StaticResource Text2Brush}" FontSize="14" TextDecorations="Strikethrough" Margin="0,0,12,0"/>
-                                    <TextBlock Text="{Binding FormattedDiscount}" edit:Editable.IsOn="False" Style="{StaticResource MonoFont}" Foreground="{StaticResource MagentaBrush}" FontSize="14"/>
+                                    <TextBlock Text="{Binding FormattedOriginalPrice}" edit:Editable.IsOn="False" Foreground="{StaticResource Text2Brush}" FontSize="18" TextDecorations="Strikethrough" Margin="0,0,12,0"/>
+                                    <TextBlock Text="{Binding FormattedDiscount}" edit:Editable.IsOn="False" Style="{StaticResource MonoFont}" Foreground="{StaticResource MagentaBrush}" FontSize="18" FontWeight="Bold"/>
                                 </StackPanel>
                                 
-                                <Border Margin="0,22,0,0" Padding="12,14" Background="#0AFFFFFF" BorderBrush="{StaticResource Line1Brush}" BorderThickness="1">
+                                <Border Margin="0,22,0,0" Padding="16,16" Background="#0AFFFFFF" BorderBrush="{StaticResource Line2Brush}" BorderThickness="1" CornerRadius="10">
                                     <StackPanel>
                                         <Grid>
-                                            <TextBlock Text="{Binding Texts[price.installments]}" Style="{StaticResource MonoFont}" FontSize="11" Foreground="{StaticResource Text2Brush}" VerticalAlignment="Center"/>
-                                            <!-- Alterna el plazo de cuotas 6 ⇄ 12 meses -->
-                                            <Button HorizontalAlignment="Right" Padding="8,3" Background="#1AFFFFFF" BorderBrush="{StaticResource Line2Brush}" BorderThickness="1"
+                                            <TextBlock Text="{Binding Texts[price.installments]}" Style="{StaticResource MonoFont}" FontSize="16" Foreground="{StaticResource Text2Brush}" VerticalAlignment="Center"/>
+                                            <!-- Alterna el plazo de cuotas 6 ⇄ 12 meses — botón grande y táctil -->
+                                            <Button HorizontalAlignment="Right" Padding="16,11" Background="#26F37A4A" BorderBrush="{StaticResource CyanBrush}" BorderThickness="1.5"
                                                     Cursor="Hand" Click="InstallmentsToggle_Click" edit:Editable.IsOn="False">
-                                                <TextBlock Text="{Binding InstallmentsToggleText}" Style="{StaticResource MonoFont}" FontSize="10" Foreground="{StaticResource CyanBrush}"/>
+                                                <TextBlock Text="{Binding InstallmentsToggleText}" Style="{StaticResource MonoFont}" FontSize="18" FontWeight="Bold" Foreground="{StaticResource CyanBrush}"/>
                                             </Button>
                                         </Grid>
-                                        <StackPanel Orientation="Horizontal" Margin="0,2,0,0" VerticalAlignment="Bottom">
-                                            <TextBlock Text="{Binding InstallmentsPrefix}" edit:Editable.IsOn="False" Style="{StaticResource DisplayFont}" FontSize="22" Foreground="{StaticResource Text0Brush}"/>
-                                            <TextBlock Text="{Binding FormattedMonthly}" edit:Editable.IsOn="False" Style="{StaticResource DisplayFont}" FontSize="22" Foreground="{StaticResource Text0Brush}"/>
-                                            <TextBlock Text="{Binding Texts[price.noInterest]}" Style="{StaticResource MonoFont}" FontSize="12" Foreground="{StaticResource Text2Brush}" Margin="8,0,0,2" VerticalAlignment="Bottom"/>
+                                        <!-- Cuota mensual: héroe del bloque, acento -->
+                                        <StackPanel Orientation="Horizontal" Margin="0,12,0,0" VerticalAlignment="Bottom">
+                                            <TextBlock Text="{Binding InstallmentsPrefix}" edit:Editable.IsOn="False" Style="{StaticResource DisplayFont}" FontSize="30" Foreground="{StaticResource CyanBrush}"/>
+                                            <TextBlock Text="{Binding FormattedMonthly}" edit:Editable.IsOn="False" Style="{StaticResource DisplayFont}" FontSize="30" Foreground="{StaticResource CyanBrush}"/>
                                         </StackPanel>
+                                        <!-- "Sin intereses" como píldora verde -->
+                                        <Border HorizontalAlignment="Left" Margin="0,10,0,0" Padding="10,5" CornerRadius="6"
+                                                Background="#1FF0D26B" BorderBrush="{StaticResource OkBrush}" BorderThickness="1">
+                                            <TextBlock Text="{Binding Texts[price.noInterest]}" Style="{StaticResource MonoFont}" FontSize="15" FontWeight="Medium" Foreground="{StaticResource OkBrush}"/>
+                                        </Border>
                                     </StackPanel>
                                 </Border>
                                 
@@ -1006,8 +1021,8 @@
                                         <Image x:Name="QrImage" Stretch="Uniform" RenderOptions.BitmapScalingMode="NearestNeighbor"/>
                                     </Border>
                                     <StackPanel Margin="0,14,0,0">
-                                        <TextBlock Text="{Binding Texts[price.scanTitle]}" Style="{StaticResource MonoFont}" FontSize="13" Foreground="{StaticResource Text2Brush}" Margin="0,0,0,6" TextAlignment="Center"/>
-                                        <TextBlock Text="{Binding Texts[price.scanText]}" edit:Editable.Multiline="True" Foreground="{StaticResource Text1Brush}" FontSize="14" TextWrapping="Wrap" LineHeight="20" TextAlignment="Center"/>
+                                        <TextBlock Text="{Binding Texts[price.scanTitle]}" Style="{StaticResource MonoFont}" FontSize="16" Foreground="{StaticResource Text2Brush}" Margin="0,0,0,6" TextAlignment="Center"/>
+                                        <TextBlock Text="{Binding Texts[price.scanText]}" edit:Editable.Multiline="True" Foreground="{StaticResource Text1Brush}" FontSize="17" TextWrapping="Wrap" LineHeight="24" TextAlignment="Center"/>
                                     </StackPanel>
                                 </StackPanel>
                             </StackPanel>
@@ -1026,7 +1041,8 @@
                     </Grid.ColumnDefinitions>
 
                     <!-- LEFT: contenido arriba (fila *) + navegación SIEMPRE anclada abajo (fila Auto) -->
-                    <Grid Grid.Column="0" Margin="120,138,40,80">
+                    <!-- Top margin deja sitio bajo el logo (agrandado) para que la fila breadcrumb no choque. -->
+                    <Grid Grid.Column="0" Margin="120,185,40,80">
                       <Grid.RowDefinitions>
                         <RowDefinition Height="*"/>
                         <RowDefinition Height="Auto"/>
@@ -1040,7 +1056,7 @@
                             </Rectangle.Effect>
                           </Rectangle>
                           <Path Data="{Binding IconData, FallbackValue='M 0,0'}" Fill="{Binding AccentBrush, FallbackValue={StaticResource CyanBrush}}" Height="34" Width="34" Stretch="Uniform" VerticalAlignment="Center"/>
-                          <TextBlock Text="{Binding IndexLabelFull}" edit:Editable.IsOn="False" Style="{StaticResource MonoFont}" FontSize="14" Foreground="{Binding AccentBrush, FallbackValue={StaticResource CyanBrush}}" VerticalAlignment="Center" Margin="14,0,0,0"/>
+                          <TextBlock Text="{Binding IndexLabelFull}" edit:Editable.IsOn="False" Style="{StaticResource MonoFont}" FontSize="18" Foreground="{Binding AccentBrush, FallbackValue={StaticResource CyanBrush}}" VerticalAlignment="Center" Margin="14,0,0,0"/>
                         </StackPanel>
 
                         <!-- family eyebrow -->
@@ -1056,7 +1072,7 @@
                         </Viewbox>
 
                         <!-- nombre amigable (chip secundario): pequeño, oculto si no aporta nada al cliente -->
-                        <TextBlock Text="{Binding DetailSubtitle}" edit:Editable.IsOn="False" Style="{StaticResource MonoFont}" FontSize="15" Foreground="{StaticResource Text2Brush}" TextWrapping="NoWrap" Margin="0,0,0,28" Visibility="{Binding HasDetailSubtitle, Converter={StaticResource BoolToVis}}"/>
+                        <TextBlock Text="{Binding DetailSubtitle}" edit:Editable.IsOn="False" Style="{StaticResource MonoFont}" FontSize="20" Foreground="{StaticResource Text2Brush}" TextWrapping="NoWrap" Margin="0,0,0,28" Visibility="{Binding HasDetailSubtitle, Converter={StaticResource BoolToVis}}"/>
 
                         <!-- StatStrip: Detail parsed into framed cells. Oculto si no hay detalle real. -->
                         <Border BorderBrush="{StaticResource Line1Brush}" BorderThickness="1" Background="#05FFFFFF" HorizontalAlignment="Left"
@@ -1085,9 +1101,9 @@
                           <StackPanel Orientation="Horizontal">
                             <edit:RadialGauge Value="{Binding BenchScore}" AccentColor="{Binding AccentColor}" GaugeSize="196" VerticalAlignment="Center" Margin="0,0,38,0"/>
                             <StackPanel Width="640" VerticalAlignment="Center">
-                              <TextBlock Text="// RENDIMIENTO MEDIDO" Style="{StaticResource MonoFont}" FontSize="12" Foreground="{Binding AccentBrush, FallbackValue={StaticResource CyanBrush}}" Margin="0,0,0,14"/>
+                              <TextBlock Text="// RENDIMIENTO MEDIDO" Style="{StaticResource MonoFont}" FontSize="18" Foreground="{Binding AccentBrush, FallbackValue={StaticResource CyanBrush}}" Margin="0,0,0,14"/>
                               <TextBlock Text="{Binding Tier}" edit:Editable.IsOn="False" Style="{StaticResource DisplayFont}" FontSize="34" Foreground="{StaticResource Text0Brush}" Margin="0,0,0,8"/>
-                              <TextBlock Text="{Binding BenchPercentLabel}" edit:Editable.IsOn="False" Style="{StaticResource MonoFont}" FontSize="12" Foreground="{StaticResource Text2Brush}" Margin="0,0,0,20"/>
+                              <TextBlock Text="{Binding BenchPercentLabel}" edit:Editable.IsOn="False" Style="{StaticResource MonoFont}" FontSize="16" Foreground="{StaticResource Text2Brush}" Margin="0,0,0,20"/>
                               <!-- honest position scale (0–640px = 0–100) -->
                               <Grid Height="10" Width="640" Background="#10FFFFFF" HorizontalAlignment="Left">
                                 <Rectangle HorizontalAlignment="Left" Width="{Binding BenchBarWidth}" Fill="{Binding AccentBrush, FallbackValue={StaticResource CyanBrush}}">
@@ -1099,8 +1115,8 @@
                                            Margin="{Binding BenchMarkerLeft, Converter={StaticResource LeftMarginConverter}}"/>
                               </Grid>
                               <Grid Width="640" HorizontalAlignment="Left" Margin="0,10,0,0">
-                                <TextBlock Text="BÁSICO" Style="{StaticResource MonoFont}" FontSize="10" Foreground="{StaticResource Text3Brush}" HorizontalAlignment="Left"/>
-                                <TextBlock Text="TOPE DE GAMA" Style="{StaticResource MonoFont}" FontSize="10" Foreground="{StaticResource Text3Brush}" HorizontalAlignment="Right"/>
+                                <TextBlock Text="BÁSICO" Style="{StaticResource MonoFont}" FontSize="16" Foreground="{StaticResource Text3Brush}" HorizontalAlignment="Left"/>
+                                <TextBlock Text="TOPE DE GAMA" Style="{StaticResource MonoFont}" FontSize="16" Foreground="{StaticResource Text3Brush}" HorizontalAlignment="Right"/>
                               </Grid>
                             </StackPanel>
                           </StackPanel>
@@ -1111,7 +1127,7 @@
                                 HorizontalAlignment="Left" Visibility="{Binding HasBench, Converter={StaticResource InverseBoolToVis}}">
                           <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                             <Path Data="{Binding IconData, FallbackValue='M 0,0'}" Fill="{Binding AccentBrush, FallbackValue={StaticResource CyanBrush}}" Height="28" Width="28" Stretch="Uniform" VerticalAlignment="Center"/>
-                            <TextBlock Text="Componente verificado · operativo" Style="{StaticResource MonoFont}" FontSize="14" Foreground="{StaticResource Text1Brush}" VerticalAlignment="Center" Margin="18,0,32,0"/>
+                            <TextBlock Text="Componente verificado · operativo" Style="{StaticResource MonoFont}" FontSize="18" Foreground="{StaticResource Text1Brush}" VerticalAlignment="Center" Margin="18,0,32,0"/>
                             <Ellipse Width="9" Height="9" Fill="{StaticResource OkBrush}" VerticalAlignment="Center">
                               <Ellipse.Effect>
                                 <DropShadowEffect Color="{StaticResource OkColor}" BlurRadius="10" ShadowDepth="0" Opacity="0.9"/>
@@ -1184,9 +1200,9 @@
                             <Border HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="16,0,0,14"
                                     Background="#990A0716" BorderBrush="{Binding AccentBrush, FallbackValue={StaticResource CyanBrush}}" BorderThickness="2,0,0,0" Padding="9,5">
                               <Grid>
-                                <TextBlock Style="{StaticResource MonoFont}" FontSize="11" Foreground="{StaticResource Text2Brush}" Text="COMPONENTE REAL"
+                                <TextBlock Style="{StaticResource MonoFont}" FontSize="16" Foreground="{StaticResource Text2Brush}" Text="COMPONENTE REAL"
                                            edit:Editable.IsOn="False" Visibility="{Binding HasImage, Converter={StaticResource BoolToVis}}"/>
-                                <TextBlock Style="{StaticResource MonoFont}" FontSize="11" Foreground="{StaticResource Text2Brush}"
+                                <TextBlock Style="{StaticResource MonoFont}" FontSize="16" Foreground="{StaticResource Text2Brush}"
                                            edit:Editable.IsOn="False" Visibility="{Binding HasImage, Converter={StaticResource InverseBoolToVis}}"><Run Text="ESQUEMA · "/><Run Text="{Binding Family}"/></TextBlock>
                               </Grid>
                             </Border>
@@ -1195,19 +1211,19 @@
 
                         <Border Background="#120A0A1A" BorderBrush="{StaticResource Line1Brush}" BorderThickness="1" Padding="36" CornerRadius="0">
                           <StackPanel>
-                            <TextBlock Text="// QUÉ SIGNIFICA" Style="{StaticResource MonoFont}" FontSize="12" Foreground="{Binding AccentBrush, FallbackValue={StaticResource CyanBrush}}" Margin="0,0,0,18"/>
+                            <TextBlock Text="// QUÉ SIGNIFICA" Style="{StaticResource MonoFont}" FontSize="18" Foreground="{Binding AccentBrush, FallbackValue={StaticResource CyanBrush}}" Margin="0,0,0,18"/>
                             <TextBlock Text="{Binding Summary}" edit:Editable.Multiline="True" FontSize="22" LineHeight="33" Foreground="{StaticResource Text0Brush}" TextWrapping="Wrap"/>
                     
-                            <TextBlock Text="// PARA QUÉ TE SIRVE" Style="{StaticResource MonoFont}" FontSize="12" Foreground="{Binding AccentBrush, FallbackValue={StaticResource CyanBrush}}" Margin="0,38,0,18"/>
+                            <TextBlock Text="// PARA QUÉ TE SIRVE" Style="{StaticResource MonoFont}" FontSize="18" Foreground="{Binding AccentBrush, FallbackValue={StaticResource CyanBrush}}" Margin="0,38,0,18"/>
                             
                             <ItemsControl ItemsSource="{Binding Pros}">
                               <ItemsControl.ItemTemplate>
                                 <DataTemplate>
                                   <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
                                     <Border Width="28" Height="28" BorderBrush="{Binding DataContext.AccentBrush, RelativeSource={RelativeSource AncestorType=ItemsControl}}" BorderThickness="1" Background="#1AFFFFFF" Margin="0,0,16,0">
-                                      <TextBlock Text="{Binding Index}" edit:Editable.IsOn="False" Style="{StaticResource MonoFont}" FontSize="12" Foreground="{Binding DataContext.AccentBrush, RelativeSource={RelativeSource AncestorType=ItemsControl}}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                      <TextBlock Text="{Binding Index}" edit:Editable.IsOn="False" Style="{StaticResource MonoFont}" FontSize="16" Foreground="{Binding DataContext.AccentBrush, RelativeSource={RelativeSource AncestorType=ItemsControl}}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                     </Border>
-                                    <TextBlock Text="{Binding Text}" edit:Editable.Multiline="True" Foreground="{StaticResource Text1Brush}" FontSize="18" VerticalAlignment="Center" TextWrapping="Wrap" MaxWidth="380"/>
+                                    <TextBlock Text="{Binding Text}" edit:Editable.Multiline="True" Foreground="{StaticResource Text1Brush}" FontSize="20" VerticalAlignment="Center" TextWrapping="Wrap" MaxWidth="380"/>
                                   </StackPanel>
                                 </DataTemplate>
                               </ItemsControl.ItemTemplate>
@@ -1230,7 +1246,7 @@
                                                 <Border x:Name="NavBorder" Padding="6,10" Background="#05FFFFFF" BorderBrush="{StaticResource Line1Brush}" BorderThickness="1">
                                                     <StackPanel HorizontalAlignment="Center">
                                                         <Path x:Name="NavIcon" Data="{Binding IconData, FallbackValue='M 0,0'}" Fill="{StaticResource Text2Brush}" Height="18" Width="18" Stretch="Uniform" HorizontalAlignment="Center" Margin="0,0,0,4"/>
-                                                        <TextBlock x:Name="NavLbl" Text="{Binding LabelShort}" edit:Editable.IsOn="False" Style="{StaticResource MonoFont}" FontSize="9" Foreground="{StaticResource Text2Brush}" HorizontalAlignment="Center"/>
+                                                        <TextBlock x:Name="NavLbl" Text="{Binding LabelShort}" edit:Editable.IsOn="False" Style="{StaticResource MonoFont}" FontSize="15" Foreground="{StaticResource Text2Brush}" HorizontalAlignment="Center"/>
                                                     </StackPanel>
                                                 </Border>
                                                 <ControlTemplate.Triggers>
