@@ -2,15 +2,22 @@
 using System.IO;
 using System.Threading;
 using System.Windows;
+using Microsoft.Extensions.DependencyInjection;
 using KioskClinicaPC.Core;
-using KioskClinicaPC.Windows; 
-using Newtonsoft.Json; 
+using KioskClinicaPC.Services;
+using KioskClinicaPC.ViewModels;
+using KioskClinicaPC.Windows;
+using Newtonsoft.Json;
 using Serilog;
 
 namespace KioskClinicaPC
 {
     public partial class App : Application
     {
+        /// <summary>Contenedor DI raíz. Construye el grafo de servicios (hardware, persistencia,
+        /// diálogos), el ViewModel y la ventana principal en un único punto.</summary>
+        private IServiceProvider? _services;
+
         // Mantiene viva la referencia: si el GC la recoge, el mutex se libera y la guardia falla.
         private static Mutex? _singleInstanceMutex;
         // Solo restauramos el escritorio al salir si esta instancia llegó a protegerlo. Evita que
@@ -111,9 +118,27 @@ namespace KioskClinicaPC
                 }
             }
             
-            var mainWindow = new MainWindow();
-            Application.Current.MainWindow = mainWindow; 
+            _services = BuildServiceProvider();
+            var mainWindow = _services.GetRequiredService<MainWindow>();
+            Application.Current.MainWindow = mainWindow;
             mainWindow.Show();
+        }
+
+        /// <summary>Registra el grafo de dependencias. Un solo sitio para cablear implementaciones;
+        /// sustituir una (p.ej. un repo de test) ya no exige tocar el ViewModel ni la ventana.</summary>
+        private static IServiceProvider BuildServiceProvider()
+        {
+            var services = new ServiceCollection();
+
+            services.AddSingleton<IHardwareService, HardwareDiscoveryService>();
+            // Factoría explícita: JsonConfigRepository tiene un ctor (string, string) que el contenedor
+            // no sabría resolver; forzamos el sin-parámetros (rutas de App).
+            services.AddSingleton<IConfigRepository>(_ => new JsonConfigRepository());
+            services.AddSingleton<IDialogService, MessageBoxDialogService>();
+            services.AddSingleton<MainViewModel>();
+            services.AddSingleton<MainWindow>();
+
+            return services.BuildServiceProvider();
         }
 
         private void App_DispatcherUnhandledException(object sender, System.Windows.Threading.DispatcherUnhandledExceptionEventArgs e)
@@ -132,6 +157,7 @@ namespace KioskClinicaPC
             if (_protected) KioskManager.Release();
             try { _singleInstanceMutex?.ReleaseMutex(); } catch { /* no propietaria/abandonada */ }
             _singleInstanceMutex?.Dispose();
+            (_services as IDisposable)?.Dispose();
             Log.Information("Aplicación cerrada con código {ExitCode}.", e.ApplicationExitCode);
             Log.CloseAndFlush();
             base.OnExit(e);

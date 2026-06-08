@@ -43,11 +43,11 @@ namespace KioskClinicaPC
         private KioskSettings _settings = new KioskSettings();
         private int _hotspotClicks = 0;
 
-        public MainWindow()
+        public MainWindow(MainViewModel viewModel)
         {
             InitializeComponent();
 
-            _viewModel = new MainViewModel(new HardwareDiscoveryService(), new JsonConfigRepository(), new MessageBoxDialogService());
+            _viewModel = viewModel;
             DataContext = _viewModel;
 
             _hook = new KeyboardHook();
