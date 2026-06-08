@@ -1,0 +1,23 @@
+#!/bin/sh
+# Bloquea basura de shell: ficheros en la raíz del repo sin extensión.
+# Origen típico: redirecciones rotas ("comando > _isDetected", "0", "{})", ",", "1").
+# Un fichero raíz legítimo siempre tiene extensión (.cs/.xaml/.sln/.manifest...) o
+# es un dotfile (.gitignore). Todo lo demás en la raíz es accidente.
+
+bad=""
+for f in $(git diff --cached --name-only --diff-filter=A); do
+	case "$f" in
+		*/*) continue ;;        # no está en la raíz -> ok
+		.*) continue ;;         # dotfile (.gitignore, .gitattributes) -> ok
+		*.*) continue ;;        # tiene extensión -> ok
+		*) bad="$bad  $f\n" ;;  # raíz, sin extensión -> basura
+	esac
+done
+
+if [ -n "$bad" ]; then
+	printf '\033[31mcommit bloqueado: basura sin extension en la raiz:\033[0m\n'
+	printf "$bad"
+	printf 'Si es legitimo: anade excepcion en .githooks/pre-commit o usa --no-verify.\n'
+	exit 1
+fi
+exit 0

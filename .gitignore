@@ -63,9 +63,7 @@ ruvector.db
 *.ruv
 memory/
 
-# Artefactos accidentales de shell (archivos basura en la raíz)
-/0
-/new
-# Artefacto basura recurrente
-/GoToScreenInEdit(2)
-/{})
+# Artefactos accidentales de shell (redirecciones rotas: "0", "{})", ",", "1",
+# "_isDetected"...). gitignore no distingue "fichero sin extensión" de directorio,
+# así que el filtro genérico vive en el hook .githooks/pre-commit (core.hooksPath),
+# que bloquea cualquier basura sin extensión en la raíz al hacer commit.
