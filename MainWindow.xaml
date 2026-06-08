@@ -38,6 +38,40 @@
         <Style TargetType="TextBlock" x:Key="MonoFont">
             <Setter Property="FontFamily" Value="{StaticResource JetBrainsMono}"/>
         </Style>
+
+        <!-- Segmento del switch de cuotas: apagado (Tag=False) = tenue; encendido (Tag=True) = acento.
+             Tag se enlaza a IsSixMonths / IsTwelveMonths del VM. -->
+        <Style TargetType="Button" x:Key="InstallmentSegment">
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FontFamily" Value="{StaticResource JetBrainsMono}"/>
+            <Setter Property="FontSize" Value="18"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="{StaticResource Text3Brush}"/>
+            <Setter Property="Padding" Value="14,7"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="seg" Background="Transparent" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <MultiDataTrigger>
+                                <MultiDataTrigger.Conditions>
+                                    <Condition Binding="{Binding Tag, RelativeSource={RelativeSource Self}}" Value="False"/>
+                                    <Condition Binding="{Binding IsMouseOver, RelativeSource={RelativeSource Self}}" Value="True"/>
+                                </MultiDataTrigger.Conditions>
+                                <Setter TargetName="seg" Property="Background" Value="#1AFFFFFF"/>
+                                <Setter Property="Foreground" Value="{StaticResource Text1Brush}"/>
+                            </MultiDataTrigger>
+                            <DataTrigger Binding="{Binding Tag, RelativeSource={RelativeSource Self}}" Value="True">
+                                <Setter TargetName="seg" Property="Background" Value="{StaticResource CyanBrush}"/>
+                                <Setter Property="Foreground" Value="#02121a"/>
+                            </DataTrigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Window.Resources>
 
     <!-- Fondo ambiente (no negro) para que las bandas de letterbox en paneles no 16:9 no sean
@@ -853,7 +887,7 @@
 
                     <!-- Component tile grid (bottom) — ordered, tappable, auto-cycling highlight.
                          Bajado para dar más alto al spotlight y cerrar el hueco inferior. -->
-                    <StackPanel HorizontalAlignment="Left" VerticalAlignment="Top" Width="1260" Margin="120,628,0,0">
+                    <StackPanel HorizontalAlignment="Left" VerticalAlignment="Top" Width="1260" Margin="120,622,0,0">
                         <TextBlock Text="{Binding Texts[hud.components]}" Style="{StaticResource MonoFont}" FontSize="18" Foreground="{StaticResource Text2Brush}" Margin="0,0,0,16"/>
                         <ItemsControl x:Name="SpecTiles" ItemsSource="{Binding Specs}">
                             <ItemsControl.ItemsPanel>
@@ -863,7 +897,7 @@
                             </ItemsControl.ItemsPanel>
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
-                                    <Button Click="SpecNode_Click" Height="176" Margin="0,0,14,14"
+                                    <Button Click="SpecNode_Click" Height="160" Margin="0,0,14,14"
                                             Background="#AE140B24" BorderBrush="{StaticResource Line1Brush}" BorderThickness="1"
                                             Foreground="White" Cursor="Hand">
                                         <Button.Template>
@@ -876,7 +910,7 @@
                                                         <DropShadowEffect Color="{StaticResource CyanColor}" BlurRadius="28" ShadowDepth="0" Opacity="0"/>
                                                     </Border.Effect>
                                                     <Border.Clip>
-                                                        <PathGeometry Figures="M 0,0 L 238,0 L 238,164 L 226,176 L 0,176 Z"/>
+                                                        <PathGeometry Figures="M 0,0 L 238,0 L 238,148 L 226,160 L 0,160 Z"/>
                                                     </Border.Clip>
                                                     <Grid>
                                                         <!-- tinte de selección: sutil, concentrado en la parte baja (degradado) -->
@@ -889,7 +923,7 @@
                                                                 </LinearGradientBrush>
                                                             </Rectangle.OpacityMask>
                                                         </Rectangle>
-                                                        <Grid Margin="18,16,18,14">
+                                                        <Grid Margin="18,14,18,12">
                                                             <Grid.RowDefinitions>
                                                                 <RowDefinition Height="Auto"/>
                                                                 <RowDefinition Height="*"/>
@@ -983,13 +1017,22 @@
                                 
                                 <Border Margin="0,22,0,0" Padding="16,16" Background="#0AFFFFFF" BorderBrush="{StaticResource Line2Brush}" BorderThickness="1" CornerRadius="10">
                                     <StackPanel>
+                                        <!-- Etiqueta + switch de plazo en la misma fila (compacto) -->
                                         <Grid>
-                                            <TextBlock Text="{Binding Texts[price.installments]}" Style="{StaticResource MonoFont}" FontSize="16" Foreground="{StaticResource Text2Brush}" VerticalAlignment="Center"/>
-                                            <!-- Alterna el plazo de cuotas 6 ⇄ 12 meses — botón grande y táctil -->
-                                            <Button HorizontalAlignment="Right" Padding="16,11" Background="#26F37A4A" BorderBrush="{StaticResource CyanBrush}" BorderThickness="1.5"
-                                                    Cursor="Hand" Click="InstallmentsToggle_Click" edit:Editable.IsOn="False">
-                                                <TextBlock Text="{Binding InstallmentsToggleText}" Style="{StaticResource MonoFont}" FontSize="18" FontWeight="Bold" Foreground="{StaticResource CyanBrush}"/>
-                                            </Button>
+                                            <TextBlock Text="{Binding Texts[price.installments]}" Style="{StaticResource MonoFont}" FontSize="16" Foreground="{StaticResource Text2Brush}" VerticalAlignment="Center" HorizontalAlignment="Left" Margin="0,0,16,0"/>
+                                            <!-- Switch: ambos plazos visibles; el seleccionado se enciende, el otro queda apagado -->
+                                            <Border HorizontalAlignment="Right" CornerRadius="8" Background="#0AFFFFFF" BorderBrush="{StaticResource CyanBrush}" BorderThickness="1.5" ClipToBounds="True">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                        <ColumnDefinition Width="1.5"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <Button Grid.Column="0" Style="{StaticResource InstallmentSegment}" FontSize="15" Padding="10,7" Tag="{Binding IsSixMonths}" Click="Installments6_Click" Content="6 MESES" edit:Editable.IsOn="False"/>
+                                                    <Rectangle Grid.Column="1" Fill="{StaticResource CyanBrush}" Opacity="0.5"/>
+                                                    <Button Grid.Column="2" Style="{StaticResource InstallmentSegment}" FontSize="15" Padding="10,7" Tag="{Binding IsTwelveMonths}" Click="Installments12_Click" Content="12 MESES" edit:Editable.IsOn="False"/>
+                                                </Grid>
+                                            </Border>
                                         </Grid>
                                         <!-- Cuota mensual: héroe del bloque, acento -->
                                         <StackPanel Orientation="Horizontal" Margin="0,12,0,0" VerticalAlignment="Bottom">

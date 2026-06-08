@@ -118,6 +118,8 @@ namespace KioskClinicaPC.ViewModels
                     OnPropertyChanged(nameof(FormattedMonthly));
                     OnPropertyChanged(nameof(InstallmentsPrefix));
                     OnPropertyChanged(nameof(InstallmentsToggleText));
+                    OnPropertyChanged(nameof(IsSixMonths));
+                    OnPropertyChanged(nameof(IsTwelveMonths));
                 }
             }
         }
@@ -129,6 +131,13 @@ namespace KioskClinicaPC.ViewModels
 
         /// <summary>Alterna el plazo de cuotas entre 6 y 12 meses.</summary>
         public void ToggleInstallments() => InstallmentMonths = InstallmentMonths == 6 ? 12 : 6;
+
+        /// <summary>Fija el plazo de cuotas (switch 6 / 12 meses).</summary>
+        public void SetInstallments(int months) => InstallmentMonths = months;
+
+        // Estado de cada segmento del switch de cuotas (encendido = seleccionado).
+        public bool IsSixMonths => InstallmentMonths == 6;
+        public bool IsTwelveMonths => InstallmentMonths == 12;
 
         // Attract screen slides
         public ObservableCollection<AttractSlide> Slides { get; } = new ObservableCollection<AttractSlide>();

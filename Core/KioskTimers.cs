@@ -14,6 +14,8 @@ namespace KioskClinicaPC.Core
         AutoScan,
         /// <summary>Rotación del componente resaltado en Main. Repetitivo.</summary>
         Highlight,
+        /// <summary>Recorrido automático por la pantalla Detail de cada spec. Repetitivo.</summary>
+        DetailAdvance,
         /// <summary>Episodios de giro del orbe en atracción. Repetitivo.</summary>
         OrbEpisode,
         /// <summary>Ventana para contar los 3 clics del hotspot de ajustes. One-shot.</summary>
@@ -41,6 +43,7 @@ namespace KioskClinicaPC.Core
         public Action? AttractAdvance { get; set; }
         public Action? AutoScan { get; set; }
         public Action? Highlight { get; set; }
+        public Action? DetailAdvance { get; set; }
         public Action? OrbEpisode { get; set; }
         public Action? HotspotReset { get; set; }
 
@@ -51,6 +54,7 @@ namespace KioskClinicaPC.Core
             Add(KioskTimer.AttractAdvance, TimeSpan.FromSeconds(5.2), () => AttractAdvance?.Invoke());
             Add(KioskTimer.AutoScan, TimeSpan.FromSeconds(18), () => AutoScan?.Invoke());
             Add(KioskTimer.Highlight, TimeSpan.FromSeconds(4.5), () => Highlight?.Invoke());
+            Add(KioskTimer.DetailAdvance, TimeSpan.FromSeconds(6.5), () => DetailAdvance?.Invoke());
             Add(KioskTimer.OrbEpisode, TimeSpan.FromSeconds(11), () => OrbEpisode?.Invoke());
             Add(KioskTimer.HotspotReset, TimeSpan.FromSeconds(1.5), () => HotspotReset?.Invoke());
         }

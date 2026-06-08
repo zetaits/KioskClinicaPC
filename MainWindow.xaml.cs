@@ -39,6 +39,9 @@ namespace KioskClinicaPC
 
         private int _highlightIndex = 0;
         private int _attractSlideIndex = 0;
+        private int _mainShown = 0;        // specs ya mostrados en la pasada actual de Main
+        private int _detailTourIndex = 0;  // índice del recorrido automático por Detail
+        private bool _autoTour = false;    // true mientras el bucle conduce la pantalla Detail
 
         private KioskSettings _settings = new KioskSettings();
         private int _hotspotClicks = 0;
@@ -60,7 +63,15 @@ namespace KioskClinicaPC
             {
                 if (_viewModel.CurrentScreen == 0 && !EditModeService.Instance.IsActive) StartScanSequence();
             };
-            _timers.Highlight = () => ApplyHighlight(_highlightIndex, animateMorph: true);
+            // Main resalta cada spec una vez; tras la última pasada arranca el recorrido por Detail.
+            _timers.Highlight = () =>
+            {
+                if (_viewModel.Specs.Count == 0) return;
+                if (_mainShown >= _viewModel.Specs.Count) { StartDetailTour(); return; }
+                ApplyHighlight(_highlightIndex, animateMorph: true);
+                _mainShown++;
+            };
+            _timers.DetailAdvance = AdvanceDetailTour;
             _timers.OrbEpisode = PlayOrbEpisode;
             _timers.HotspotReset = () => _hotspotClicks = 0;
         }
@@ -79,9 +90,7 @@ namespace KioskClinicaPC
             StartAmbientMotion();
             await _viewModel.LoadHardwareAndConfigAsync();
             RefreshQr();
-            UpdateSlideDots(0);
-            _timers.Start(KioskTimer.AttractAdvance);
-            _timers.Start(KioskTimer.AutoScan);
+            EnterAttractMode();
         }
 
         private void ApplyTimerIntervals() => _timers.ApplyIntervals(_settings);
@@ -206,6 +215,7 @@ namespace KioskClinicaPC
         {
             if (sender is FrameworkElement fe && fe.DataContext is SpecItem item)
             {
+                _autoTour = false; // entrada manual: no auto-avanza, el usuario navega a su ritmo
                 _viewModel.SelectedSpec = item;
                 NavigateToScreen(3); // Detail
             }
@@ -248,11 +258,13 @@ namespace KioskClinicaPC
 
         private void DetailBack_Click(object sender, RoutedEventArgs e)
         {
+            EndAutoTour();
             NavigateToScreen(2);
         }
 
         private void DetailPrev_Click(object sender, RoutedEventArgs e)
         {
+            EndAutoTour();
             if (_viewModel.SelectedSpec == null) return;
             int idx = _viewModel.Specs.IndexOf(_viewModel.SelectedSpec);
             idx = idx > 0 ? idx - 1 : _viewModel.Specs.Count - 1;
@@ -261,10 +273,18 @@ namespace KioskClinicaPC
 
         private void DetailNext_Click(object sender, RoutedEventArgs e)
         {
+            EndAutoTour();
             if (_viewModel.SelectedSpec == null) return;
             int idx = _viewModel.Specs.IndexOf(_viewModel.SelectedSpec);
             idx = idx < _viewModel.Specs.Count - 1 ? idx + 1 : 0;
             _viewModel.SelectedSpec = _viewModel.Specs[idx];
+        }
+
+        /// <summary>El usuario tomó el control en Detail: corta el auto-avance del recorrido.</summary>
+        private void EndAutoTour()
+        {
+            _autoTour = false;
+            _timers.Stop(KioskTimer.DetailAdvance);
         }
 
         private void NavigateToScreen(int target)
@@ -294,7 +314,7 @@ namespace KioskClinicaPC
                     screens[target].BeginAnimation(OpacityProperty, new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(300)));
                 _viewModel.CurrentScreen = target;
                 if (target > 0) { _timers.Start(KioskTimer.Inactivity); _timers.Stop(KioskTimer.AutoScan); }
-                else { _timers.Start(KioskTimer.AttractAdvance); _timers.Restart(KioskTimer.AutoScan); }
+                else { EnterAttractMode(); }
 
                 if (target == 2)
                 {
@@ -311,11 +331,18 @@ namespace KioskClinicaPC
                     {
                         _highlightIndex = 0;
                         ApplyHighlight(0, animateMorph: false); // 1ª tarjeta ya resaltada al entrar (fix selección)
+                        _mainShown = 1;                         // spec 0 ya mostrado; el resto, por timer
                         PlayMainEntrance();
                         _timers.Start(KioskTimer.Highlight);
                     }
                 }
                 else _timers.Stop(KioskTimer.Highlight);
+
+                // Recorrido automático por Detail: solo cuando lo conduce el bucle (no entrada manual).
+                if (target == 3 && _autoTour && !EditModeService.Instance.IsActive)
+                    _timers.Restart(KioskTimer.DetailAdvance);
+                else
+                    _timers.Stop(KioskTimer.DetailAdvance);
 
                 if (EditModeService.Instance.IsActive)
                 {
@@ -341,12 +368,52 @@ namespace KioskClinicaPC
 
         #region Timers & Loops
 
+        /// <summary>Entra en modo espera (Attract): reinicia el recorrido de slides desde el primero.
+        /// El bucle muestra todos los textos una vez y luego pasa a Scan→Main automáticamente.</summary>
+        private void EnterAttractMode()
+        {
+            _autoTour = false;
+            _attractSlideIndex = 0;
+            if (_viewModel.Slides.Count > 0)
+            {
+                _viewModel.CurrentSlide = _viewModel.Slides[0];
+                UpdateSlideDots(0);
+            }
+            _timers.Restart(KioskTimer.AttractAdvance);
+            // AutoScan solo como red de seguridad cuando no hay slides que conduzcan la transición.
+            if (_viewModel.Slides.Count == 0) _timers.Restart(KioskTimer.AutoScan);
+        }
+
         private void AdvanceAttractSlide()
         {
             if (_viewModel.Slides.Count == 0) return;
-            _attractSlideIndex = (_attractSlideIndex + 1) % _viewModel.Slides.Count;
+            int next = _attractSlideIndex + 1;
+            // Mostrados todos los textos de Attract → arranca el recorrido (Scan → Main).
+            if (next >= _viewModel.Slides.Count) { StartScanSequence(); return; }
+            _attractSlideIndex = next;
             _viewModel.CurrentSlide = _viewModel.Slides[_attractSlideIndex];
             UpdateSlideDots(_attractSlideIndex);
+        }
+
+        /// <summary>Fin de la pasada por Main: arranca el recorrido automático por la pantalla Detail.</summary>
+        private void StartDetailTour()
+        {
+            _timers.Stop(KioskTimer.Highlight);
+            if (EditModeService.Instance.IsActive || _viewModel.Specs.Count == 0) { NavigateToScreen(0); return; }
+            _autoTour = true;
+            _detailTourIndex = 0;
+            _viewModel.SelectedSpec = _viewModel.Specs[0];
+            NavigateToScreen(3); // el timer DetailAdvance arranca al entrar (ver NavigateToScreen)
+        }
+
+        /// <summary>Avanza al Detail del siguiente spec; al terminar la vuelta, reinicia el bucle en Attract.</summary>
+        private void AdvanceDetailTour()
+        {
+            if (_viewModel.CurrentScreen != 3 || _viewModel.Specs.Count == 0) return;
+            int next = _detailTourIndex + 1;
+            if (next >= _viewModel.Specs.Count) { _autoTour = false; NavigateToScreen(0); return; }
+            _detailTourIndex = next;
+            _viewModel.SelectedSpec = _viewModel.Specs[_detailTourIndex];
         }
 
         private void UpdateSlideDots(int index)
@@ -436,6 +503,18 @@ namespace KioskClinicaPC
                 && e.Key != Key.LWin && e.Key != Key.RWin)
             {
                 StartScanSequence();
+            }
+
+            // En Detalle, cualquier tecla (no modificadora, salvo Escape) vuelve al resumen (Main).
+            if (_viewModel.CurrentScreen == 3 && !EditModeService.Instance.IsActive
+                && Keyboard.Modifiers == ModifierKeys.None
+                && e.Key != Key.Escape
+                && e.Key != Key.System && e.Key != Key.LeftCtrl && e.Key != Key.RightCtrl
+                && e.Key != Key.LeftShift && e.Key != Key.RightShift
+                && e.Key != Key.LWin && e.Key != Key.RWin)
+            {
+                EndAutoTour();
+                NavigateToScreen(2);
             }
         }
 

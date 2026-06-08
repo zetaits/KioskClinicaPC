@@ -21,6 +21,8 @@ namespace KioskClinicaPC
             _timers.Stop(KioskTimer.AttractAdvance);
             _timers.Stop(KioskTimer.AutoScan);
             _timers.Stop(KioskTimer.Highlight);
+            _timers.Stop(KioskTimer.DetailAdvance);
+            _autoTour = false;
             foreach (var s in _viewModel.Specs) s.IsHighlighted = false;
 
             EditModeService.Instance.IsDirty = false;
@@ -34,9 +36,15 @@ namespace KioskClinicaPC
             InlineEditController.SetHighlights(RootGrid, false);
             EditModeService.Instance.IsActive = false;
 
-            if (_viewModel.CurrentScreen == 0) { _timers.Start(KioskTimer.AttractAdvance); _timers.Start(KioskTimer.AutoScan); }
+            if (_viewModel.CurrentScreen == 0) { EnterAttractMode(); }
             else { _timers.Start(KioskTimer.Inactivity); }
-            if (_viewModel.CurrentScreen == 2) _timers.Start(KioskTimer.Highlight);
+            if (_viewModel.CurrentScreen == 2)
+            {
+                _highlightIndex = 0;
+                ApplyHighlight(0, animateMorph: false);
+                _mainShown = 1;
+                _timers.Start(KioskTimer.Highlight);
+            }
 
             RefreshQr(); // los datos editados (precio, specs) pueden haber cambiado
         }
@@ -101,8 +109,9 @@ namespace KioskClinicaPC
         private void EditPrevSlide_Click(object sender, RoutedEventArgs e) => StepSlide(-1);
         private void EditNextSlide_Click(object sender, RoutedEventArgs e) => StepSlide(1);
 
-        // Alterna el plazo de cuotas (6 ⇄ 12 meses) mostrado en la ficha de precio.
-        private void InstallmentsToggle_Click(object sender, RoutedEventArgs e) => _viewModel.ToggleInstallments();
+        // Switch de plazo de cuotas: cada segmento fija 6 o 12 meses.
+        private void Installments6_Click(object sender, RoutedEventArgs e) => _viewModel.SetInstallments(6);
+        private void Installments12_Click(object sender, RoutedEventArgs e) => _viewModel.SetInstallments(12);
 
         private void StepSlide(int dir)
         {

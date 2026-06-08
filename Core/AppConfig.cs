@@ -104,7 +104,7 @@ namespace KioskClinicaPC.Core
 
         /// <summary>Dirección por defecto de la tienda. Fuente única: la web (docs/app.js → SHOP.address)
         /// la conoce, así que no se manda en el QR cuando coincide con este valor (lo aligera).</summary>
-        public const string DefaultShopAddress = "Calle Sevilla 54, Málaga";
+        public const string DefaultShopAddress = "Calle Sevilla 58, Ronda";
 
         private string? _shopAddress;
         public string? ShopAddress { get => _shopAddress; set => SetProperty(ref _shopAddress, value); }

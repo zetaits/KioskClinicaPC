@@ -15,7 +15,7 @@ namespace KioskClinicaPC.Core
         private static readonly Dictionary<string, string> Defaults = new()
         {
             ["attract.cta"] = "TOCA PARA ANALIZAR ESTE EQUIPO",
-            ["attract.hint"] = "O ESPERA · ARRANCA SOLO EN 3 SEGUNDOS",
+            ["attract.hint"] = "O ESPERA · EL RECORRIDO ARRANCA SOLO",
 
             ["scan.logTitle"] = "// CLINICAPC :: SCAN LOG",
             ["scan.progress"] = "PROGRESO",
@@ -43,12 +43,12 @@ namespace KioskClinicaPC.Core
             ["card.verified"] = "VERIFICADO · GRADO A+",
 
             ["price.label"] = "// Precio en tienda",
-            ["price.installments"] = "O EN CUOTAS",
+            ["price.installments"] = "FINÁNCIALO",
             ["price.installmentsPrefix"] = "4 × ",
             ["price.noInterest"] = "SIN INTERESES",
             ["price.cta"] = "LLÉVATELO · HABLA CON UN ASESOR",
-            ["price.scanTitle"] = "ESCANEA",
-            ["price.scanText"] = "Llévate la ficha al móvil para enseñársela a quien te asesore.",
+            ["price.scanTitle"] = "DESCARGA EN PDF",
+            ["price.scanText"] = "Llévate toda la información de este equipo en tu móvil.",
         };
 
         private readonly Dictionary<string, string> _overrides;

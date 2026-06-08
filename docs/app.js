@@ -43,7 +43,7 @@ const LABELS = {
 // Debe coincidir con el valor por defecto de ShopAddress en MainViewModel.cs. Solo viaja `ad`
 // si el comercio la ha personalizado (y entonces tiene prioridad sobre este valor).
 const SHOP = {
-  address: "Calle Sevilla 54, Málaga"
+  address: "Calle Sevilla 58, Ronda"
 };
 
 function setStatus(msg, isError) {
