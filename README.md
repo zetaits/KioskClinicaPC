@@ -25,7 +25,7 @@ Pones el kiosko en un equipo de la tienda. La app:
 
 Todo editable a mano desde la propia pantalla. Sin tocar código.
 
-![Kiosko en mostrador](docs/screenshots/hero.png)
+![Kiosko en mostrador] (docs/screenshots/hero.png) 
 
 ---
 
@@ -39,26 +39,26 @@ Bucle de slides con orbe wireframe, neón y tu mensaje. Llama la atención cuand
 ### 2. Escaneo
 Radar a pantalla completa mientras lee los componentes reales del equipo.
 
-<!-- 📸 CAPTURA: Screen1 Scan — el radar en plena animación -->
+<!-- CAPTURA: Screen1 Scan — el radar en plena animación -->
 ![Escaneo](docs/screenshots/02-scan.png)
 
 ### 3. Ficha del equipo
 La carne del asunto: specs detectadas, precio (con rebaja opcional), identidad del equipo y QR.
 
-<!-- 📸 CAPTURA: Screen2 Main — ficha completa con specs + precio + QR -->
+<!-- CAPTURA: Screen2 Main — ficha completa con specs + precio + QR -->
 ![Ficha](docs/screenshots/03-main.png)
 
 ### 4. Detalle de componente
 Toca cualquier spec y se abre su explicación ampliada ("qué es y por qué importa").
 
-<!-- 📸 CAPTURA: Screen3 Detail — un componente abierto con gauge/detalle -->
+<!-- CAPTURA: Screen3 Detail — un componente abierto con gauge/detalle -->
 ![Detalle](docs/screenshots/04-detail.png)
 
 ### Ficha en el móvil del cliente
 El QR abre una página que **genera el PDF en el propio móvil**. Las specs viajan dentro del QR,
 así que no hace falta internet en la tienda ni servidor que guarde nada.
 
-<!-- 📸 CAPTURA: el móvil mostrando la ficha PDF generada tras escanear el QR -->
+<!-- CAPTURA: el móvil mostrando la ficha PDF generada tras escanear el QR -->
 ![Ficha en móvil](docs/screenshots/05-pdf-movil.png)
 
 ---

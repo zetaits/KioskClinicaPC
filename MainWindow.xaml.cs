@@ -30,6 +30,7 @@ namespace KioskClinicaPC
     public partial class MainWindow : Window
     {
         private bool _isExitingSafely = false;
+        private bool _ready = false;          // true tras cargar config/hardware; bloquea interacción durante el arranque
         private bool _scanning = false;       // evita secuencias de escaneo solapadas
         private bool _isNavigating = false;   // evita transiciones de pantalla re-entrantes
         private readonly KeyboardHook _hook;
@@ -91,6 +92,7 @@ namespace KioskClinicaPC
             await _viewModel.LoadHardwareAndConfigAsync();
             RefreshQr();
             EnterAttractMode();
+            _ready = true; // DisplayConfig/Specs ya construidos: la interacción puede disparar el escaneo
         }
 
         private void ApplyTimerIntervals() => _timers.ApplyIntervals(_settings);
@@ -143,6 +145,9 @@ namespace KioskClinicaPC
 
         private async void StartScanSequence()
         {
+            // Antes de que LoadHardwareAndConfigAsync termine (~0.5s) DisplayConfig es null:
+            // un clic temprano crasheaba al construir el log y dejaba la pantalla Scan en 0%.
+            if (!_ready) return;
             // Disparable desde clic en atracción, timer de auto-escaneo y teclado. Sin este guard,
             // dos secuencias concurrentes duplicarían logs y navegarían dos veces.
             if (_scanning) return;
