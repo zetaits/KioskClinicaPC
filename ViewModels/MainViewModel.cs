@@ -389,8 +389,11 @@ namespace KioskClinicaPC.ViewModels
                     AccentBrush = vis.AccentBrush,
                     AccentColor = vis.AccentColor
                 };
-                // Foto real del componente: empareja modelo concreto / valor con archivo en SpecImages.
-                item.ImagePath = Core.AssetResolver.ResolveSpecImage(item.TechDetail, item.Value);
+                // Foto real del componente: solo CPU/GPU/SO la muestran (el resto, icono vectorial).
+                // Empareja modelo concreto / valor con archivo en SpecImages.
+                item.ImagePath = Core.ComponentIds.SupportsImage(item.Id)
+                    ? Core.AssetResolver.ResolveSpecImage(item.TechDetail, item.Value)
+                    : null;
                 items.Add(item);
             }
 

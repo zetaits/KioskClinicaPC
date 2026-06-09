@@ -413,7 +413,27 @@ namespace KioskClinicaPC
             int next = _detailTourIndex + 1;
             if (next >= _viewModel.Specs.Count) { _autoTour = false; NavigateToScreen(0); return; }
             _detailTourIndex = next;
-            _viewModel.SelectedSpec = _viewModel.Specs[_detailTourIndex];
+            CrossFadeDetailTo(_viewModel.Specs[_detailTourIndex]);
+        }
+
+        /// <summary>Transición suave entre fichas en el recorrido automático: cross-fade rápido
+        /// con una leve entrada desde la derecha. El swap del spec ocurre con la pantalla a opacidad 0,
+        /// así no se ve el cambio brusco de textos/imagen.</summary>
+        private void CrossFadeDetailTo(SpecItem item)
+        {
+            var fadeOut = new DoubleAnimation(1, 0, TimeSpan.FromMilliseconds(150))
+                { EasingFunction = new SineEase { EasingMode = EasingMode.EaseIn } };
+            fadeOut.Completed += (s, e) =>
+            {
+                _viewModel.SelectedSpec = item;
+                DetailShift.BeginAnimation(TranslateTransform.XProperty,
+                    new DoubleAnimation(26, 0, TimeSpan.FromMilliseconds(260))
+                        { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } });
+                Screen3_Detail.BeginAnimation(OpacityProperty,
+                    new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(260))
+                        { EasingFunction = new SineEase { EasingMode = EasingMode.EaseOut } });
+            };
+            Screen3_Detail.BeginAnimation(OpacityProperty, fadeOut);
         }
 
         private void UpdateSlideDots(int index)

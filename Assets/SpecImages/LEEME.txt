@@ -3,17 +3,20 @@ FOTOS DE COMPONENTES
 
 Suelta aquí la foto real de cada componente. Se empaquetan dentro del .exe.
 
-ORGANIZACIÓN EN SUBCARPETAS
----------------------------
-Hay una subcarpeta por tipo de componente, solo para tenerlo ordenado:
+SOLO 3 TIPOS LLEVAN FOTO
+------------------------
+Por decisión de producto, únicamente estos componentes muestran imagen real
+(el resto usa solo el icono vectorial). Hay una subcarpeta por tipo:
 
-    cpu\        gpu\        ram\        storage\
-    pantalla\   so\         wifi\       camara\
-    bateria\    puertos\
+    cpu\        gpu\        so\
+
+La MARCA del equipo (logo del fabricante) va aparte, en Assets\Brands\.
+
+Aunque pongas archivos en otras carpetas o en la raíz, la app NO los usará para
+esos componentes: el filtro está en código (ComponentIds.SupportsImage = cpu/gpu/os).
 
 La búsqueda es RECURSIVA: da igual la subcarpeta donde pongas el archivo, casa por
-NOMBRE. Las carpetas son solo para que tú lo tengas claro. (Puedes incluso dejar
-archivos en la raíz; también valen.)
+NOMBRE. Las carpetas son solo para tenerlo ordenado.
 
 NOMBRE DEL ARCHIVO
 ------------------
@@ -24,8 +27,8 @@ Nombre = modelo del componente (sin importar mayúsculas/espacios/guiones). Ejem
     cpu\amd-ryzen-7.png
     gpu\rtx-4060.png
     gpu\iris-xe.png
-    ram\16gb.png
-    storage\ssd.png
+    so\windows-11.png
+    so\windows-11-pro.png
 
 Formatos: png, jpg, jpeg, webp, bmp.
 

@@ -26,9 +26,9 @@
         <BooleanToVisibilityConverter x:Key="BoolToVis"/>
         <core:LeftMarginConverter x:Key="LeftMarginConverter"/>
         <core:StringToBrushConverter x:Key="StringBrushConverter"/>
-        <core:PathToImageConverter x:Key="PathToImage"/>
         <core:OptionalPathToImageConverter x:Key="OptionalImage"/>
         <core:InverseBoolToVisibilityConverter x:Key="InverseBoolToVis"/>
+        <core:NonEmptyStringToVisibilityConverter x:Key="NonEmptyToVis"/>
         
         <Style TargetType="TextBlock" x:Key="DisplayFont">
             <Setter Property="FontFamily" Value="{StaticResource ChakraPetch}"/>
@@ -680,17 +680,21 @@
                     </Grid.RenderTransform>
 
                     <!-- IDENTITY BLOCK — left column at top:180. Ancho 440 = deja hueco al spotlight (x=600). -->
-                    <StackPanel HorizontalAlignment="Left" VerticalAlignment="Top" Width="440" Margin="120,180,0,0">
+                    <StackPanel HorizontalAlignment="Left" VerticalAlignment="Top" Width="440" Margin="120,220,0,0">
                       <!-- Marca del equipo: logo si existe (Brands\<marca>.png); si no, el texto de siempre.
                            DownOnly: nunca amplía el PNG (evita pixelado); solo encoge si no cabe. -->
-                      <Image Source="{Binding BrandLogoPath, Converter={StaticResource OptionalImage}}"
-                             Visibility="{Binding HasBrandLogo, Converter={StaticResource BoolToVis}}"
-                             HorizontalAlignment="Left" Stretch="Uniform" StretchDirection="DownOnly"
-                             MaxHeight="120" MaxWidth="440" Margin="0,0,0,12">
-                        <Image.Effect>
-                          <DropShadowEffect Color="{StaticResource CyanColor}" BlurRadius="22" ShadowDepth="0" Opacity="0.35"/>
-                        </Image.Effect>
-                      </Image>
+                      <!-- Slot de altura fija: reserva 120px pase lo que pase, así el logo (sea cual sea
+                           su proporción) no empuja el resto del bloque. DownOnly: solo encoge, no amplía. -->
+                      <Grid Height="120" Margin="0,0,0,12" HorizontalAlignment="Left"
+                            Visibility="{Binding HasBrandLogo, Converter={StaticResource BoolToVis}}">
+                        <Image Source="{Binding BrandLogoPath, Converter={StaticResource OptionalImage}}"
+                               HorizontalAlignment="Left" VerticalAlignment="Center"
+                               Stretch="Uniform" StretchDirection="DownOnly" MaxHeight="120" MaxWidth="440">
+                          <Image.Effect>
+                            <DropShadowEffect Color="{StaticResource CyanColor}" BlurRadius="22" ShadowDepth="0" Opacity="0.35"/>
+                          </Image.Effect>
+                        </Image>
+                      </Grid>
                       <!-- Marca/Modelo detectados: auto-encogen si el nombre real es largo (no se cortan) -->
                       <Viewbox StretchDirection="DownOnly" Stretch="Uniform" HorizontalAlignment="Left" MaxWidth="440" Margin="0,0,0,10"
                                Visibility="{Binding HasBrandLogo, Converter={StaticResource InverseBoolToVis}}">
@@ -704,9 +708,14 @@
                         </TextBlock>
                       </Viewbox>
 
-                      <TextBlock Foreground="{StaticResource Text1Brush}" FontSize="18" Margin="0,24,0,0">
-                        <Run Text="{Binding DisplayConfig.Family}"/><Run Text=" · "/><Run Text="SKU " Foreground="{StaticResource Text2Brush}"/><Run Text="{Binding DisplayConfig.Sku}" Foreground="{StaticResource Text2Brush}"/>
-                      </TextBlock>
+                      <StackPanel Orientation="Horizontal" Margin="0,24,0,0">
+                        <TextBlock Foreground="{StaticResource Text1Brush}" FontSize="18" Text="{Binding DisplayConfig.Family}"/>
+                        <!-- SKU: solo visible si el campo está relleno (tienda sin inventario → oculto). -->
+                        <TextBlock Foreground="{StaticResource Text2Brush}" FontSize="18"
+                                   Visibility="{Binding DisplayConfig.Sku, Converter={StaticResource NonEmptyToVis}}">
+                          <Run Text=" · SKU "/><Run Text="{Binding DisplayConfig.Sku}"/>
+                        </TextBlock>
+                      </StackPanel>
                     
                       <StackPanel Orientation="Horizontal" Margin="0,32,0,0">
                         <!-- Píldora de grado/reacondicionado: borde + tinte dorado, punto luminoso -->
@@ -1077,7 +1086,8 @@
                 </Grid>
 
                 <!-- ====== SCREEN 3: DETAIL ====== -->
-                <Grid x:Name="Screen3_Detail" Visibility="Collapsed" Opacity="0" DataContext="{Binding SelectedSpec}">
+                <Grid x:Name="Screen3_Detail" Visibility="Collapsed" Opacity="0" DataContext="{Binding SelectedSpec}" RenderTransformOrigin="0.5,0.5">
+                    <Grid.RenderTransform><TranslateTransform x:Name="DetailShift"/></Grid.RenderTransform>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="560"/>
@@ -1385,7 +1395,8 @@
                         </Image>
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Right">
-                        <TextBlock Style="{StaticResource MonoFont}" Foreground="{StaticResource Text2Brush}" FontSize="14" VerticalAlignment="Center" Margin="0,0,32,0">
+                        <TextBlock Style="{StaticResource MonoFont}" Foreground="{StaticResource Text2Brush}" FontSize="14" VerticalAlignment="Center" Margin="0,0,32,0"
+                                   Visibility="{Binding DisplayConfig.Sku, Converter={StaticResource NonEmptyToVis}}">
                             <Run Text="SKU "/><Run Text="{Binding DisplayConfig.Sku}" Foreground="{StaticResource Text0Brush}" FontWeight="Bold"/>
                         </TextBlock>
                         <TextBlock Text="{Binding CurrentScreenName}" edit:Editable.IsOn="False" Style="{StaticResource MonoFont}" Foreground="{StaticResource Text2Brush}" FontSize="14" VerticalAlignment="Center" Margin="0,0,32,0"/>

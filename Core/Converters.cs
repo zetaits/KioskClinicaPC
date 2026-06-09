@@ -9,41 +9,6 @@ using System.Windows.Media.Imaging;
 namespace KioskClinicaPC.Core
 {
     /// <summary>
-    /// Turns a product-image file path into an ImageSource. Falls back to the bundled
-    /// showcase asset when the path is empty or the file is missing. Loads with OnLoad
-    /// caching so the source file isn't locked (allows re-dropping a new photo).
-    /// </summary>
-    public class PathToImageConverter : IValueConverter
-    {
-        private static readonly Uri FallbackUri =
-            new("pack://application:,,,/KioskClinicaPC;component/Assets/product-showcase.png");
-
-        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
-        {
-            try
-            {
-                if (value is string path && !string.IsNullOrWhiteSpace(path) && File.Exists(path))
-                {
-                    var bmp = new BitmapImage();
-                    bmp.BeginInit();
-                    bmp.CacheOption = BitmapCacheOption.OnLoad;
-                    bmp.CreateOptions = BitmapCreateOptions.IgnoreImageCache;
-                    bmp.UriSource = new Uri(path, UriKind.Absolute);
-                    bmp.EndInit();
-                    bmp.Freeze();
-                    return bmp;
-                }
-            }
-            catch { /* fall through to bundled asset */ }
-
-            return new BitmapImage(FallbackUri);
-        }
-
-        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
-            => throw new NotImplementedException();
-    }
-
-    /// <summary>
     /// Igual que PathToImageConverter pero SIN fallback: devuelve null si la ruta es vacía o
     /// el archivo no existe. Para logos de marca / fotos de componente que sólo aparecen si hay imagen.
     /// </summary>
@@ -91,6 +56,16 @@ namespace KioskClinicaPC.Core
     {
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
             => (value is bool b && b) ? Visibility.Collapsed : Visibility.Visible;
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+            => throw new NotImplementedException();
+    }
+
+    /// <summary>Texto no vacío → Visible; vacío/espacios → Collapsed. Para ocultar etiquetas opcionales (p.ej. SKU).</summary>
+    public class NonEmptyStringToVisibilityConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+            => string.IsNullOrWhiteSpace(value as string) ? Visibility.Collapsed : Visibility.Visible;
 
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
             => throw new NotImplementedException();

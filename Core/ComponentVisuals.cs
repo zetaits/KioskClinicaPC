@@ -24,7 +24,9 @@ namespace KioskClinicaPC.Core
     {
         private const string IconCpu = "M 9,9 L 23,9 L 23,23 L 9,23 Z M 13,13 L 19,13 L 19,19 L 13,19 Z M 12,9 L 12,6 M 15,9 L 15,6 M 18,9 L 18,6 M 21,9 L 21,6 M 12,23 L 12,26 M 15,23 L 15,26 M 18,23 L 18,26 M 21,23 L 21,26 M 9,12 L 6,12 M 9,15 L 6,15 M 9,18 L 6,18 M 9,21 L 6,21 M 23,12 L 26,12 M 23,15 L 26,15 M 23,18 L 26,18 M 23,21 L 26,21";
         private const string IconGpu = "M 4,11 L 28,11 L 28,22 L 4,22 Z M 11,14 A 2.6,2.6 0 1,0 11,19 A 2.6,2.6 0 1,0 11,14 M 21,14 A 2.6,2.6 0 1,0 21,19 A 2.6,2.6 0 1,0 21,14 M 4,22 L 2,25 M 28,22 L 30,25";
-        private const string IconRam = "M 4,10 L 28,10 L 28,20 L 4,20 Z M 9,10 L 9,20 M 14,10 L 14,20 M 19,10 L 19,20 M 24,10 L 24,20 M 6,22 L 6,25 M 26,22 L 26,25";
+        // DIMM: cuerpo PCB + 2 ventanas de chip (huecos even-odd) + tira de contactos con muesca de llave.
+        // Todo formas CERRADAS porque el icono se rellena con Fill (las líneas abiertas no se verían).
+        private const string IconRam = "M 3,8 L 29,8 L 29,20 L 3,20 Z M 6,11 L 13,11 L 13,17 L 6,17 Z M 16,11 L 23,11 L 23,17 L 16,17 Z M 5,20 L 27,20 L 27,23 L 5,23 Z M 15,20 L 17,20 L 17,23 L 15,23 Z";
         // SSD: carcasa redondeada (marco) + 3 chips NAND + LED de actividad. No base de datos.
         private const string IconStorage = "M 6,7 A 2,2 0 0,0 4,9 L 4,23 A 2,2 0 0,0 6,25 L 26,25 A 2,2 0 0,0 28,23 L 28,9 A 2,2 0 0,0 26,7 Z M 7,11 L 25,11 L 25,21 L 7,21 Z M 9,13 L 12,13 L 12,19 L 9,19 Z M 14.5,13 L 17.5,13 L 17.5,19 L 14.5,19 Z M 20,13 L 23,13 L 23,16 L 20,16 Z M 21,18 A 1.1,1.1 0 1,0 21.01,18 Z";
         // Monitor: marco con pantalla (hueco) + cuello + peana. No bloque sólido.

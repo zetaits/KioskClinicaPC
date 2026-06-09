@@ -51,8 +51,6 @@
     <ItemGroup>
       <None Remove="Assets\clinicapc-logo.png" />
       <Resource Include="Assets\clinicapc-logo.png" />
-      <None Remove="Assets\product-showcase.png" />
-      <Resource Include="Assets\product-showcase.png" />
       <None Remove="Fonts\SpaceGrotesk-Regular.ttf" />
       <Resource Include="Fonts\SpaceGrotesk-Regular.ttf" />
       <None Remove="Fonts\SpaceGrotesk-Bold.ttf" />

@@ -21,5 +21,13 @@ namespace KioskClinicaPC.Core
             Cpu or Gpu or Ram or Storage or Screen or Os => true,
             _ => false
         };
+
+        /// <summary>Componentes que muestran FOTO real (el resto solo icono vectorial): CPU, GPU y
+        /// Sistema Operativo. La Marca tiene su propio logo aparte (AssetResolver.ResolveBrandLogo).</summary>
+        public static bool SupportsImage(string? id) => id?.ToLowerInvariant() switch
+        {
+            Cpu or Gpu or Os => true,
+            _ => false
+        };
     }
 }
