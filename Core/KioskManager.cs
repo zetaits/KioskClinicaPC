@@ -13,6 +13,15 @@ namespace KioskClinicaPC.Core
         [DllImport("user32.dll")]
         private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
 
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern uint SetThreadExecutionState(uint esFlags);
+
+        // Mantiene la pantalla y el sistema despiertos mientras el kiosco corre.
+        // ES_CONTINUOUS persiste el estado hasta una nueva llamada (no necesita refresco).
+        private const uint ES_CONTINUOUS = 0x80000000;
+        private const uint ES_SYSTEM_REQUIRED = 0x00000001;
+        private const uint ES_DISPLAY_REQUIRED = 0x00000002;
+
         private const int SW_HIDE = 0;
         private const int SW_SHOW = 5;
 
@@ -31,6 +40,7 @@ namespace KioskClinicaPC.Core
             {
                 SetTaskbarVisibility(false);
                 SetTaskManagerEnabled(false);
+                SetDisplaySleepEnabled(false);
                 Log.Information("Protecciones de Kiosco activadas.");
             }
             catch (Exception ex)
@@ -48,6 +58,7 @@ namespace KioskClinicaPC.Core
             {
                 SetTaskbarVisibility(true);
                 SetTaskManagerEnabled(true);
+                SetDisplaySleepEnabled(true);
                 Log.Information("Protecciones de Kiosco desactivadas.");
             }
             catch (Exception ex)
@@ -64,6 +75,29 @@ namespace KioskClinicaPC.Core
 
             if (mainHandle != IntPtr.Zero) ShowWindow(mainHandle, cmd);
             if (secondaryHandle != IntPtr.Zero) ShowWindow(secondaryHandle, cmd);
+        }
+
+        /// <summary>
+        /// Evita (o restaura) el apagado automático de la pantalla y la suspensión del sistema.
+        /// No modifica el plan de energía de Windows: el estado se revierte al cerrar la app.
+        /// </summary>
+        private static void SetDisplaySleepEnabled(bool sleepEnabled)
+        {
+            try
+            {
+                uint flags = sleepEnabled
+                    ? ES_CONTINUOUS
+                    : ES_CONTINUOUS | ES_SYSTEM_REQUIRED | ES_DISPLAY_REQUIRED;
+
+                if (SetThreadExecutionState(flags) == 0)
+                {
+                    Log.Warning("SetThreadExecutionState devolvió 0 (no se pudo fijar el estado de energía).");
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Error al fijar el estado de energía de la pantalla.");
+            }
         }
 
         private static void SetTaskManagerEnabled(bool enabled)
