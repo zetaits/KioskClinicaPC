@@ -2,7 +2,7 @@ using System;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 
-namespace KioskClinicaPC
+namespace KioskClinicaPC.Core.Platform
 {
     public class KeyboardHook : IDisposable
     {

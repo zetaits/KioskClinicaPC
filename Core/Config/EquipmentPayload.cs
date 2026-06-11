@@ -6,7 +6,7 @@ using System.Linq;
 using System.Text;
 using Newtonsoft.Json;
 
-namespace KioskClinicaPC.Core
+namespace KioskClinicaPC.Core.Config
 {
     /// <summary>
     /// Empaqueta la ficha del equipo (identidad, precio, componentes presentes) en un payload compacto

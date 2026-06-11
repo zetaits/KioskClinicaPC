@@ -1,7 +1,7 @@
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 
-namespace KioskClinicaPC.Core
+namespace KioskClinicaPC.Core.Config
 {
     public class AttractSlide : INotifyPropertyChanged
     {

@@ -1,6 +1,6 @@
 using Newtonsoft.Json.Linq;
 
-namespace KioskClinicaPC.Core
+namespace KioskClinicaPC.Core.Config
 {
     /// <summary>
     /// Migra KioskConfig.json entre versiones de esquema. Trabaja sobre el JSON crudo (JObject)

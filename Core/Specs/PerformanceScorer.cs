@@ -2,7 +2,7 @@ using System;
 using System.Globalization;
 using System.Text.RegularExpressions;
 
-namespace KioskClinicaPC.Core
+namespace KioskClinicaPC.Core.Specs
 {
     /// <summary>
     /// Deriva una "potencia" (0–100, escalada a 70–100 para los componentes con benchmark) y una

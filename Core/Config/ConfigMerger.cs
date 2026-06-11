@@ -1,6 +1,6 @@
 using System;
 
-namespace KioskClinicaPC.Core
+namespace KioskClinicaPC.Core.Config
 {
     /// <summary>
     /// Reglas de fusión entre la configuración guardada (overrides manuales) y el hardware detectado.

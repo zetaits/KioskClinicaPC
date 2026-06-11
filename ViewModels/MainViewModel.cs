@@ -251,7 +251,13 @@ namespace KioskClinicaPC.ViewModels
 
             if (config.AttractSlides == null || config.AttractSlides.Count == 0)
             {
-                config.AttractSlides = GetDefaultSlides();
+                config.AttractSlides = SpecCatalog.DefaultSlidesUsed();
+                changed = true;
+            }
+
+            if (config.AttractSlidesNew == null || config.AttractSlidesNew.Count == 0)
+            {
+                config.AttractSlidesNew = SpecCatalog.DefaultSlidesNew();
                 changed = true;
             }
 
@@ -331,7 +337,11 @@ namespace KioskClinicaPC.ViewModels
             Texts = new EditableContent(new Dictionary<string, string>(_savedConfig.UiTexts ?? new Dictionary<string, string>()));
 
             Slides.Clear();
-            foreach (var s in _savedConfig.AttractSlides ?? new List<AttractSlide>())
+            // Textos del Attract según el estado: set "Nuevo" o "De ocasión".
+            var slideSource = Warranty.IsNew(_savedConfig.Condition)
+                ? _savedConfig.AttractSlidesNew
+                : _savedConfig.AttractSlides;
+            foreach (var s in slideSource ?? new List<AttractSlide>())
                 Slides.Add(new AttractSlide { Eyebrow = s.Eyebrow, Title1 = s.Title1, Title2 = s.Title2, Subtitle = s.Subtitle });
             CurrentSlide = Slides.Count > 0 ? Slides[0] : new AttractSlide();
 
@@ -391,7 +401,7 @@ namespace KioskClinicaPC.ViewModels
                 };
                 // Foto real del componente: solo CPU/GPU/SO la muestran (el resto, icono vectorial).
                 // Empareja modelo concreto / valor con archivo en SpecImages.
-                item.ImagePath = Core.ComponentIds.SupportsImage(item.Id)
+                item.ImagePath = ComponentIds.SupportsImage(item.Id)
                     ? Core.AssetResolver.ResolveSpecImage(item.TechDetail, item.Value)
                     : null;
                 items.Add(item);
@@ -513,7 +523,6 @@ namespace KioskClinicaPC.ViewModels
             return untouched ? n.Pros : m.Pros;
         }
 
-        private List<AttractSlide> GetDefaultSlides() => SpecCatalog.DefaultSlides();
 
         /// <summary>Persiste el estado editado (DisplayConfig/Specs/Slides/Texts) en KioskConfig.json.</summary>
         public void SaveEdits()
@@ -571,9 +580,14 @@ namespace KioskClinicaPC.ViewModels
                 _savedConfig.Price = DisplayConfig.Price;
                 _savedConfig.DiscountedPrice = DisplayConfig.DiscountedPrice;
 
-                _savedConfig.AttractSlides = Slides
+                // El modo edición edita el set del estado actual; persiste en el que corresponde.
+                var editedSlides = Slides
                     .Select(s => new AttractSlide { Eyebrow = s.Eyebrow, Title1 = s.Title1, Title2 = s.Title2, Subtitle = s.Subtitle })
                     .ToList();
+                if (Warranty.IsNew(_savedConfig.Condition))
+                    _savedConfig.AttractSlidesNew = editedSlides;
+                else
+                    _savedConfig.AttractSlides = editedSlides;
                 _savedConfig.UiTexts = new Dictionary<string, string>(Texts.Overrides);
 
                 _configRepo.SaveConfig(_savedConfig);

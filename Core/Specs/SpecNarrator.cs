@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Text.RegularExpressions;
 
-namespace KioskClinicaPC.Core
+namespace KioskClinicaPC.Core.Specs
 {
     /// <summary>
     /// Genera el "Qué significa" (Summary) y el "Para qué te sirve" (Pros) ADAPTADOS al hardware real,

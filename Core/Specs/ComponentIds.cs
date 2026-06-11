@@ -1,4 +1,4 @@
-namespace KioskClinicaPC.Core
+namespace KioskClinicaPC.Core.Specs
 {
     /// <summary>Identificadores canónicos de cada componente. Evita strings mágicos repartidos por el código.</summary>
     public static class ComponentIds

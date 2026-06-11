@@ -1,6 +1,6 @@
 using System;
 
-namespace KioskClinicaPC.Core
+namespace KioskClinicaPC.Core.Specs
 {
     /// <summary>
     /// Garantía derivada del estado del equipo (lógica pura, testeable). Equipo nuevo = 3 años;

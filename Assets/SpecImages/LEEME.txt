@@ -8,7 +8,7 @@ SOLO 3 TIPOS LLEVAN FOTO
 Por decisión de producto, únicamente estos componentes muestran imagen real
 (el resto usa solo el icono vectorial). Hay una subcarpeta por tipo:
 
-    cpu\        gpu\        so\
+    cpu\        gpu\        os\
 
 La MARCA del equipo (logo del fabricante) va aparte, en Assets\Brands\.
 
@@ -27,8 +27,8 @@ Nombre = modelo del componente (sin importar mayúsculas/espacios/guiones). Ejem
     cpu\amd-ryzen-7.png
     gpu\rtx-4060.png
     gpu\iris-xe.png
-    so\windows-11.png
-    so\windows-11-pro.png
+    os\windows-11.png
+    os\windows-11-pro.png
 
 Formatos: png, jpg, jpeg, webp, bmp.
 

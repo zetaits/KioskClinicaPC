@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Media;
 
-namespace KioskClinicaPC.Core
+namespace KioskClinicaPC.Core.Specs
 {
     /// <summary>Identidad visual de un componente: icono vectorial y acento (brush + color).
     /// Datos puramente de presentación.</summary>

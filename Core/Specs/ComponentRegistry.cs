@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace KioskClinicaPC.Core
+namespace KioskClinicaPC.Core.Specs
 {
     /// <summary>
     /// Cómo leer/escribir el valor y el detalle técnico de un componente en un <see cref="AppConfig"/>.

@@ -2,7 +2,7 @@ using System;
 using System.IO;
 using System.Threading;
 
-namespace KioskClinicaPC.Core
+namespace KioskClinicaPC.Core.Config
 {
     /// <summary>Escritura de archivos resistente a fallos a mitad de escritura.</summary>
     public static class JsonStore

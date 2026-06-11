@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace KioskClinicaPC.Core
+namespace KioskClinicaPC.Core.Config
 {
     public class AppConfig : ObservableObject
     {
@@ -117,7 +117,11 @@ namespace KioskClinicaPC.Core
 
         public List<SpecMarketingData> MarketingData { get; set; } = new List<SpecMarketingData>();
 
+        // Textos rotativos del Attract según el estado del equipo: AttractSlides = "De ocasión",
+        // AttractSlidesNew = "Nuevo". Se muestra el set que corresponde a Condition.
         public List<AttractSlide> AttractSlides { get; set; } = new List<AttractSlide>();
+
+        public List<AttractSlide> AttractSlidesNew { get; set; } = new List<AttractSlide>();
 
         public Dictionary<string, string> UiTexts { get; set; } = new Dictionary<string, string>();
     }

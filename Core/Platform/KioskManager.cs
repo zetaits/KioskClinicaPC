@@ -3,7 +3,7 @@ using System.Runtime.InteropServices;
 using Microsoft.Win32;
 using Serilog;
 
-namespace KioskClinicaPC.Core
+namespace KioskClinicaPC.Core.Platform
 {
     public static class KioskManager
     {

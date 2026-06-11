@@ -4,7 +4,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:KioskClinicaPC"
-        xmlns:core="clr-namespace:KioskClinicaPC.Core"
+        xmlns:conv="clr-namespace:KioskClinicaPC.Converters"
         xmlns:edit="clr-namespace:KioskClinicaPC.Controls"
         mc:Ignorable="d"
         Title="KioskClinicaPC"
@@ -24,11 +24,11 @@
     
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVis"/>
-        <core:LeftMarginConverter x:Key="LeftMarginConverter"/>
-        <core:StringToBrushConverter x:Key="StringBrushConverter"/>
-        <core:OptionalPathToImageConverter x:Key="OptionalImage"/>
-        <core:InverseBoolToVisibilityConverter x:Key="InverseBoolToVis"/>
-        <core:NonEmptyStringToVisibilityConverter x:Key="NonEmptyToVis"/>
+        <conv:LeftMarginConverter x:Key="LeftMarginConverter"/>
+        <conv:StringToBrushConverter x:Key="StringBrushConverter"/>
+        <conv:OptionalPathToImageConverter x:Key="OptionalImage"/>
+        <conv:InverseBoolToVisibilityConverter x:Key="InverseBoolToVis"/>
+        <conv:NonEmptyStringToVisibilityConverter x:Key="NonEmptyToVis"/>
         
         <Style TargetType="TextBlock" x:Key="DisplayFont">
             <Setter Property="FontFamily" Value="{StaticResource ChakraPetch}"/>
@@ -718,18 +718,6 @@
                       </StackPanel>
                     
                       <StackPanel Orientation="Horizontal" Margin="0,32,0,0">
-                        <!-- Píldora de grado/reacondicionado: borde + tinte dorado, punto luminoso -->
-                        <Border Background="#1FF0D26B" BorderBrush="{StaticResource OkBrush}" BorderThickness="1.5" CornerRadius="8" Padding="14,11" Margin="0,0,12,0"
-                                Visibility="{Binding ShowRefurbished, Converter={StaticResource BoolToVis}}">
-                          <StackPanel Orientation="Horizontal">
-                            <Ellipse Width="11" Height="11" Fill="{StaticResource OkBrush}" VerticalAlignment="Center" Margin="0,0,10,0">
-                                <Ellipse.Effect>
-                                    <DropShadowEffect Color="{StaticResource OkColor}" BlurRadius="12" ShadowDepth="0" Opacity="0.9"/>
-                                </Ellipse.Effect>
-                            </Ellipse>
-                            <TextBlock Text="{Binding Texts[hud.badgeGrade]}" Style="{StaticResource MonoFont}" FontSize="18" FontWeight="Medium" Foreground="{StaticResource OkBrush}"/>
-                          </StackPanel>
-                        </Border>
                         <!-- Píldora de garantía: borde + tinte ámbar, icono de escudo -->
                         <Border Background="#1FFFA75C" BorderBrush="{StaticResource AmberBrush}" BorderThickness="1.5" CornerRadius="8" Padding="14,11">
                           <StackPanel Orientation="Horizontal">

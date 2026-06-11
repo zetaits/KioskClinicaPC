@@ -3,7 +3,7 @@ using System.Diagnostics;
 using Microsoft.Win32;
 using Serilog;
 
-namespace KioskClinicaPC.Core
+namespace KioskClinicaPC.Core.Platform
 {
     /// <summary>
     /// Registra el arranque automático del kiosko en HKCU\...\Run (extraído de MainWindow para

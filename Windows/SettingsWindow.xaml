@@ -122,63 +122,77 @@
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
                             <RadioButton x:Name="NewRadio" Grid.Column="0" Style="{StaticResource ChoiceCard}" GroupName="Condition"
-                                         Content="Nuevo" Tag="3 años de garantía"/>
+                                         Content="Nuevo" Tag="3 años de garantía" Checked="ConditionRadio_Checked"/>
                             <RadioButton x:Name="UsedRadio" Grid.Column="2" Style="{StaticResource ChoiceCard}" GroupName="Condition"
-                                         Content="De ocasión" Tag="1 año · sello reacondicionado"/>
+                                         Content="De ocasión" Tag="1 año · sello reacondicionado" Checked="ConditionRadio_Checked"/>
                         </Grid>
                     </StackPanel>
                 </Border>
 
-                <!-- Pantalla Attract · textos rotativos -->
+                <!-- Pantalla Attract · textos rotativos (un set por estado del equipo) -->
                 <Border Style="{StaticResource SectionCard}">
                     <StackPanel>
+                        <StackPanel.Resources>
+                            <DataTemplate x:Key="AttractSlideTemplate">
+                                <Border Background="#0AFFFFFF" BorderBrush="{StaticResource Line1Brush}" BorderThickness="1" Padding="14" Margin="0,0,0,12">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0">
+                                            <TextBlock Style="{StaticResource FieldLabel}" Text="ANTETÍTULO (pequeño, arriba)"/>
+                                            <TextBox Style="{StaticResource ConfigTextBox}" Margin="0,0,0,8"
+                                                     Text="{Binding Eyebrow, UpdateSourceTrigger=PropertyChanged}"/>
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="12"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel Grid.Column="0">
+                                                    <TextBlock Style="{StaticResource FieldLabel}" Text="TITULAR 1"/>
+                                                    <TextBox Style="{StaticResource ConfigTextBox}" Margin="0,0,0,8"
+                                                             Text="{Binding Title1, UpdateSourceTrigger=PropertyChanged}"/>
+                                                </StackPanel>
+                                                <StackPanel Grid.Column="2">
+                                                    <TextBlock Style="{StaticResource FieldLabel}" Text="TITULAR 2 (acento)"/>
+                                                    <TextBox Style="{StaticResource ConfigTextBox}" Margin="0,0,0,8"
+                                                             Text="{Binding Title2, UpdateSourceTrigger=PropertyChanged}"/>
+                                                </StackPanel>
+                                            </Grid>
+                                            <TextBlock Style="{StaticResource FieldLabel}" Text="SUBTÍTULO"/>
+                                            <TextBox Style="{StaticResource ConfigTextBox}"
+                                                     Text="{Binding Subtitle, UpdateSourceTrigger=PropertyChanged}"/>
+                                        </StackPanel>
+                                        <Button Grid.Column="1" Content="✕ Quitar" VerticalAlignment="Top" Margin="12,18,0,0"
+                                                Padding="10,6" Background="#1AFF5252" Foreground="#FFFF8A8A" BorderThickness="0"
+                                                Cursor="Hand" Tag="{Binding}" Click="RemoveSlide_Click"/>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </StackPanel.Resources>
+
                         <TextBlock Style="{StaticResource SectionTitle}" Text="Pantalla de espera (Attract) · Textos"/>
-                        <TextBlock Style="{StaticResource SectionHint}" Text="Mensajes que van rotando en la pantalla inicial. Añade o elimina los que quieras."/>
-                        <ItemsControl x:Name="SlidesItemsControl">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <Border Background="#0AFFFFFF" BorderBrush="{StaticResource Line1Brush}" BorderThickness="1" Padding="14" Margin="0,0,0,12">
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="Auto"/>
-                                            </Grid.ColumnDefinitions>
-                                            <StackPanel Grid.Column="0">
-                                                <TextBlock Style="{StaticResource FieldLabel}" Text="ANTETÍTULO (pequeño, arriba)"/>
-                                                <TextBox Style="{StaticResource ConfigTextBox}" Margin="0,0,0,8"
-                                                         Text="{Binding Eyebrow, UpdateSourceTrigger=PropertyChanged}"/>
-                                                <Grid>
-                                                    <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="*"/>
-                                                        <ColumnDefinition Width="12"/>
-                                                        <ColumnDefinition Width="*"/>
-                                                    </Grid.ColumnDefinitions>
-                                                    <StackPanel Grid.Column="0">
-                                                        <TextBlock Style="{StaticResource FieldLabel}" Text="TITULAR 1"/>
-                                                        <TextBox Style="{StaticResource ConfigTextBox}" Margin="0,0,0,8"
-                                                                 Text="{Binding Title1, UpdateSourceTrigger=PropertyChanged}"/>
-                                                    </StackPanel>
-                                                    <StackPanel Grid.Column="2">
-                                                        <TextBlock Style="{StaticResource FieldLabel}" Text="TITULAR 2 (acento)"/>
-                                                        <TextBox Style="{StaticResource ConfigTextBox}" Margin="0,0,0,8"
-                                                                 Text="{Binding Title2, UpdateSourceTrigger=PropertyChanged}"/>
-                                                    </StackPanel>
-                                                </Grid>
-                                                <TextBlock Style="{StaticResource FieldLabel}" Text="SUBTÍTULO"/>
-                                                <TextBox Style="{StaticResource ConfigTextBox}"
-                                                         Text="{Binding Subtitle, UpdateSourceTrigger=PropertyChanged}"/>
-                                            </StackPanel>
-                                            <Button Grid.Column="1" Content="✕ Quitar" VerticalAlignment="Top" Margin="12,18,0,0"
-                                                    Padding="10,6" Background="#1AFF5252" Foreground="#FFFF8A8A" BorderThickness="0"
-                                                    Cursor="Hand" Tag="{Binding}" Click="RemoveSlide_Click"/>
-                                        </Grid>
-                                    </Border>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                        <Button Content="+ Añadir texto" HorizontalAlignment="Left" Margin="0,4,0,0"
-                                Padding="14,8" Background="#1A00F0FF" Foreground="{StaticResource CyanBrush}" BorderThickness="0"
-                                Cursor="Hand" Click="AddSlide_Click"/>
+                        <TextBlock Style="{StaticResource SectionHint}" Text="Mensajes que van rotando en la pantalla inicial. Solo se editan los del estado seleccionado arriba."/>
+
+                        <!-- Set "De ocasión": visible solo cuando UsedRadio está marcado -->
+                        <StackPanel x:Name="UsedSlidesPanel">
+                            <TextBlock Style="{StaticResource FieldLabel}" Margin="0,10,0,10" Text="◆ EQUIPO DE OCASIÓN"/>
+                            <ItemsControl x:Name="SlidesItemsControl" ItemTemplate="{StaticResource AttractSlideTemplate}"/>
+                            <Button Content="+ Añadir texto" HorizontalAlignment="Left" Margin="0,4,0,0"
+                                    Padding="14,8" Background="#1A00F0FF" Foreground="{StaticResource CyanBrush}" BorderThickness="0"
+                                    Cursor="Hand" Click="AddSlide_Click"/>
+                        </StackPanel>
+
+                        <!-- Set "Nuevo": visible solo cuando NewRadio está marcado -->
+                        <StackPanel x:Name="NewSlidesPanel" Visibility="Collapsed">
+                            <TextBlock Style="{StaticResource FieldLabel}" Margin="0,10,0,10" Text="◆ EQUIPO NUEVO"/>
+                            <ItemsControl x:Name="SlidesNewItemsControl" ItemTemplate="{StaticResource AttractSlideTemplate}"/>
+                            <Button Content="+ Añadir texto" HorizontalAlignment="Left" Margin="0,4,0,0"
+                                    Padding="14,8" Background="#1A00F0FF" Foreground="{StaticResource CyanBrush}" BorderThickness="0"
+                                    Cursor="Hand" Click="AddSlideNew_Click"/>
+                        </StackPanel>
                     </StackPanel>
                 </Border>
 

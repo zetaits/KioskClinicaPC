@@ -3,7 +3,7 @@ using System.Diagnostics;
 using System.IO;
 using Serilog;
 
-namespace KioskClinicaPC.Core
+namespace KioskClinicaPC.Core.Platform
 {
     /// <summary>
     /// Abre el teclado en pantalla de Windows. Necesario en kioscos táctiles sin teclado físico:

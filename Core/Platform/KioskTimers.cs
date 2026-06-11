@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Windows.Threading;
 
-namespace KioskClinicaPC.Core
+namespace KioskClinicaPC.Core.Platform
 {
     public enum KioskTimer
     {

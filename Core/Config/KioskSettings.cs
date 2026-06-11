@@ -3,7 +3,7 @@ using System.IO;
 using Newtonsoft.Json;
 using Serilog;
 
-namespace KioskClinicaPC.Core
+namespace KioskClinicaPC.Core.Config
 {
     /// <summary>Ajustes de comportamiento del kiosko (separados del contenido en KioskConfig.json).</summary>
     public class KioskSettings

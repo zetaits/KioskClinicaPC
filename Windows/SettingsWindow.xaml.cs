@@ -24,7 +24,8 @@ namespace KioskClinicaPC.Windows
         private KioskSettings _settings = new KioskSettings();
 
         // Slides del Attract editables (añadir/eliminar/editar). Se ligan al ItemsControl por nombre.
-        private readonly ObservableCollection<AttractSlide> _attractSlides = new ObservableCollection<AttractSlide>();
+        private readonly ObservableCollection<AttractSlide> _attractSlides = new ObservableCollection<AttractSlide>();        // De ocasión
+        private readonly ObservableCollection<AttractSlide> _attractSlidesNew = new ObservableCollection<AttractSlide>();     // Nuevo
 
         /// <summary>Indica a MainWindow que debe entrar en modo edición al cerrar.</summary>
         public bool LaunchEditMode { get; private set; }
@@ -96,23 +97,53 @@ namespace KioskClinicaPC.Windows
             if (Warranty.IsNew(_savedConfig.Condition)) NewRadio.IsChecked = true;
             else UsedRadio.IsChecked = true;
 
-            // Slides del Attract: copia editable (clona para no mutar _savedConfig hasta Guardar).
+            // Slides del Attract: copia editable por estado (clona para no mutar _savedConfig hasta Guardar).
             _attractSlides.Clear();
             foreach (var s in _savedConfig.AttractSlides ?? new List<AttractSlide>())
                 _attractSlides.Add(new AttractSlide { Eyebrow = s.Eyebrow, Title1 = s.Title1, Title2 = s.Title2, Subtitle = s.Subtitle });
             SlidesItemsControl.ItemsSource = _attractSlides;
+
+            _attractSlidesNew.Clear();
+            foreach (var s in _savedConfig.AttractSlidesNew ?? new List<AttractSlide>())
+                _attractSlidesNew.Add(new AttractSlide { Eyebrow = s.Eyebrow, Title1 = s.Title1, Title2 = s.Title2, Subtitle = s.Subtitle });
+            SlidesNewItemsControl.ItemsSource = _attractSlidesNew;
         }
 
         private void AddSlide_Click(object sender, RoutedEventArgs e)
         {
-            _attractSlides.Add(new AttractSlide { Eyebrow = "NUEVO", Title1 = "TITULAR", Title2 = "SECUNDARIO", Subtitle = "Subtítulo" });
+            _attractSlides.Add(new AttractSlide { Eyebrow = "OCASIÓN", Title1 = "TITULAR", Title2 = "SECUNDARIO", Subtitle = "Subtítulo" });
+        }
+
+        private void AddSlideNew_Click(object sender, RoutedEventArgs e)
+        {
+            _attractSlidesNew.Add(new AttractSlide { Eyebrow = "NUEVO", Title1 = "TITULAR", Title2 = "SECUNDARIO", Subtitle = "Subtítulo" });
+        }
+
+        // Muestra en tiempo real solo el set de textos del estado seleccionado.
+        private void ConditionRadio_Checked(object sender, RoutedEventArgs e)
+        {
+            if (NewSlidesPanel == null || UsedSlidesPanel == null) return; // aún cargando la vista
+            bool isNew = NewRadio.IsChecked == true;
+            NewSlidesPanel.Visibility = isNew ? Visibility.Visible : Visibility.Collapsed;
+            UsedSlidesPanel.Visibility = isNew ? Visibility.Collapsed : Visibility.Visible;
         }
 
         private void RemoveSlide_Click(object sender, RoutedEventArgs e)
         {
+            // El botón puede pertenecer a cualquiera de los dos sets; quita del que lo contenga.
             if (sender is FrameworkElement fe && fe.Tag is AttractSlide slide)
-                _attractSlides.Remove(slide);
+            {
+                if (!_attractSlides.Remove(slide))
+                    _attractSlidesNew.Remove(slide);
+            }
         }
+
+        // Descarta slides completamente vacíos y clona el resto conservando el orden.
+        private static List<AttractSlide> CleanSlides(IEnumerable<AttractSlide> slides) => slides
+            .Where(s => !(string.IsNullOrWhiteSpace(s.Eyebrow) && string.IsNullOrWhiteSpace(s.Title1)
+                          && string.IsNullOrWhiteSpace(s.Title2) && string.IsNullOrWhiteSpace(s.Subtitle)))
+            .Select(s => new AttractSlide { Eyebrow = s.Eyebrow, Title1 = s.Title1, Title2 = s.Title2, Subtitle = s.Subtitle })
+            .ToList();
 
         private void LoadSettings()
         {
@@ -161,12 +192,9 @@ namespace KioskClinicaPC.Windows
                 // Sello "Reacondicionado" = derivado del estado: solo en equipos de ocasión.
                 _savedConfig.ShowRefurbished = UsedRadio.IsChecked == true;
 
-                // Slides del Attract: descarta los completamente vacíos; conserva el resto en orden.
-                _savedConfig.AttractSlides = _attractSlides
-                    .Where(s => !(string.IsNullOrWhiteSpace(s.Eyebrow) && string.IsNullOrWhiteSpace(s.Title1)
-                                  && string.IsNullOrWhiteSpace(s.Title2) && string.IsNullOrWhiteSpace(s.Subtitle)))
-                    .Select(s => new AttractSlide { Eyebrow = s.Eyebrow, Title1 = s.Title1, Title2 = s.Title2, Subtitle = s.Subtitle })
-                    .ToList();
+                // Slides del Attract (un set por estado): descarta los vacíos; conserva el resto en orden.
+                _savedConfig.AttractSlides = CleanSlides(_attractSlides);
+                _savedConfig.AttractSlidesNew = CleanSlides(_attractSlidesNew);
 
                 string json = JsonConvert.SerializeObject(_savedConfig, Formatting.Indented);
                 JsonStore.WriteAtomic(App.ConfigFilePath, json);

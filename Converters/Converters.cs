@@ -6,7 +6,7 @@ using System.Windows.Data;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 
-namespace KioskClinicaPC.Core
+namespace KioskClinicaPC.Converters
 {
     /// <summary>
     /// Igual que PathToImageConverter pero SIN fallback: devuelve null si la ruta es vacía o
