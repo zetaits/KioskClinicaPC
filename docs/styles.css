@@ -185,3 +185,11 @@ td { padding: 13px 6px; vertical-align: top; }
   color: var(--t3);
 }
 .sheet-foot #shopline { color: var(--t2); }
+.sheet-foot .foot-info { display: flex; flex-direction: column; gap: 8px; }
+.contact-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; }
+.contact-item { display: inline-flex; align-items: center; gap: 6px; color: var(--t2); text-decoration: none; }
+.contact-item.phone { gap: 8px; }
+.contact-item .ico { width: 13px; height: 13px; flex: none; }
+.phone-link { display: inline-flex; align-items: center; gap: 6px; color: var(--t2); text-decoration: none; }
+.wa-link { display: inline-flex; color: #25d366; text-decoration: none; }
+.wa-link .ico { width: 15px; height: 15px; }

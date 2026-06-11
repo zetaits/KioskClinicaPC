@@ -43,7 +43,12 @@ const LABELS = {
 // Debe coincidir con el valor por defecto de ShopAddress en MainViewModel.cs. Solo viaja `ad`
 // si el comercio la ha personalizado (y entonces tiene prioridad sobre este valor).
 const SHOP = {
-  address: "Calle Sevilla 58, Ronda"
+  address: "Calle Sevilla 58, Ronda",
+  email: "info@clinicapc.es",
+  // Display = como se lee; tel/wa = formato canónico (E.164 sin '+' para wa.me).
+  phoneDisplay: "952 87 24 63",
+  phoneTel: "+34952872463",
+  phoneWa: "34952872463"
 };
 
 function setStatus(msg, isError) {
@@ -126,6 +131,16 @@ function render(data) {
   // Footer
   document.getElementById("shopline").textContent =
     [data.sh, data.ad || SHOP.address].filter(Boolean).join(" · ");
+
+  // Contacto: enlaces accionables (html2pdf conserva los <a> como anotaciones clicables en el PDF).
+  const mail = document.getElementById("mailLink");
+  mail.querySelector("span").textContent = SHOP.email;
+  mail.href = "mailto:" + SHOP.email;
+  const phone = document.getElementById("phoneLink");
+  phone.querySelector("span").textContent = SHOP.phoneDisplay;
+  phone.href = "tel:" + SHOP.phoneTel;
+  document.getElementById("waLink").href = "https://wa.me/" + SHOP.phoneWa;
+
   document.getElementById("generated").textContent =
     "Generado el " + new Date().toLocaleDateString("es-ES") + " · specs reales detectadas en tienda";
 
