@@ -28,9 +28,7 @@ namespace KioskClinicaPC.Windows
                 Price = PriceTextBox.Text,
                 DiscountedPrice = DiscountedPriceTextBox.Text,
                 Sku = SkuTextBox.Text.Trim(),
-                Condition = NewRadio.IsChecked == true ? Warranty.New : Warranty.Used,
-                // Sello "Reacondicionado" = derivado del estado: solo en equipos de ocasión.
-                ShowRefurbished = UsedRadio.IsChecked == true
+                Condition = NewRadio.IsChecked == true ? Warranty.New : Warranty.Used
             };
             
             this.DialogResult = true;

@@ -18,11 +18,6 @@ namespace KioskClinicaPC.Core.Config
         private string? _discountedPrice;
         public string? DiscountedPrice { get => _discountedPrice; set => SetProperty(ref _discountedPrice, value); }
 
-        // Mostrar el distintivo "REACONDICIONADO" en la ficha. Inicializado a true: los configs antiguos
-        // (sin el campo) conservan el comportamiento previo (Newtonsoft no toca propiedades ausentes).
-        private bool _showRefurbished = true;
-        public bool ShowRefurbished { get => _showRefurbished; set => SetProperty(ref _showRefurbished, value); }
-
         // Estado del equipo: "Nuevo" (garantía 3 años) u "Ocasion" (1 año). Determina la garantía mostrada.
         private string? _condition = "Ocasion";
         public string? Condition { get => _condition; set => SetProperty(ref _condition, value); }

@@ -55,7 +55,6 @@ namespace KioskClinicaPC.ViewModels
                     OnPropertyChanged(nameof(HasDiscount));
                     OnPropertyChanged(nameof(BrandLogoPath));
                     OnPropertyChanged(nameof(HasBrandLogo));
-                    OnPropertyChanged(nameof(ShowRefurbished));
                     OnPropertyChanged(nameof(WarrantyText));
                 }
             }
@@ -102,8 +101,7 @@ namespace KioskClinicaPC.ViewModels
         public string FormattedMonthly => PriceFormatter.Monthly(DisplayConfig?.DiscountedPrice ?? DisplayConfig?.Price, InstallmentMonths);
         public bool HasDiscount => !string.IsNullOrWhiteSpace(DisplayConfig?.DiscountedPrice);
 
-        // Distintivo "Reacondicionado" y garantía derivada del estado del equipo (Nuevo/Ocasión).
-        public bool ShowRefurbished => DisplayConfig?.ShowRefurbished ?? true;
+        // Garantía derivada del estado del equipo (Nuevo/Ocasión).
         public string WarrantyText => Warranty.Label(DisplayConfig?.Condition);
 
         // Pago en cuotas: por defecto 6 meses; el botón de la ficha alterna a 12 y vuelve.
@@ -328,9 +326,8 @@ namespace KioskClinicaPC.ViewModels
                 ShopServices = ConfigMerger.Display(_savedConfig.ShopServices, "Asistencia · Cambio · Reparación"),
                 ProductImagePath = _savedConfig.ProductImagePath,
                 MarketingData = _savedConfig.MarketingData,
-                // Distintivo "Reacondicionado" + estado (garantía): se copian directos. Omitirlos dejaba
-                // ShowRefurbished/Condition en sus defaults (true / "Ocasion"), ignorando lo guardado.
-                ShowRefurbished = _savedConfig.ShowRefurbished,
+                // Estado (garantía): se copia directo. Omitirlo dejaba Condition en su default
+                // ("Ocasion"), ignorando lo guardado.
                 Condition = _savedConfig.Condition
             };
 

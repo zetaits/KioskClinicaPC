@@ -93,7 +93,7 @@ namespace KioskClinicaPC.Windows
             PortsDetailTextBox.Text = ConfigMerger.Display(_savedConfig.PortsDetail, _detectedSpecs.PortsDetail);
             OsDetailTextBox.Text = ConfigMerger.Display(_savedConfig.OsDetail, _detectedSpecs.OsDetail);
 
-            // Estado del equipo. "De ocasión" = reacondicionado (muestra el sello en la ficha).
+            // Estado del equipo: determina la garantía mostrada en la ficha.
             if (Warranty.IsNew(_savedConfig.Condition)) NewRadio.IsChecked = true;
             else UsedRadio.IsChecked = true;
 
@@ -189,8 +189,6 @@ namespace KioskClinicaPC.Windows
                 _savedConfig.OsDetail = ConfigMerger.Override(OsDetailTextBox.Text, _detectedSpecs.OsDetail);
 
                 _savedConfig.Condition = NewRadio.IsChecked == true ? Warranty.New : Warranty.Used;
-                // Sello "Reacondicionado" = derivado del estado: solo en equipos de ocasión.
-                _savedConfig.ShowRefurbished = UsedRadio.IsChecked == true;
 
                 // Slides del Attract (un set por estado): descarta los vacíos; conserva el resto en orden.
                 _savedConfig.AttractSlides = CleanSlides(_attractSlides);

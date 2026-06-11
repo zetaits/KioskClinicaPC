@@ -94,7 +94,7 @@
                 <RadioButton x:Name="NewRadio" Grid.Column="0" Style="{StaticResource ChoiceCard}" GroupName="Condition"
                              Content="Nuevo" Tag="3 años de garantía"/>
                 <RadioButton x:Name="UsedRadio" Grid.Column="2" Style="{StaticResource ChoiceCard}" GroupName="Condition"
-                             Content="De ocasión" Tag="1 año · sello reacondicionado" IsChecked="True"/>
+                             Content="De ocasión" Tag="1 año de garantía" IsChecked="True"/>
             </Grid>
 
             <TextBlock x:Name="ErrorText"

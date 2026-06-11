@@ -21,8 +21,6 @@ namespace KioskClinicaPC.Core
             ["scan.progress"] = "PROGRESO",
 
             ["hud.detected"] = "EQUIPO DETECTADO",
-            ["hud.badgeGrade"] = "REACONDICIONADO GRADO A+",
-            ["hud.badgeWarranty"] = "24 MESES DE GARANTÍA",
             ["hud.productView"] = "// VISTA DEL EQUIPO",
             ["hud.components"] = "// COMPONENTES · TOCA PARA VER EL DETALLE",
             ["hud.tileCta"] = "VER DETALLE →",
