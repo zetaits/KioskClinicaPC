@@ -48,6 +48,10 @@ _ReSharper*/
 *.userosscache
 *.sln.docstates
 
+# Artefactos del instalador (dotnet publish + Inno Setup)
+publish/
+installer/Output/
+
 # Local agent notes
 CLAUDE.md
 

@@ -141,9 +141,6 @@ function render(data) {
   phone.href = "tel:" + SHOP.phoneTel;
   document.getElementById("waLink").href = "https://wa.me/" + SHOP.phoneWa;
 
-  document.getElementById("generated").textContent =
-    "Generado el " + new Date().toLocaleDateString("es-ES") + " · specs reales detectadas en tienda";
-
   document.getElementById("status").hidden = true;
   document.getElementById("sheet").hidden = false;
   document.getElementById("actions").hidden = false;

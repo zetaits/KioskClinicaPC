@@ -19,8 +19,9 @@ namespace KioskClinicaPC.Core
         /// <summary>true → modo ligero (degradar efectos pesados).</summary>
         public static bool IsLow { get; private set; }
 
-        /// <summary>Partículas decorativas a generar: 26 en alta, 0 en baja (eran el mayor coste por frame).</summary>
-        public static int ParticleCount => IsLow ? 0 : 26;
+        /// <summary>Partículas decorativas a generar: 16 en alta, 0 en baja (cada una se anima en bucle;
+        /// 16 cunde casi igual que 26 visualmente y cuesta bastante menos en composición por frame).</summary>
+        public static int ParticleCount => IsLow ? 0 : 16;
 
         /// <summary>Resuelve el modo efectivo a partir del ajuste y la capacidad de render del equipo.</summary>
         /// <param name="setting">"Auto" (def.), "High" o "Low" desde <see cref="KioskSettings.GraphicsMode"/>.</param>

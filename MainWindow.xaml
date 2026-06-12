@@ -283,6 +283,12 @@
                              efectivo caía en ~(100,100), y escalado ×14.8 el orbe orbitaba un punto fuera de
                              pantalla en vez de rotar sobre sí mismo. -->
                         <Canvas Width="100" Height="100">
+                            <!-- Cacheado a bitmap: el episodio (escala+giro) transforma un bitmap ya
+                                 rasterizado en vez de re-dibujar 33 trazos + la sombra de 22px cada frame.
+                                 RenderAtScale≈15 compensa que el Viewbox lo amplía ×14.8 → nítido, no borroso. -->
+                            <Canvas.CacheMode>
+                                <BitmapCache RenderAtScale="15"/>
+                            </Canvas.CacheMode>
                             <Canvas.Effect>
                                 <DropShadowEffect Color="{StaticResource CyanColor}" BlurRadius="22"
                                                   ShadowDepth="0" Opacity="0.5"/>
@@ -406,7 +412,7 @@
                                     Background="#10F37A4A" BorderBrush="{StaticResource CyanBrush}" BorderThickness="2"
                                     Padding="36,18">
                                 <Border.Effect>
-                                    <DropShadowEffect Color="{StaticResource CyanColor}" BlurRadius="24" ShadowDepth="0" Opacity="0.35"/>
+                                    <DropShadowEffect Color="{StaticResource CyanColor}" BlurRadius="24" ShadowDepth="0" Opacity="0.48"/>
                                 </Border.Effect>
                                 <StackPanel Orientation="Horizontal">
                                     <Ellipse Width="12" Height="12" Fill="{StaticResource CyanBrush}" VerticalAlignment="Center" Margin="0,0,16,0">
@@ -419,11 +425,14 @@
                                 <Border.Triggers>
                                     <EventTrigger RoutedEvent="Loaded">
                                         <BeginStoryboard>
-                                            <!-- Pulso solo por opacidad: animar BlurRadius forzaba re-rasterizar
-                                                 la sombra entera cada frame (caro en iGPU). El cambio de opacidad
-                                                 da el mismo latido visual sin recalcular el blur. -->
+                                            <!-- Pulso por la opacidad del ELEMENTO (UIElement.Opacity), no por la
+                                                 del Effect: animar cualquier prop del DropShadowEffect re-ejecuta
+                                                 su pixel shader cada frame (en bucle Forever = coste constante,
+                                                 caro en iGPU). Animar UIElement.Opacity solo alfa-mezcla en
+                                                 composición la superficie de sombra ya rasterizada → mismo latido,
+                                                 sin shader por frame. Recorrido sutil para no atenuar el contenido. -->
                                             <Storyboard RepeatBehavior="Forever" AutoReverse="True">
-                                                <DoubleAnimation Storyboard.TargetProperty="(Border.Effect).(DropShadowEffect.Opacity)" From="0.30" To="0.60" Duration="0:0:1.1"/>
+                                                <DoubleAnimation Storyboard.TargetProperty="Opacity" From="1.0" To="0.85" Duration="0:0:1.1"/>
                                             </Storyboard>
                                         </BeginStoryboard>
                                     </EventTrigger>

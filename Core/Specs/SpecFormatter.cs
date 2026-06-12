@@ -30,13 +30,23 @@ namespace KioskClinicaPC.Core.Specs
             {
                 ComponentIds.Wifi => FormatWifi(raw),
                 ComponentIds.Camera => FormatCamera(raw),
-                ComponentIds.Cpu => new Result(CleanVendorNoise(raw), null),
+                ComponentIds.Cpu => new Result(CleanCpu(raw), null),
                 ComponentIds.Gpu => FormatGpu(raw),
                 ComponentIds.Ram => FormatRam(raw),
                 ComponentIds.Storage => FormatStorage(raw),
                 ComponentIds.Screen => FormatScreen(raw),
                 _ => new Result(raw, null)
             };
+        }
+
+        /// <summary>Nombre de CPU sin ruido de marca ni el sufijo iGPU redundante. La GPU se muestra
+        /// aparte, así que "AMD Ryzen 7 4700U with Radeon Graphics" → "AMD Ryzen 7 4700U" (cubre variantes
+        /// "with Radeon Vega Graphics"). Solo se aplica al CPU: la GPU usa "Radeon Graphics" legítimamente.</summary>
+        private static string CleanCpu(string s)
+        {
+            s = CleanVendorNoise(s);
+            s = Regex.Replace(s, @"\s+with\s+radeon[\w\s]*graphics\s*$", "", RegexOptions.IgnoreCase);
+            return s.Trim();
         }
 
         /// <summary>Quita ruido de marca: (R), (TM), comillas, dobles espacios.</summary>

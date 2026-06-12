@@ -29,6 +29,34 @@ namespace KioskClinicaPC.Tests
         }
 
         [Fact]
+        public void Cpu_QuitaSufijoRadeonGraphics_RedundanteConLaGpu()
+        {
+            var r = SpecFormatter.Format("cpu", "AMD Ryzen 7 4700U with Radeon Graphics");
+            Assert.Equal("AMD Ryzen 7 4700U", r.Headline);
+        }
+
+        [Fact]
+        public void Cpu_QuitaVarianteVega_YRuidoDeMarca()
+        {
+            var r = SpecFormatter.Format("cpu", "AMD Ryzen 5 4500U with Radeon Vega Graphics");
+            Assert.Equal("AMD Ryzen 5 4500U", r.Headline);
+        }
+
+        [Fact]
+        public void Cpu_IntelSinSufijo_SeMantieneLimpio()
+        {
+            var r = SpecFormatter.Format("cpu", "Intel(R) Core(TM) i7-1165G7");
+            Assert.Equal("Intel Core i7-1165G7", r.Headline);
+        }
+
+        [Fact]
+        public void Gpu_ConservaRadeonGraphics()
+        {
+            var r = SpecFormatter.Format("gpu", "AMD Radeon Graphics");
+            Assert.Equal("AMD Radeon", r.Headline);
+        }
+
+        [Fact]
         public void ValorVacio_DevuelveNulos()
         {
             var r = SpecFormatter.Format("cpu", "");
