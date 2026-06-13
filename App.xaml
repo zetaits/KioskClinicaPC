@@ -115,6 +115,39 @@
                 </Setter>
             </Style>
 
+            <!-- ═══ GHOST NAV BUTTON ═══ Plano-angular del prototipo (Anterior/Siguiente/Volver):
+                 fondo translúcido, esquinas rectas, borde sutil; hover sube fondo/borde. -->
+            <Style x:Key="GhostNavButton" TargetType="Button">
+                <Setter Property="Background" Value="#14FFFFFF" />
+                <Setter Property="BorderBrush" Value="{StaticResource Line1Brush}" />
+                <Setter Property="BorderThickness" Value="1" />
+                <Setter Property="Foreground" Value="{StaticResource Text1Brush}" />
+                <Setter Property="FontFamily" Value="{StaticResource SpaceGrotesk}" />
+                <Setter Property="FontSize" Value="18" />
+                <Setter Property="Padding" Value="22,14" />
+                <Setter Property="Cursor" Value="Hand" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="border"
+                                    Background="{TemplateBinding Background}"
+                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="{TemplateBinding BorderThickness}"
+                                    CornerRadius="0"
+                                    Padding="{TemplateBinding Padding}">
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="border" Property="Background" Value="#1AFFFFFF" />
+                                    <Setter TargetName="border" Property="BorderBrush" Value="{StaticResource Line2Brush}" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
             <Style x:Key="DangerButton" TargetType="Button">
                 <Setter Property="Background" Value="#FFDA3030" />
                 <Setter Property="Foreground" Value="White" />

@@ -27,11 +27,17 @@ namespace KioskClinicaPC.ViewModels
             set
             {
                 if (SetProperty(ref _currentScreen, value))
+                {
                     OnPropertyChanged(nameof(IsAttractScreen));
+                    OnPropertyChanged(nameof(ShowPriceBar));
+                }
             }
         }
 
         public bool IsAttractScreen => _currentScreen == 0;
+
+        // Barra-ticket de precio persistente: visible solo en Detalle (3).
+        public bool ShowPriceBar => _currentScreen == 3;
 
         private string _currentScreenName = "RESUMEN DEL EQUIPO";
         public string CurrentScreenName
@@ -95,10 +101,18 @@ namespace KioskClinicaPC.ViewModels
             set => SetProperty(ref _activeSpec, value);
         }
 
-        public string FormattedPrice => PriceFormatter.Format(DisplayConfig?.DiscountedPrice ?? DisplayConfig?.Price);
+        // Precio efectivo: el con descuento si está relleno, si no el principal.
+        // Ojo: el TextBox vacío guarda "" (no null), así que ?? no sirve; hay que
+        // comprobar whitespace como hace HasDiscount.
+        private string? EffectivePrice =>
+            string.IsNullOrWhiteSpace(DisplayConfig?.DiscountedPrice)
+                ? DisplayConfig?.Price
+                : DisplayConfig?.DiscountedPrice;
+
+        public string FormattedPrice => PriceFormatter.Format(EffectivePrice);
         public string FormattedOriginalPrice => PriceFormatter.Format(DisplayConfig?.Price);
         public string FormattedDiscount => PriceFormatter.Discount(DisplayConfig?.Price, DisplayConfig?.DiscountedPrice);
-        public string FormattedMonthly => PriceFormatter.Monthly(DisplayConfig?.DiscountedPrice ?? DisplayConfig?.Price, InstallmentMonths);
+        public string FormattedMonthly => PriceFormatter.Monthly(EffectivePrice, InstallmentMonths);
         public bool HasDiscount => !string.IsNullOrWhiteSpace(DisplayConfig?.DiscountedPrice);
 
         // Garantía derivada del estado del equipo (Nuevo/Ocasión).

@@ -127,11 +127,16 @@ namespace KioskClinicaPC
 
                 QrImage.Source = qr;
                 QrBorder.Visibility = qr != null ? Visibility.Visible : Visibility.Collapsed;
+
+                // Mismo QR en la barra-ticket de precio persistente.
+                PriceBarQrImage.Source = qr;
+                PriceBarQrBorder.Visibility = qr != null ? Visibility.Visible : Visibility.Collapsed;
             }
             catch (Exception ex)
             {
                 Log.Error(ex, "No se pudo refrescar el código QR de la ficha.");
                 QrBorder.Visibility = Visibility.Collapsed;
+                PriceBarQrBorder.Visibility = Visibility.Collapsed;
             }
         }
 

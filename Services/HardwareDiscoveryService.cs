@@ -444,6 +444,27 @@ namespace KioskClinicaPC.Services
             return "";
         }
 
+        // Tamaños comerciales (GB nominales). El espacio útil real en GiB siempre es
+        // algo menor (un SSD de 512 GB reporta ~477), así que ajustamos al estándar
+        // más cercano para mostrar cifras de venta limpias.
+        private static readonly double[] CommercialSizesGB =
+            { 64, 128, 256, 512, 1024, 2048, 4096, 8192 };
+
+        private static double NormalizeToCommercialGB(double rawGiB)
+        {
+            if (rawGiB <= 0) return rawGiB;
+            double best = rawGiB;
+            double bestDist = double.MaxValue;
+            foreach (double std in CommercialSizesGB)
+            {
+                double dist = Math.Abs(std - rawGiB);
+                if (dist < bestDist) { bestDist = dist; best = std; }
+            }
+            // Solo ajustar si el estándar más cercano está dentro del ~25% relativo;
+            // si no, conservar el valor real (discos no estándar, p.ej. 3 TB).
+            return bestDist <= rawGiB * 0.25 ? best : rawGiB;
+        }
+
         private (string Value, string? Detail) GetStorageDetails()
         {
             try
@@ -463,7 +484,8 @@ namespace KioskClinicaPC.Services
 
                         string model = (mo["Model"]?.ToString() ?? "Disco Genérico").Trim();
                         ulong totalBytes = Convert.ToUInt64(mo["Size"]);
-                        double totalGB = Math.Round(totalBytes / (1024.0 * 1024.0 * 1024.0), 0);
+                        double totalGB = NormalizeToCommercialGB(
+                            Math.Round(totalBytes / (1024.0 * 1024.0 * 1024.0), 0));
 
                         string mediaType = GetMediaTypeString(mo["MediaType"]?.ToString() ?? "", model);
 

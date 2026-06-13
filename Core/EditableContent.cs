@@ -44,9 +44,8 @@ namespace KioskClinicaPC.Core
             ["price.installments"] = "FINÁNCIALO",
             ["price.installmentsPrefix"] = "4 × ",
             ["price.noInterest"] = "SIN INTERESES",
-            ["price.cta"] = "LLÉVATELO · HABLA CON UN ASESOR",
-            ["price.scanTitle"] = "DESCARGA EN PDF",
-            ["price.scanText"] = "Llévate toda la información de este equipo en tu móvil.",
+            ["price.scanTitle"] = "ESCANEA Y GUARDA LA FICHA",
+            ["price.scanText"] = "Toda la info de este equipo en tu móvil, en PDF.",
         };
 
         private readonly Dictionary<string, string> _overrides;
