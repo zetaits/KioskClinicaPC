@@ -423,6 +423,7 @@
                             <Button Content="Reiniciar PC" Style="{StaticResource SecondaryButton}" Margin="0,0,10,10" Click="RestartPc_Click"/>
                             <Button Content="Apagar PC" Style="{StaticResource SecondaryButton}" Margin="0,0,10,10" Click="ShutdownPc_Click"/>
                             <Button Content="Restaurar valores por defecto" Style="{StaticResource SecondaryButton}" Margin="0,0,10,10" Click="RestoreDefaults_Click"/>
+                            <Button x:Name="CheckUpdateButton" Content="⬇  Buscar actualizaciones" Style="{StaticResource SecondaryButton}" Margin="0,0,10,10" Click="CheckUpdateButton_Click"/>
                             <Button x:Name="UninstallButton" Content="🗑  Desinstalar" Style="{StaticResource DangerButton}" Margin="0,0,10,10" Click="UninstallButton_Click"/>
                         </WrapPanel>
                     </StackPanel>

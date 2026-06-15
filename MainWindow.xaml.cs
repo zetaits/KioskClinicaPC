@@ -93,6 +93,13 @@ namespace KioskClinicaPC
             RefreshQr();
             EnterAttractMode();
             _ready = true; // DisplayConfig/Specs ya construidos: la interacción puede disparar el escaneo
+
+#if !DEBUG
+            // Auto-update: comprueba GitHub y deja la nueva versión lista en segundo plano. No
+            // bloquea ni puede tumbar el kiosko (todo va envuelto en try/catch). La aplica luego
+            // la tarea SYSTEM de madrugada.
+            _ = UpdateService.CheckAndStageAsync();
+#endif
         }
 
         private void ApplyTimerIntervals() => _timers.ApplyIntervals(_settings);

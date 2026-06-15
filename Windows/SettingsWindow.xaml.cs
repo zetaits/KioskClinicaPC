@@ -12,6 +12,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using KioskClinicaPC.Core;
 using KioskClinicaPC;
+using KioskClinicaPC.Services;
 using Newtonsoft.Json;
 using Serilog;
 
@@ -322,6 +323,37 @@ namespace KioskClinicaPC.Windows
             this.Close();
         }
 
+        private async void CheckUpdateButton_Click(object sender, RoutedEventArgs e)
+        {
+            var btn = sender as Button;
+            string? originalContent = btn?.Content as string;
+            if (btn != null) { btn.IsEnabled = false; btn.Content = "Comprobando…"; }
+            try
+            {
+                var result = await UpdateService.CheckAndStageAsync();
+                switch (result.Outcome)
+                {
+                    case UpdateService.UpdateOutcome.UpToDate:
+                        KioskDialog.Alert(this, "Actualizaciones",
+                            $"Ya tienes la última versión instalada (v{UpdateService.CurrentVersion}).");
+                        break;
+                    case UpdateService.UpdateOutcome.Staged:
+                        KioskDialog.Alert(this, "Actualización lista",
+                            $"Se descargó la versión {result.LatestVersion} y se aplicará automáticamente esta " +
+                            "madrugada (el equipo se reiniciará). Para aplicarla ahora, reinicia el PC.");
+                        break;
+                    default:
+                        KioskDialog.Alert(this, "Actualizaciones",
+                            "No se pudo comprobar si hay actualizaciones. Revisa la conexión a internet.", danger: true);
+                        break;
+                }
+            }
+            finally
+            {
+                if (btn != null) { btn.IsEnabled = true; btn.Content = originalContent; }
+            }
+        }
+
         private void UninstallButton_Click(object sender, RoutedEventArgs e)
         {
             try
@@ -331,6 +363,24 @@ namespace KioskClinicaPC.Windows
                 if (!KioskDialog.Confirm(this, "Desinstalar", "Se eliminará la configuración y el inicio automático, y la app se cerrará. ¿Continuar?", "Desinstalar", danger: true))
                     return;
 
+                // Si la app está instalada vía Inno, hay un unins000.exe junto al ejecutable.
+                // Lanzarlo = desinstalación real del sistema (borra Program Files, accesos directos,
+                // entrada de Agregar/quitar programas, y vía [Code] del .iss: autostart + config).
+                // La app corre como asInvoker y no puede borrar Program Files por sí misma.
+                string? exeDir = Path.GetDirectoryName(Process.GetCurrentProcess().MainModule?.FileName);
+                string? uninstaller = exeDir != null ? Path.Combine(exeDir, "unins000.exe") : null;
+                if (uninstaller != null && File.Exists(uninstaller))
+                {
+                    KioskManager.Release(); // restaura taskbar/Task Manager antes de soltar el control
+                    Log.CloseAndFlush();
+                    Process.Start(new ProcessStartInfo(uninstaller) { UseShellExecute = true });
+                    // Cierra el kiosko para liberar los archivos que el desinstalador va a borrar.
+                    if (this.Owner is MainWindow installedKiosk)
+                        installedKiosk.ShutdownKiosk();
+                    return;
+                }
+
+                // Fallback (build portable / desarrollo, sin instalador): limpieza manual.
                 string? currentExeName = Path.GetFileName(Assembly.GetEntryAssembly()?.Location);
                 if (string.IsNullOrEmpty(currentExeName))
                 {
