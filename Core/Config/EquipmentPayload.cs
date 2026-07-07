@@ -13,7 +13,8 @@ namespace KioskClinicaPC.Core.Config
     /// que viaja DENTRO del QR (en el #hash de la URL). La web destino lo descomprime y genera el PDF
     /// en el propio móvil del cliente: sin backend, sin subir nada, sin que el kiosko necesite red.
     ///
-    /// Formato: JSON con claves cortas → gzip → Base64Url. La web hace el camino inverso (pako.ungzip).
+    /// Formato: JSON con claves cortas → deflate raw → Base64Url. La web hace el camino inverso
+    /// (pako.inflateRaw; conserva pako.ungzip como fallback para QRs antiguos en gzip).
     /// Se usan claves de 1-2 letras para que quepa de sobra en un QR (límite práctico ~2,9 KB).
     /// </summary>
     public static class EquipmentPayload
@@ -49,8 +50,10 @@ namespace KioskClinicaPC.Core.Config
             public string? Detail { get; set; }
         }
 
-        /// <summary>Construye la URL completa "{baseUrl}#{payload}" o null si no hay baseUrl válida.</summary>
-        public static string? BuildUrl(string? baseUrl, AppConfig config, IEnumerable<SpecLine> specs, string? shopName)
+        /// <summary>Construye la URL completa "{baseUrl}#{payload}" o null si no hay baseUrl válida.
+        /// includeDetails=false omite los textos Detail (los más largos): escalón intermedio cuando
+        /// el payload completo no cabe en el QR, antes de degradar a la URL base pelada.</summary>
+        public static string? BuildUrl(string? baseUrl, AppConfig config, IEnumerable<SpecLine> specs, string? shopName, bool includeDetails = true)
         {
             if (string.IsNullOrWhiteSpace(baseUrl)) return null;
 
@@ -77,7 +80,7 @@ namespace KioskClinicaPC.Core.Config
                     // mandamos para aligerar el QR. Solo viaja si el comercio la ha personalizado.
                     Label = IsDefaultLabel(s.Id, s.Label) ? null : NullIfEmpty(s.Label),
                     Value = NullIfEmpty(s.Value),
-                    Detail = NullIfEmpty(s.Detail)
+                    Detail = includeDetails ? NullIfEmpty(s.Detail) : null
                 });
             }
 
@@ -86,7 +89,7 @@ namespace KioskClinicaPC.Core.Config
                 NullValueHandling = NullValueHandling.Ignore
             });
 
-            string encoded = Base64UrlEncode(Gzip(json));
+            string encoded = Base64UrlEncode(DeflateRaw(json));
             string sep = baseUrl.Contains('#') ? "" : "#";
             return baseUrl + sep + encoded;
         }
@@ -113,12 +116,14 @@ namespace KioskClinicaPC.Core.Config
             !string.IsNullOrWhiteSpace(address) &&
             string.Equals(address!.Trim(), AppConfig.DefaultShopAddress, StringComparison.OrdinalIgnoreCase);
 
-        private static byte[] Gzip(string text)
+        // Deflate crudo (sin cabecera/trailer gzip): ahorra 18 bytes ≈ 24 chars base64 en el QR.
+        // La web distingue por magic bytes: gzip (0x1f 0x8b) → pako.ungzip; resto → pako.inflateRaw.
+        private static byte[] DeflateRaw(string text)
         {
             byte[] raw = Encoding.UTF8.GetBytes(text);
             using var ms = new MemoryStream();
-            using (var gz = new GZipStream(ms, CompressionLevel.Optimal, leaveOpen: true))
-                gz.Write(raw, 0, raw.Length);
+            using (var deflate = new DeflateStream(ms, CompressionLevel.Optimal, leaveOpen: true))
+                deflate.Write(raw, 0, raw.Length);
             return ms.ToArray();
         }
 

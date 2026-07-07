@@ -71,7 +71,12 @@ function decodePayload() {
   const hash = (location.hash || "").replace(/^#/, "");
   if (!hash) throw new Error("Esta página debe abrirse escaneando el código QR del equipo.");
   const bytes = base64UrlToBytes(hash);
-  const json = pako.ungzip(bytes, { to: "string" });
+  // Payloads nuevos = deflate crudo (sin cabecera, QR más corto); los QR antiguos ya impresos
+  // llevan gzip. Se distinguen por los magic bytes de gzip (0x1f 0x8b).
+  const isGzip = bytes.length > 2 && bytes[0] === 0x1f && bytes[1] === 0x8b;
+  const json = isGzip
+    ? pako.ungzip(bytes, { to: "string" })
+    : pako.inflateRaw(bytes, { to: "string" });
   return JSON.parse(json);
 }
 

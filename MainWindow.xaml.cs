@@ -107,6 +107,11 @@ namespace KioskClinicaPC
         /// <summary>URL de la web (GitHub Pages) que genera el PDF de la ficha. El QR apunta a "{url}#{datos}".</summary>
         private const string FichaPdfBaseUrl = "https://zetaits.github.io/KioskClinicaPC/";
 
+        // Píxeles útiles de cada hueco de QR (tamaño del Border menos su Padding). El bitmap se
+        // genera al múltiplo entero de módulos que quepa y se muestra 1:1: reescalarlo emborrona.
+        private const int QrCardPixels = 232;     // QrBorder 260 - padding 14*2
+        private const int QrPriceBarPixels = 72;  // PriceBarQrBorder 84 - padding 6*2
+
         /// <summary>Genera el QR real con la ficha del equipo embebida (datos en el #hash de la URL).</summary>
         private void RefreshQr()
         {
@@ -118,26 +123,30 @@ namespace KioskClinicaPC
                     Label = s.Label,
                     Value = s.Value,
                     Detail = s.Detail
-                });
+                }).ToList();
 
+                // Degradación: ficha completa → ficha sin detalles. Sin escalón de URL base: la
+                // landing sin datos no puede generar la ficha, así que un QR a ella no sirve de
+                // nada — si ni el payload recortado cabe, mejor ocultar el QR (qr == null).
                 string? url = EquipmentPayload.BuildUrl(FichaPdfBaseUrl, _viewModel.DisplayConfig, specs, shopName: null);
                 if (url != null) Log.Information("QR payload longitud {Len} caracteres.", url.Length);
-                var qr = QrGenerator.Generate(url);
+                var qr = QrGenerator.Generate(url, QrCardPixels);
 
-                // Si el payload excede la capacidad del QR (ECC-L ~2.9KB), genera uno con la URL
-                // base sin datos: al menos la landing es alcanzable en vez de quedarse sin QR.
                 if (qr == null)
                 {
-                    Log.Warning("QR con datos embebidos falló (payload demasiado grande); usando URL base.");
-                    qr = QrGenerator.Generate(FichaPdfBaseUrl);
+                    Log.Warning("QR con ficha completa falló (payload demasiado grande); probando sin detalles.");
+                    url = EquipmentPayload.BuildUrl(FichaPdfBaseUrl, _viewModel.DisplayConfig, specs, shopName: null, includeDetails: false);
+                    qr = QrGenerator.Generate(url, QrCardPixels);
+                    if (qr == null) Log.Warning("QR sin detalles también falló; se oculta el QR.");
                 }
 
                 QrImage.Source = qr;
                 QrBorder.Visibility = qr != null ? Visibility.Visible : Visibility.Collapsed;
 
-                // Mismo QR en la barra-ticket de precio persistente.
-                PriceBarQrImage.Source = qr;
-                PriceBarQrBorder.Visibility = qr != null ? Visibility.Visible : Visibility.Collapsed;
+                // Mismo payload en la barra-ticket de precio, con bitmap a su propio tamaño.
+                var qrSmall = QrGenerator.Generate(url, QrPriceBarPixels);
+                PriceBarQrImage.Source = qrSmall;
+                PriceBarQrBorder.Visibility = qrSmall != null ? Visibility.Visible : Visibility.Collapsed;
             }
             catch (Exception ex)
             {

@@ -1078,11 +1078,13 @@
                                         </RadialGradientBrush>
                                     </Border.Background>
                                     <StackPanel>
-                                        <Border x:Name="QrBorder" Width="220" Height="220" Background="White" Padding="16" HorizontalAlignment="Center">
+                                        <!-- Stretch=None: el bitmap llega a escala entera de módulos (QrGenerator);
+                                             reescalar un QR denso emborrona los módulos y arruina el escaneo. -->
+                                        <Border x:Name="QrBorder" Width="260" Height="260" Background="White" Padding="14" HorizontalAlignment="Center" UseLayoutRounding="True">
                                             <Border.Effect>
                                                 <DropShadowEffect Color="{StaticResource CyanColor}" BlurRadius="30" ShadowDepth="0" Opacity="0.35"/>
                                             </Border.Effect>
-                                            <Image x:Name="QrImage" Stretch="Uniform" RenderOptions.BitmapScalingMode="NearestNeighbor"/>
+                                            <Image x:Name="QrImage" Stretch="None" SnapsToDevicePixels="True" RenderOptions.BitmapScalingMode="NearestNeighbor"/>
                                         </Border>
                                         <TextBlock Text="{Binding Texts[price.scanTitle]}" Style="{StaticResource MonoFont}" FontSize="17" FontWeight="Bold" Foreground="{StaticResource CyanBrush}" Margin="0,15,0,0" TextAlignment="Center"/>
                                         <TextBlock Text="{Binding Texts[price.scanText]}" edit:Editable.Multiline="True" Foreground="{StaticResource Text1Brush}" FontSize="18" TextWrapping="Wrap" LineHeight="24" TextAlignment="Center" Margin="0,6,0,0"/>
