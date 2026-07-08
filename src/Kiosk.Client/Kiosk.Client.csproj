@@ -7,19 +7,18 @@
     <UseWPF>true</UseWPF>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <RootNamespace>KioskClinicaPC</RootNamespace>
+    <!-- El proyecto se llama Kiosk.Client pero el ensamblado/exe DEBE seguir siendo
+         KioskClinicaPC.exe: el instalador (.iss) y el auto-update dependen de ese nombre. -->
+    <AssemblyName>KioskClinicaPC</AssemblyName>
     <ApplicationIcon>Assets/clinicapc-logo.ico</ApplicationIcon>
     <!-- Version = fuente unica. La lee la app en runtime (Assembly version) para el auto-update,
          y build-installer.ps1 la pasa a ISCC (/DMyAppVersion) para que el Setup cuadre. -->
     <Version>1.0.1</Version>
 </PropertyGroup>
 
-    <!-- El proyecto de tests vive en Tests\ bajo esta carpeta; sin esto, el glob por defecto
-         (**/*.cs) lo compilaría aquí y fallaría por no tener xUnit. -->
+    <!-- Modelos de contenido compartidos con el servidor. -->
     <ItemGroup>
-      <Compile Remove="Tests\**\*.cs" />
-      <Content Remove="Tests\**\*" />
-      <None Remove="Tests\**\*" />
-      <Page Remove="Tests\**\*" />
+      <ProjectReference Include="..\Kiosk.Shared\Kiosk.Shared.csproj" />
     </ItemGroup>
 
     <ItemGroup>

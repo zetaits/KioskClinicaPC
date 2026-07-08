@@ -107,10 +107,10 @@ Nada de esto hace falta para usarlo, pero por si te pica la curiosidad:
 WPF, `net8.0-windows`. Necesita el SDK de .NET (no solo el runtime):
 
 ```
-dotnet build KioskClinicaPC.csproj -c Release
+dotnet build KioskClinicaPC.sln -c Release
 ```
 
-Salida: `bin\Debug\net8.0-windows\KioskClinicaPC.exe`.
+Salida: `src\Kiosk.Client\bin\Debug\net8.0-windows\KioskClinicaPC.exe`.
 
 > ⚠️ Al ejecutarlo entra en modo kiosko: oculta la barra de tareas y bloquea el Administrador de tareas.
 > Para salir limpio usa Ajustes → "Salir del kiosko" o `Ctrl+Shift+K`. Matar el proceso deja el escritorio bloqueado.

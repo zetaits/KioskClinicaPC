@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Modelos de contenido compartidos por cliente (WPF) y servidor (ASP.NET Core).
+       net8.0 puro (sin -windows) para que el servidor lo pueda referenciar. No debe
+       depender de WPF ni de nada específico del cliente. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <!-- Los .cs declaran namespaces KioskClinicaPC.Core[.Config] explícitos; se conservan
+         para no tocar los 'using' del cliente. -->
+    <RootNamespace>KioskClinicaPC</RootNamespace>
+  </PropertyGroup>
+
+</Project>
