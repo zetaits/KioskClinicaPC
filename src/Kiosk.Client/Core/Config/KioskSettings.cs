@@ -24,6 +24,15 @@ namespace KioskClinicaPC.Core.Config
         /// "Low" fuerza modo ligero en cualquier equipo. Ver <see cref="GraphicsQuality"/>.</summary>
         public string GraphicsMode { get; set; } = "Auto";
 
+        /// <summary>URL base del servidor de contenido (p.ej. "https://kiosko.mitienda.com"). Vacío/null =
+        /// modo local puro: el kiosko usa solo su KioskConfig.json (comportamiento previo al rework).
+        /// La rellena el instalador del cliente. Ver <see cref="Services.RemoteConfigRepository"/>.</summary>
+        public string? ServerUrl { get; set; }
+
+        /// <summary>Clave que el cliente envía en la cabecera X-Api-Key para leer del servidor.
+        /// Vacío = no se envía cabecera (servidor en modo abierto, solo para pruebas).</summary>
+        public string? ServerApiKey { get; set; }
+
         public static KioskSettings Load(string path)
         {
             try

@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <!-- Servidor de contenido del kiosko: sirve la config y los assets a los clientes (Fase 1),
+       y más adelante hospedará el hub SignalR (Fase 2) y el panel Blazor de administración (Fase 3). -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>Kiosk.Server</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Newtonsoft para (de)serializar AppConfig EXACTAMENTE igual que el cliente (PascalCase).
+         System.Text.Json usaría camelCase por defecto y el cliente no lo reconocería. -->
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Kiosk.Shared\Kiosk.Shared.csproj" />
+  </ItemGroup>
+
+</Project>

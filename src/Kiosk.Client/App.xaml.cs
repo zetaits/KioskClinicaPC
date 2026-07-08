@@ -117,7 +117,7 @@ namespace KioskClinicaPC
                 }
             }
             
-            _services = BuildServiceProvider();
+            _services = BuildServiceProvider(settings);
             var mainWindow = _services.GetRequiredService<MainWindow>();
             Application.Current.MainWindow = mainWindow;
             mainWindow.Show();
@@ -125,14 +125,16 @@ namespace KioskClinicaPC
 
         /// <summary>Registra el grafo de dependencias. Un solo sitio para cablear implementaciones;
         /// sustituir una (p.ej. un repo de test) ya no exige tocar el ViewModel ni la ventana.</summary>
-        private static IServiceProvider BuildServiceProvider()
+        private static IServiceProvider BuildServiceProvider(KioskSettings settings)
         {
             var services = new ServiceCollection();
 
             services.AddSingleton<IHardwareService, HardwareDiscoveryService>();
-            // Factoría explícita: JsonConfigRepository tiene un ctor (string, string) que el contenedor
-            // no sabría resolver; forzamos el sin-parámetros (rutas de App).
-            services.AddSingleton<IConfigRepository>(_ => new JsonConfigRepository());
+            // Repositorio de config: si hay servidor configurado, lee de él con caché/fallback local;
+            // si no (ServerUrl vacío), es exactamente el JSON local de siempre. Factoría explícita
+            // porque el contenedor no sabría resolver los ctores con parámetros (rutas de App).
+            services.AddSingleton<IConfigRepository>(_ => new RemoteConfigRepository(
+                settings.ServerUrl, settings.ServerApiKey, ConfigFilePath, HardwareFilePath));
             services.AddSingleton<IDialogService, MessageBoxDialogService>();
             services.AddSingleton<MainViewModel>();
             services.AddSingleton<MainWindow>();

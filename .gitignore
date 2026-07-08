@@ -1,3 +1,8 @@
+# Estado runtime del servidor: config sembrada (data/) y assets subidos por el panel (assets/).
+# No es código; se genera al ejecutar y no debe versionarse.
+src/Kiosk.Server/data/
+src/Kiosk.Server/assets/
+
 # Visual Studio / Rider files
 .vs/
 .idea/
