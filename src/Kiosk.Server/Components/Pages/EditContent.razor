@@ -32,12 +32,12 @@ else
 
     <div class="card">
         <h2>Slides atracción · De ocasión</h2>
-        @SlideEditor(_config.AttractSlides)
+        <SlideListEditor Slides="_config.AttractSlides" />
     </div>
 
     <div class="card">
         <h2>Slides atracción · Nuevo</h2>
-        @SlideEditor(_config.AttractSlidesNew)
+        <SlideListEditor Slides="_config.AttractSlidesNew" />
     </div>
 
     <div class="card">
@@ -105,26 +105,6 @@ else
         Store.Write(_config);
         _saved = true;
     }
-
-    // Editor reutilizable de una lista de slides.
-    private RenderFragment SlideEditor(List<AttractSlide> slides) => __builder =>
-    {
-        foreach (var s in slides)
-        {
-            <div class="slide-item">
-                <div class="row">
-                    <div style="flex:1"><label>Eyebrow</label><input type="text" @bind="s.Eyebrow" /></div>
-                    <div style="flex:1"><label>Título 1</label><input type="text" @bind="s.Title1" /></div>
-                    <div style="flex:1"><label>Título 2</label><input type="text" @bind="s.Title2" /></div>
-                </div>
-                <div class="row">
-                    <div style="flex:3"><label>Subtítulo</label><input type="text" @bind="s.Subtitle" /></div>
-                    <button class="danger" @onclick="() => slides.Remove(s)">Eliminar</button>
-                </div>
-            </div>
-        }
-        <button class="secondary" @onclick="() => slides.Add(new AttractSlide())">+ Añadir slide</button>
-    };
 
     private sealed class KeyVal { public string? Key { get; set; } public string? Value { get; set; } }
 }

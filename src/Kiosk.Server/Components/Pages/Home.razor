@@ -1,6 +1,6 @@
 @page "/"
 @attribute [Authorize]
-@inject ServerConfigStore Store
+@inject ContentResolver Content
 @inject AssetLibrary Assets
 
 <h1>Panel de administración</h1>
@@ -18,8 +18,20 @@
         <a href="/imagenes"><button>Gestionar imágenes</button></a>
     </div>
     <div class="card">
+        <h2>Eventos</h2>
+        @if (_activeEvent is not null)
+        {
+            <p class="muted">Activo ahora: <strong>@_activeEvent</strong></p>
+        }
+        else
+        {
+            <p class="muted">Ninguno activo</p>
+        }
+        <a href="/eventos"><button>Gestionar eventos</button></a>
+    </div>
+    <div class="card">
         <h2>Estado</h2>
-        <p class="muted">Versión de contenido</p>
+        <p class="muted">Versión de contenido efectivo</p>
         <code>@_version</code>
     </div>
 </div>
@@ -30,11 +42,13 @@
 
 @code {
     private string _version = "";
+    private string? _activeEvent;
     private int _brandCount, _specCount;
 
     protected override void OnInitialized()
     {
-        _version = Store.Version();
+        _version = Content.Version();
+        _activeEvent = Content.ActiveEvent()?.Name;
         _brandCount = Assets.List("Brands").Count;
         _specCount = Assets.List("SpecImages").Count;
     }

@@ -1,0 +1,167 @@
+@page "/eventos"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@inject EventStore Store
+@inject ContentResolver Content
+@using KioskClinicaPC.Core.Config
+@using Newtonsoft.Json
+
+<h1>Eventos</h1>
+<p class="muted">
+    Sustituyen slides y textos durante un rango de fechas (hora local de la tienda: @Content.NowLocal.ToString("dd/MM/yyyy HH:mm")).
+    No tocan precio ni especificaciones.
+</p>
+
+@if (_message is not null)
+{
+    <div class="toast ok">@_message</div>
+}
+
+<div class="card">
+    <div class="row" style="justify-content:space-between">
+        <h2 style="margin:0">Programados</h2>
+        <button @onclick="NewEvent">+ Nuevo evento</button>
+    </div>
+
+    @if (_events.Count == 0)
+    {
+        <p class="muted">No hay eventos.</p>
+    }
+    else
+    {
+        @foreach (var ev in _events)
+        {
+            <div class="slide-item">
+                <div class="row" style="justify-content:space-between; align-items:center">
+                    <div>
+                        <strong>@(string.IsNullOrWhiteSpace(ev.Name) ? "(sin nombre)" : ev.Name)</strong>
+                        @if (ev.IsActiveAt(_now))
+                        {
+                            <span class="toast ok" style="padding:.1rem .5rem; margin-left:.5rem">ACTIVO</span>
+                        }
+                        else if (!ev.Enabled)
+                        {
+                            <span class="muted" style="margin-left:.5rem">(desactivado)</span>
+                        }
+                        <div class="muted">@ev.Start.ToString("dd/MM/yyyy HH:mm") → @ev.End.ToString("dd/MM/yyyy HH:mm")</div>
+                    </div>
+                    <div class="row">
+                        <button class="secondary" @onclick="() => Edit(ev)">Editar</button>
+                        <button class="danger" @onclick="() => Delete(ev)">Borrar</button>
+                    </div>
+                </div>
+            </div>
+        }
+    }
+</div>
+
+@if (_editing is not null)
+{
+    <div class="card">
+        <h2>@(_isNew ? "Nuevo evento" : "Editar evento")</h2>
+
+        <div class="row">
+            <div class="field" style="flex:2">
+                <label>Nombre</label>
+                <input type="text" @bind="_editing.Name" placeholder="Black Friday" />
+            </div>
+            <div class="field">
+                <label>Activo</label>
+                <input type="checkbox" @bind="_editing.Enabled" />
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="field" style="flex:1">
+                <label>Inicio</label>
+                <input type="datetime-local" @bind="_editing.Start" @bind:format="yyyy-MM-ddTHH:mm" />
+            </div>
+            <div class="field" style="flex:1">
+                <label>Fin</label>
+                <input type="datetime-local" @bind="_editing.End" @bind:format="yyyy-MM-ddTHH:mm" />
+            </div>
+        </div>
+
+        <h2>Slides · De ocasión (sustituyen a los base si hay alguno)</h2>
+        <SlideListEditor Slides="_editing.AttractSlides" />
+
+        <h2>Slides · Nuevo</h2>
+        <SlideListEditor Slides="_editing.AttractSlidesNew" />
+
+        <h2>Textos de UI a sobreponer</h2>
+        @foreach (var t in _texts)
+        {
+            <div class="row" style="margin-bottom:.5rem">
+                <div style="flex:1"><label>Clave</label><input type="text" @bind="t.Key" /></div>
+                <div style="flex:2"><label>Texto</label><input type="text" @bind="t.Value" /></div>
+                <button class="danger" @onclick="() => _texts.Remove(t)">✕</button>
+            </div>
+        }
+        <button class="secondary" @onclick="() => _texts.Add(new KeyVal())">+ Añadir texto</button>
+
+        <div class="row" style="margin-top:1rem">
+            <button @onclick="Save">Guardar</button>
+            <button class="secondary" @onclick="Cancel">Cancelar</button>
+        </div>
+    </div>
+}
+
+@code {
+    private List<KioskEvent> _events = new();
+    private DateTime _now;
+    private KioskEvent? _editing;
+    private bool _isNew;
+    private List<KeyVal> _texts = new();
+    private string? _message;
+
+    protected override void OnInitialized() => Refresh();
+
+    private void Refresh()
+    {
+        _events = Store.All().OrderByDescending(e => e.Start).ToList();
+        _now = Content.NowLocal;
+    }
+
+    private void NewEvent()
+    {
+        _message = null;
+        _isNew = true;
+        var today = Content.NowLocal.Date;
+        _editing = new KioskEvent { Enabled = true, Start = today, End = today.AddDays(7) };
+        _texts = new();
+    }
+
+    private void Edit(KioskEvent ev)
+    {
+        _message = null;
+        _isNew = false;
+        // Clon profundo: cancelar descarta cambios sin tocar el guardado.
+        _editing = JsonConvert.DeserializeObject<KioskEvent>(JsonConvert.SerializeObject(ev))!;
+        _texts = _editing.UiTextOverrides.Select(kv => new KeyVal { Key = kv.Key, Value = kv.Value }).ToList();
+    }
+
+    private void Save()
+    {
+        if (_editing is null) return;
+        _editing.UiTextOverrides = _texts
+            .Where(t => !string.IsNullOrWhiteSpace(t.Key))
+            .GroupBy(t => t.Key!.Trim())
+            .ToDictionary(g => g.Key, g => g.Last().Value ?? "");
+        Store.Save(_editing);
+        _message = $"Evento «{_editing.Name}» guardado.";
+        _editing = null;
+        Refresh();
+    }
+
+    private void Delete(KioskEvent ev)
+    {
+        Store.Delete(ev.Id);
+        if (_editing?.Id == ev.Id) _editing = null;
+        _message = $"Evento «{ev.Name}» borrado.";
+        Refresh();
+    }
+
+    private void Cancel() => _editing = null;
+
+    private sealed class KeyVal { public string? Key { get; set; } public string? Value { get; set; } }
+}

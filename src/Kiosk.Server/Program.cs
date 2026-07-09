@@ -17,8 +17,22 @@ string assetsDir = OrDefault(builder.Configuration["Kiosk:AssetsDir"], Path.Comb
 string? apiKey   = builder.Configuration["Kiosk:ApiKey"];   // vacío = servidor abierto (solo pruebas)
 int slideDurationMs = builder.Configuration.GetValue<int?>("Kiosk:SlideDurationMs") ?? 5200; // = default del cliente
 
+// Zona horaria de la tienda para evaluar la vigencia de los eventos (no la del VPS). Id de Windows
+// (p.ej. "Romance Standard Time" para España); vacío = zona local del servidor.
+string? tzId = builder.Configuration["Kiosk:TimeZone"];
+TimeZoneInfo storeTz = TimeZoneInfo.Local;
+if (!string.IsNullOrWhiteSpace(tzId))
+{
+    try { storeTz = TimeZoneInfo.FindSystemTimeZoneById(tzId); }
+    catch (TimeZoneNotFoundException) { /* id inválido → zona local */ }
+}
+
 Directory.CreateDirectory(assetsDir);
-builder.Services.AddSingleton(new ServerConfigStore(dataDir));
+var configStore = new ServerConfigStore(dataDir);
+var eventStore = new EventStore(dataDir);
+builder.Services.AddSingleton(configStore);
+builder.Services.AddSingleton(eventStore);
+builder.Services.AddSingleton(new ContentResolver(configStore, eventStore, storeTz));
 builder.Services.AddSingleton(new AssetLibrary(assetsDir));
 
 // Sincronización del bucle de atracción (Fase 2): reloj maestro + hub SignalR + latido periódico.
@@ -65,14 +79,11 @@ app.Use(async (ctx, next) =>
 // Sonda de vida (sin auth): el cliente puede comprobar conectividad barata.
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
 
-// Config de contenido que consumen todos los kioscos.
-app.MapGet("/api/config", (ServerConfigStore store) =>
-{
-    string json = store.ReadJson();
-    return Results.Content(json, "application/json");
-});
+// Config de contenido que consumen todos los kioscos: contenido efectivo (base + evento vigente).
+app.MapGet("/api/config", (ContentResolver content) =>
+    Results.Content(content.EffectiveJson(), "application/json"));
 
-app.MapGet("/api/config/version", (ServerConfigStore store) => Results.Ok(new { version = store.Version() }));
+app.MapGet("/api/config/version", (ContentResolver content) => Results.Ok(new { version = content.Version() }));
 
 // Assets (imágenes de marcas/periféricos). Sirve ficheros de assetsDir con guardia anti-traversal.
 var contentTypes = new FileExtensionContentTypeProvider();

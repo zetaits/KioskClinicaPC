@@ -1,0 +1,25 @@
+@using KioskClinicaPC.Core.Config
+@* Editor reutilizable de una lista de slides de atracción (usado en Contenido y en Eventos). *@
+
+@foreach (var s in Slides)
+{
+    <div class="slide-item">
+        <div class="row">
+            <div style="flex:1"><label>Eyebrow</label><input type="text" @bind="s.Eyebrow" /></div>
+            <div style="flex:1"><label>Título 1</label><input type="text" @bind="s.Title1" /></div>
+            <div style="flex:1"><label>Título 2</label><input type="text" @bind="s.Title2" /></div>
+        </div>
+        <div class="row">
+            <div style="flex:3"><label>Subtítulo</label><input type="text" @bind="s.Subtitle" /></div>
+            <button class="danger" @onclick="() => Remove(s)">Eliminar</button>
+        </div>
+    </div>
+}
+<button class="secondary" @onclick="Add">+ Añadir slide</button>
+
+@code {
+    [Parameter, EditorRequired] public List<AttractSlide> Slides { get; set; } = new();
+
+    private void Add() => Slides.Add(new AttractSlide());
+    private void Remove(AttractSlide s) => Slides.Remove(s);
+}
