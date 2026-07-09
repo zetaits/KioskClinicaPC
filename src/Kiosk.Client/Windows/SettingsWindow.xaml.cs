@@ -152,6 +152,8 @@ namespace KioskClinicaPC.Windows
             InactivityTextBox.Text = _settings.InactivitySeconds.ToString(CultureInfo.InvariantCulture);
             AutoScanTextBox.Text = _settings.AutoScanSeconds.ToString(CultureInfo.InvariantCulture);
             SlideIntervalTextBox.Text = _settings.SlideIntervalSeconds.ToString(CultureInfo.InvariantCulture);
+            ServerUrlTextBox.Text = _settings.ServerUrl;
+            ServerApiKeyTextBox.Text = _settings.ServerApiKey;
         }
 
         private void SaveButton_Click(object sender, RoutedEventArgs e)
@@ -213,6 +215,11 @@ namespace KioskClinicaPC.Windows
             _settings.AutoScanSeconds = Math.Max(3, ParseInt(AutoScanTextBox.Text, _settings.AutoScanSeconds));
             _settings.SlideIntervalSeconds = Math.Max(1, ParseDouble(SlideIntervalTextBox.Text, _settings.SlideIntervalSeconds));
 
+            // Servidor de contenido: en blanco = modo local. El cambio se aplica al reiniciar la app
+            // (el repositorio/sync se construyen en el arranque a partir de estos valores).
+            _settings.ServerUrl = Blank(ServerUrlTextBox.Text);
+            _settings.ServerApiKey = Blank(ServerApiKeyTextBox.Text);
+
             if (!string.IsNullOrEmpty(NewPasswordBox.Password))
             {
                 if (!PasswordService.Verify(CurrentPasswordBox.Password, _settings.PasswordHash))
@@ -237,6 +244,53 @@ namespace KioskClinicaPC.Windows
 
         private static double ParseDouble(string text, double fallback)
             => double.TryParse((text ?? "").Replace(',', '.'), NumberStyles.Float, CultureInfo.InvariantCulture, out double v) ? v : fallback;
+
+        private static string? Blank(string? text) => string.IsNullOrWhiteSpace(text) ? null : text.Trim();
+
+        /// <summary>Comprueba que el servidor responde: GET {url}/health. No guarda nada; solo informa.</summary>
+        private async void TestConnectionButton_Click(object sender, RoutedEventArgs e)
+        {
+            string? url = Blank(ServerUrlTextBox.Text);
+            if (url == null)
+            {
+                SetConnStatus("Sin URL: el kiosko funcionará en modo local.", ok: null);
+                return;
+            }
+
+            TestConnectionButton.IsEnabled = false;
+            SetConnStatus("Probando…", ok: null);
+            try
+            {
+                using var http = new System.Net.Http.HttpClient { Timeout = TimeSpan.FromSeconds(5) };
+                string? apiKey = Blank(ServerApiKeyTextBox.Text);
+                if (apiKey != null) http.DefaultRequestHeaders.Add("X-Api-Key", apiKey);
+
+                var resp = await http.GetAsync(url.TrimEnd('/') + "/health");
+                if (resp.IsSuccessStatusCode)
+                    SetConnStatus("✓ Conectado. El servidor responde.", ok: true);
+                else
+                    SetConnStatus($"✗ El servidor respondió {(int)resp.StatusCode}.", ok: false);
+            }
+            catch (Exception ex)
+            {
+                SetConnStatus($"✗ No se pudo conectar: {ex.Message}", ok: false);
+            }
+            finally
+            {
+                TestConnectionButton.IsEnabled = true;
+            }
+        }
+
+        private void SetConnStatus(string text, bool? ok)
+        {
+            ConnectionStatusText.Text = text;
+            ConnectionStatusText.Foreground = ok switch
+            {
+                true => new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0x46, 0xC9, 0x8B)),
+                false => new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0xE7, 0x6A, 0x6A)),
+                null => new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0x8A, 0x82, 0xA8)),
+            };
+        }
 
         private void EditModeButton_Click(object sender, RoutedEventArgs e)
         {

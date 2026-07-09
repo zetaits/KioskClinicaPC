@@ -365,6 +365,28 @@
                     </StackPanel>
                 </Border>
 
+                <!-- Servidor de contenido -->
+                <Border Style="{StaticResource SectionCard}">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource SectionTitle}" Text="Servidor de contenido"/>
+                        <TextBlock Style="{StaticResource SectionHint}" Text="URL del servidor de la tienda. En blanco = modo local (este kiosko usa solo su propia configuración). Con URL, descarga el contenido compartido (tienda, slides, textos, eventos) y sincroniza la pantalla de espera con el resto."/>
+                        <StackPanel Style="{StaticResource Field}">
+                            <TextBlock Style="{StaticResource FieldLabel}" Text="URL DEL SERVIDOR (p.ej. http://192.168.1.50:5099)"/>
+                            <TextBox x:Name="ServerUrlTextBox" Style="{StaticResource ConfigTextBox}"/>
+                        </StackPanel>
+                        <StackPanel Style="{StaticResource Field}">
+                            <TextBlock Style="{StaticResource FieldLabel}" Text="API KEY (en blanco si el servidor es abierto)"/>
+                            <TextBox x:Name="ServerApiKeyTextBox" Style="{StaticResource ConfigTextBox}"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal">
+                            <Button x:Name="TestConnectionButton" Content="Probar conexión" Style="{StaticResource SecondaryButton}"
+                                    Padding="16,8" Click="TestConnectionButton_Click"/>
+                            <TextBlock x:Name="ConnectionStatusText" VerticalAlignment="Center" Margin="14,0,0,0"
+                                       FontFamily="{StaticResource JetBrainsMono}" FontSize="11" Foreground="#FF8A82A8"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
                 <!-- Seguridad -->
                 <Border Style="{StaticResource SectionCard}">
                     <StackPanel>
