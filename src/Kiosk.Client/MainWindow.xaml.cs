@@ -35,11 +35,17 @@ namespace KioskClinicaPC
         private bool _isNavigating = false;   // evita transiciones de pantalla re-entrantes
         private readonly KeyboardHook _hook;
         private readonly MainViewModel _viewModel;
-        
+        private readonly ISyncClient _sync;
+
         private readonly KioskTimers _timers = new KioskTimers();
+
+        // Sondeo del reloj maestro cuando el attract está sincronizado: rápido para que el cambio de
+        // slide caiga casi a la vez en todos los kioscos (el ritmo real lo marca el servidor, no esto).
+        private const int SyncPollMs = 400;
 
         private int _highlightIndex = 0;
         private int _attractSlideIndex = 0;
+        private bool _attractSynced = false; // true mientras el attract sigue el reloj maestro
         private int _mainShown = 0;        // specs ya mostrados en la pasada actual de Main
         private int _detailTourIndex = 0;  // índice del recorrido automático por Detail
         private bool _autoTour = false;    // true mientras el bucle conduce la pantalla Detail
@@ -47,12 +53,13 @@ namespace KioskClinicaPC
         private KioskSettings _settings = new KioskSettings();
         private int _hotspotClicks = 0;
 
-        public MainWindow(MainViewModel viewModel)
+        public MainWindow(MainViewModel viewModel, ISyncClient sync)
         {
             InitializeComponent();
 
             _viewModel = viewModel;
             DataContext = _viewModel;
+            _sync = sync;
 
             _hook = new KeyboardHook();
 
@@ -85,6 +92,7 @@ namespace KioskClinicaPC
 #endif
             _settings = KioskSettings.Load(App.SettingsFilePath);
             ApplyTimerIntervals();
+            _sync.Start(); // conecta al reloj maestro si hay servidor; no-op y sin bloqueo si no lo hay
 
             GraphicsQuality.Initialize(_settings.GraphicsMode);
             ParticleField.Spawn(ParticleCanvas, GraphicsQuality.ParticleCount);
@@ -400,21 +408,62 @@ namespace KioskClinicaPC
         {
             _autoTour = false;
             _attractSlideIndex = 0;
+
+            // Si hay servidor y conexión, el attract es un MURO de slides sincronizado con el resto de
+            // kioscos (reloj maestro), en bucle y sin auto-tour: al pasar por delante de varias pantallas
+            // parecen coreografiadas. Sin servidor/conexión, comportamiento local de siempre (recorre los
+            // slides una vez y arranca Scan → Main → Detail).
+            _attractSynced = _sync.TryGetSlideIndex(_viewModel.Slides.Count, out int syncIdx);
+            if (_attractSynced) _attractSlideIndex = syncIdx;
+
             if (_viewModel.Slides.Count > 0)
             {
-                _viewModel.CurrentSlide = _viewModel.Slides[0];
-                UpdateSlideDots(0);
+                _viewModel.CurrentSlide = _viewModel.Slides[_attractSlideIndex];
+                UpdateSlideDots(_attractSlideIndex);
             }
+
+            ApplyAttractInterval(_attractSynced);
             _timers.Restart(KioskTimer.AttractAdvance);
-            // AutoScan solo como red de seguridad cuando no hay slides que conduzcan la transición.
-            if (_viewModel.Slides.Count == 0) _timers.Restart(KioskTimer.AutoScan);
+            // AutoScan solo como red de seguridad local cuando no hay slides que conduzcan la transición.
+            // En modo sincronizado nunca: el muro rota indefinidamente.
+            if (!_attractSynced && _viewModel.Slides.Count == 0) _timers.Restart(KioskTimer.AutoScan);
         }
+
+        /// <summary>Ritmo del timer de attract: sondeo rápido si sigue el reloj maestro; el intervalo de
+        /// slide configurado si rota en local.</summary>
+        private void ApplyAttractInterval(bool synced)
+            => _timers.SetInterval(KioskTimer.AttractAdvance, synced
+                ? TimeSpan.FromMilliseconds(SyncPollMs)
+                : TimeSpan.FromSeconds(Math.Max(1, _settings.SlideIntervalSeconds)));
 
         private void AdvanceAttractSlide()
         {
             if (_viewModel.Slides.Count == 0) return;
+
+            bool synced = _sync.TryGetSlideIndex(_viewModel.Slides.Count, out int syncIdx);
+            // La sincronización pudo ganarse/perderse mientras seguíamos en el attract: reajusta el ritmo
+            // y reancla el cronómetro local sin saltos bruscos.
+            if (synced != _attractSynced)
+            {
+                _attractSynced = synced;
+                ApplyAttractInterval(synced);
+                _timers.Restart(KioskTimer.AttractAdvance);
+            }
+
+            if (synced)
+            {
+                // Sigue el reloj maestro: cambia de slide solo cuando el índice compartido cambia.
+                if (syncIdx != _attractSlideIndex)
+                {
+                    _attractSlideIndex = syncIdx;
+                    _viewModel.CurrentSlide = _viewModel.Slides[_attractSlideIndex];
+                    UpdateSlideDots(_attractSlideIndex);
+                }
+                return;
+            }
+
+            // Local: recorre los slides una vez y, tras el último, arranca el recorrido (Scan → Main).
             int next = _attractSlideIndex + 1;
-            // Mostrados todos los textos de Attract → arranca el recorrido (Scan → Main).
             if (next >= _viewModel.Slides.Count) { StartScanSequence(); return; }
             _attractSlideIndex = next;
             _viewModel.CurrentSlide = _viewModel.Slides[_attractSlideIndex];

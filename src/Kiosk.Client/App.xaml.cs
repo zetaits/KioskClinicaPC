@@ -135,6 +135,9 @@ namespace KioskClinicaPC
             // porque el contenedor no sabría resolver los ctores con parámetros (rutas de App).
             services.AddSingleton<IConfigRepository>(_ => new RemoteConfigRepository(
                 settings.ServerUrl, settings.ServerApiKey, ConfigFilePath, HardwareFilePath));
+            // Sincronización del bucle de atracción: si hay servidor, sigue el reloj maestro; si no,
+            // queda deshabilitado y el kiosko rota los slides él solo (comportamiento previo).
+            services.AddSingleton<ISyncClient>(_ => new SyncClient(settings.ServerUrl));
             services.AddSingleton<IDialogService, MessageBoxDialogService>();
             services.AddSingleton<MainViewModel>();
             services.AddSingleton<MainWindow>();

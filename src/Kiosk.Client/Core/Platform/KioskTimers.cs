@@ -70,6 +70,10 @@ namespace KioskClinicaPC.Core.Platform
             _timers[kind] = timer;
         }
 
+        /// <summary>Cambia el intervalo de un timer en caliente (p.ej. el attract alterna entre el ritmo
+        /// local configurado y el sondeo rápido cuando sigue el reloj maestro del servidor).</summary>
+        public void SetInterval(KioskTimer kind, TimeSpan interval) => _timers[kind].Interval = interval;
+
         public void Start(KioskTimer kind) => _timers[kind].Start();
 
         public void Stop(KioskTimer kind) => _timers[kind].Stop();

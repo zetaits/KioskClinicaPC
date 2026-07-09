@@ -1,3 +1,4 @@
+using Kiosk.Server.Hubs;
 using Kiosk.Server.Services;
 using Microsoft.AspNetCore.StaticFiles;
 
@@ -9,9 +10,15 @@ static string OrDefault(string? value, string fallback) => string.IsNullOrWhiteS
 string dataDir   = OrDefault(builder.Configuration["Kiosk:DataDir"],   Path.Combine(builder.Environment.ContentRootPath, "data"));
 string assetsDir = OrDefault(builder.Configuration["Kiosk:AssetsDir"], Path.Combine(builder.Environment.ContentRootPath, "assets"));
 string? apiKey   = builder.Configuration["Kiosk:ApiKey"];   // vacío = servidor abierto (solo pruebas)
+int slideDurationMs = builder.Configuration.GetValue<int?>("Kiosk:SlideDurationMs") ?? 5200; // = default del cliente
 
 Directory.CreateDirectory(assetsDir);
 builder.Services.AddSingleton(new ServerConfigStore(dataDir));
+
+// Sincronización del bucle de atracción (Fase 2): reloj maestro + hub SignalR + latido periódico.
+builder.Services.AddSingleton(new AttractClock(slideDurationMs));
+builder.Services.AddSignalR();
+builder.Services.AddHostedService<AttractBroadcaster>();
 
 var app = builder.Build();
 
@@ -58,6 +65,10 @@ app.MapGet("/api/assets/{**path}", (string path) =>
         mime = "application/octet-stream";
     return Results.File(full, mime);
 });
+
+// Hub de sincronización del attract. Fuera de /api → sin guardia X-Api-Key (no lleva datos sensibles,
+// solo el origen/duración del cronómetro). El cliente escucha el evento "SyncState".
+app.MapHub<SyncHub>("/hub/sync");
 
 app.Run();
 
