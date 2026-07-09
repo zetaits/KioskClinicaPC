@@ -29,6 +29,17 @@ public sealed class ServerConfigStore
         lock (_gate) return File.ReadAllText(_configPath);
     }
 
+    /// <summary>Deserializa la config a objeto para editarla en el panel. Si el archivo estuviera
+    /// corrupto/vacío, devuelve una config por defecto en lugar de lanzar (el panel nunca muere).</summary>
+    public AppConfig Read()
+    {
+        lock (_gate)
+        {
+            var config = JsonConvert.DeserializeObject<AppConfig>(File.ReadAllText(_configPath));
+            return config ?? new AppConfig { SchemaVersion = AppConfig.CurrentSchemaVersion };
+        }
+    }
+
     /// <summary>Versión corta del contenido (hash) para que el cliente detecte cambios sin re-parsear.</summary>
     public string Version()
     {

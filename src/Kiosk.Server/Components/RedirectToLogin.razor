@@ -1,0 +1,10 @@
+@* Envía al login conservando el destino pretendido para volver tras autenticar. *@
+@inject NavigationManager Nav
+
+@code {
+    protected override void OnInitialized()
+    {
+        var target = Uri.EscapeDataString(new Uri(Nav.Uri).PathAndQuery);
+        Nav.NavigateTo($"/login?returnUrl={target}", forceLoad: true);
+    }
+}

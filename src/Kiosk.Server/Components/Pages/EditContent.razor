@@ -1,0 +1,130 @@
+@page "/contenido"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@inject ServerConfigStore Store
+@using KioskClinicaPC.Core.Config
+
+<h1>Contenido compartido</h1>
+<p class="muted">Lo edita el panel y lo reciben todos los kioscos. Precio/estado/specs son de cada equipo.</p>
+
+@if (_saved)
+{
+    <div class="toast ok">Guardado. Los kioscos lo aplicarán en su próximo refresco.</div>
+}
+
+@if (_config is null)
+{
+    <p>Cargando…</p>
+}
+else
+{
+    <div class="card">
+        <h2>Tienda</h2>
+        <div class="field">
+            <label>Dirección</label>
+            <input type="text" @bind="_config.ShopAddress" />
+        </div>
+        <div class="field">
+            <label>Servicios</label>
+            <input type="text" @bind="_config.ShopServices" />
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>Slides atracción · De ocasión</h2>
+        @SlideEditor(_config.AttractSlides)
+    </div>
+
+    <div class="card">
+        <h2>Slides atracción · Nuevo</h2>
+        @SlideEditor(_config.AttractSlidesNew)
+    </div>
+
+    <div class="card">
+        <h2>Textos de interfaz</h2>
+        @foreach (var t in _texts)
+        {
+            <div class="row" style="margin-bottom:.5rem">
+                <div style="flex:1"><label>Clave</label><input type="text" @bind="t.Key" /></div>
+                <div style="flex:2"><label>Texto</label><input type="text" @bind="t.Value" /></div>
+                <button class="danger" @onclick="() => _texts.Remove(t)">✕</button>
+            </div>
+        }
+        <button class="secondary" @onclick="() => _texts.Add(new KeyVal())">+ Añadir texto</button>
+    </div>
+
+    <div class="card">
+        <h2>Catálogo de marketing</h2>
+        @foreach (var m in _config.MarketingData)
+        {
+            <div class="slide-item">
+                <div class="row">
+                    <div style="flex:1"><label>Id</label><input type="text" @bind="m.Id" /></div>
+                    <div style="flex:1"><label>Familia</label><input type="text" @bind="m.Family" /></div>
+                    <div style="flex:1"><label>Etiqueta</label><input type="text" @bind="m.Label" /></div>
+                </div>
+                <div class="field"><label>Resumen</label><textarea @bind="m.Summary"></textarea></div>
+                <div class="row">
+                    <div style="flex:1"><label>Bench score</label><input type="number" @bind="m.BenchScore" /></div>
+                    <div style="flex:2"><label>Bench etiqueta</label><input type="text" @bind="m.BenchLabel" /></div>
+                    <button class="danger" @onclick="() => _config.MarketingData.Remove(m)">Eliminar</button>
+                </div>
+            </div>
+        }
+        <button class="secondary" @onclick="() => _config.MarketingData.Add(new SpecMarketingData())">+ Añadir componente</button>
+    </div>
+
+    <div class="row" style="margin-top:1rem">
+        <button @onclick="Save">Guardar cambios</button>
+        <button class="secondary" @onclick="Reload">Descartar</button>
+    </div>
+}
+
+@code {
+    private AppConfig? _config;
+    private List<KeyVal> _texts = new();
+    private bool _saved;
+
+    protected override void OnInitialized() => Reload();
+
+    private void Reload()
+    {
+        _config = Store.Read();
+        _texts = _config.UiTexts.Select(kv => new KeyVal { Key = kv.Key, Value = kv.Value }).ToList();
+        _saved = false;
+    }
+
+    private void Save()
+    {
+        if (_config is null) return;
+        // Reconstruye el diccionario de textos (ignora claves vacías/duplicadas: gana la última).
+        _config.UiTexts = _texts
+            .Where(t => !string.IsNullOrWhiteSpace(t.Key))
+            .GroupBy(t => t.Key!.Trim())
+            .ToDictionary(g => g.Key, g => g.Last().Value ?? "");
+        Store.Write(_config);
+        _saved = true;
+    }
+
+    // Editor reutilizable de una lista de slides.
+    private RenderFragment SlideEditor(List<AttractSlide> slides) => __builder =>
+    {
+        foreach (var s in slides)
+        {
+            <div class="slide-item">
+                <div class="row">
+                    <div style="flex:1"><label>Eyebrow</label><input type="text" @bind="s.Eyebrow" /></div>
+                    <div style="flex:1"><label>Título 1</label><input type="text" @bind="s.Title1" /></div>
+                    <div style="flex:1"><label>Título 2</label><input type="text" @bind="s.Title2" /></div>
+                </div>
+                <div class="row">
+                    <div style="flex:3"><label>Subtítulo</label><input type="text" @bind="s.Subtitle" /></div>
+                    <button class="danger" @onclick="() => slides.Remove(s)">Eliminar</button>
+                </div>
+            </div>
+        }
+        <button class="secondary" @onclick="() => slides.Add(new AttractSlide())">+ Añadir slide</button>
+    };
+
+    private sealed class KeyVal { public string? Key { get; set; } public string? Value { get; set; } }
+}

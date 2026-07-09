@@ -1,0 +1,96 @@
+@page "/imagenes"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@inject AssetLibrary Lib
+
+<h1>Imágenes</h1>
+<p class="muted">Marcas y componentes que descargan los kioscos. PNG/JPG/WEBP/SVG.</p>
+
+@if (_message is not null)
+{
+    <div class="toast @(_error ? "err" : "ok")">@_message</div>
+}
+
+@foreach (var category in AssetLibrary.Categories)
+{
+    <div class="card">
+        <h2>@CategoryLabel(category)</h2>
+
+        <div class="row" style="margin-bottom:1rem">
+            <div style="flex:1">
+                <label>Subir imagen</label>
+                <InputFile OnChange="e => Upload(category, e)" accept="image/*" multiple />
+            </div>
+        </div>
+
+        @{ var files = Lib.List(category); }
+        @if (files.Count == 0)
+        {
+            <p class="muted">Sin imágenes.</p>
+        }
+        else
+        {
+            <div class="asset-grid">
+                @foreach (var f in files)
+                {
+                    <div class="asset">
+                        <img src="@($"/panel/assets/{category}/{f}")" alt="@f" />
+                        <div class="name">@f</div>
+                        <button class="danger" @onclick="() => Delete(category, f)">Borrar</button>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private string? _message;
+    private bool _error;
+
+    private const long MaxBytes = 8 * 1024 * 1024; // 8 MB por imagen
+
+    private static string CategoryLabel(string c) => c switch
+    {
+        "Brands" => "Marcas",
+        "SpecImages" => "Componentes",
+        _ => c
+    };
+
+    private async Task Upload(string category, InputFileChangeEventArgs e)
+    {
+        _message = null;
+        int ok = 0;
+        try
+        {
+            foreach (var file in e.GetMultipleFiles(maximumFileCount: 20))
+            {
+                await using var stream = file.OpenReadStream(MaxBytes);
+                await Lib.SaveAsync(category, file.Name, stream);
+                ok++;
+            }
+            _error = false;
+            _message = $"{ok} imagen(es) subidas.";
+        }
+        catch (Exception ex)
+        {
+            _error = true;
+            _message = "Error al subir: " + ex.Message;
+        }
+    }
+
+    private void Delete(string category, string file)
+    {
+        try
+        {
+            Lib.Delete(category, file);
+            _error = false;
+            _message = $"Borrada «{file}».";
+        }
+        catch (Exception ex)
+        {
+            _error = true;
+            _message = "Error al borrar: " + ex.Message;
+        }
+    }
+}

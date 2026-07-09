@@ -1,0 +1,41 @@
+@page "/"
+@attribute [Authorize]
+@inject ServerConfigStore Store
+@inject AssetLibrary Assets
+
+<h1>Panel de administración</h1>
+<p class="muted">Gestión del contenido compartido por todos los kioscos de la tienda.</p>
+
+<div class="grid">
+    <div class="card">
+        <h2>Contenido</h2>
+        <p class="muted">Tienda, slides, textos y catálogo de marketing.</p>
+        <a href="/contenido"><button>Editar contenido</button></a>
+    </div>
+    <div class="card">
+        <h2>Imágenes</h2>
+        <p class="muted">@_brandCount marcas · @_specCount componentes</p>
+        <a href="/imagenes"><button>Gestionar imágenes</button></a>
+    </div>
+    <div class="card">
+        <h2>Estado</h2>
+        <p class="muted">Versión de contenido</p>
+        <code>@_version</code>
+    </div>
+</div>
+
+<p class="muted" style="margin-top:1.5rem">
+    Precio, estado y especificaciones se detectan y editan en cada equipo (no aquí).
+</p>
+
+@code {
+    private string _version = "";
+    private int _brandCount, _specCount;
+
+    protected override void OnInitialized()
+    {
+        _version = Store.Version();
+        _brandCount = Assets.List("Brands").Count;
+        _specCount = Assets.List("SpecImages").Count;
+    }
+}

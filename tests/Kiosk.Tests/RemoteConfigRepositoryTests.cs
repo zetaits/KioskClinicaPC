@@ -47,20 +47,28 @@ namespace KioskClinicaPC.Tests
         }
 
         [Fact]
-        public async Task Con_servidor_ok_devuelve_y_cachea()
+        public async Task Con_servidor_funde_contenido_compartido_y_conserva_lo_local()
         {
+            // Local (esta máquina): precio propio. El servidor NO debe pisarlo.
+            File.WriteAllText(_cachePath, "{\"Price\":\"111\",\"SchemaVersion\":1}");
             var repo = new RemoteConfigRepository(
                 Client(_ => new HttpResponseMessage(HttpStatusCode.OK)
                 {
-                    Content = new StringContent("{\"Price\":\"999\",\"SchemaVersion\":1}")
+                    // El servidor manda contenido compartido (servicios de tienda) e intenta un precio
+                    // que debe ignorarse por ser un campo por-máquina.
+                    Content = new StringContent("{\"Price\":\"999\",\"ShopServices\":\"Reparación y montaje\",\"SchemaVersion\":1}")
                 }),
                 baseUrl: "https://server.test", _cachePath, _hwPath);
 
             var result = await repo.LoadConfigAsync();
 
-            Assert.Equal("999", result.Config.Price);
+            Assert.Equal("111", result.Config.Price);                          // precio LOCAL conservado
+            Assert.Equal("Reparación y montaje", result.Config.ShopServices);  // contenido COMPARTIDO del servidor
             Assert.True(File.Exists(_cachePath));
-            Assert.Contains("999", File.ReadAllText(_cachePath)); // se escribió la caché para el próximo arranque offline
+            string cached = File.ReadAllText(_cachePath);
+            Assert.Contains("Reparación y montaje", cached); // se cacheó la fusión para el próximo arranque offline
+            Assert.Contains("111", cached);
+            Assert.DoesNotContain("999", cached);            // el precio del servidor no se coló
         }
 
         [Fact]

@@ -1,0 +1,49 @@
+@page "/seguridad"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@inject PanelAuthStore Auth
+
+<h1>Seguridad</h1>
+<p class="muted">Contraseña de acceso al panel.</p>
+
+@if (_message is not null)
+{
+    <div class="toast @(_error ? "err" : "ok")">@_message</div>
+}
+
+<div class="card" style="max-width:420px">
+    <div class="field">
+        <label>Contraseña actual</label>
+        <input type="password" @bind="_current" />
+    </div>
+    <div class="field">
+        <label>Nueva contraseña</label>
+        <input type="password" @bind="_new" />
+    </div>
+    <div class="field">
+        <label>Repetir nueva</label>
+        <input type="password" @bind="_repeat" />
+    </div>
+    <button @onclick="Change">Cambiar contraseña</button>
+</div>
+
+@code {
+    private string _current = "", _new = "", _repeat = "";
+    private string? _message;
+    private bool _error;
+
+    private void Change()
+    {
+        _message = null;
+        if (!Auth.Verify(_current)) { Fail("La contraseña actual no es correcta."); return; }
+        if (_new.Length < 6) { Fail("La nueva contraseña debe tener al menos 6 caracteres."); return; }
+        if (_new != _repeat) { Fail("Las contraseñas nuevas no coinciden."); return; }
+
+        Auth.SetPassword(_new);
+        _current = _new = _repeat = "";
+        _error = false;
+        _message = "Contraseña cambiada.";
+    }
+
+    private void Fail(string msg) { _error = true; _message = msg; }
+}

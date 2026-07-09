@@ -1,0 +1,28 @@
+@page "/login"
+@layout Layout.EmptyLayout
+@* Página de acceso. SSR estática (no interactiva) para que el POST del formulario emita la cookie fuera
+   del circuito Blazor. El token antiforgery lo valida el endpoint /login. *@
+
+<div class="login-wrap">
+    <div class="card login-card">
+        <h1>Panel · ClinicaPC</h1>
+        @if (Error == 1)
+        {
+            <div class="toast err">Contraseña incorrecta.</div>
+        }
+        <form method="post" action="/login">
+            <AntiforgeryToken />
+            <input type="hidden" name="returnUrl" value="@ReturnUrl" />
+            <div class="field">
+                <label for="pw">Contraseña</label>
+                <input id="pw" type="password" name="password" autofocus />
+            </div>
+            <button type="submit">Entrar</button>
+        </form>
+    </div>
+</div>
+
+@code {
+    [SupplyParameterFromQuery] public int Error { get; set; }
+    [SupplyParameterFromQuery] public string? ReturnUrl { get; set; }
+}
