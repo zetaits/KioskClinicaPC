@@ -176,6 +176,12 @@
                         <TextBlock Style="{StaticResource SectionTitle}" Text="Pantalla de espera (Attract) · Textos"/>
                         <TextBlock Style="{StaticResource SectionHint}" Text="Mensajes que van rotando en la pantalla inicial. Solo se editan los del estado seleccionado arriba."/>
 
+                        <!-- Con servidor de contenido, los slides son compartidos y los gestiona el panel: se
+                             ocultan aquí para no editar algo que el servidor sobrescribiría. -->
+                        <TextBlock x:Name="SlidesServerNote" Visibility="Collapsed" Style="{StaticResource SectionHint}"
+                                   Foreground="{StaticResource CyanBrush}" TextWrapping="Wrap" Margin="0,8,0,0"
+                                   Text="Este kiosko recibe los textos de la pantalla de espera desde el panel del servidor. Se gestionan allí, iguales para toda la tienda."/>
+
                         <!-- Set "De ocasión": visible solo cuando UsedRadio está marcado -->
                         <StackPanel x:Name="UsedSlidesPanel">
                             <TextBlock Style="{StaticResource FieldLabel}" Margin="0,10,0,10" Text="◆ EQUIPO DE OCASIÓN"/>
@@ -427,6 +433,9 @@
                             <TextBlock Style="{StaticResource SectionTitle}" Text="Modo edición libre"/>
                             <TextBlock Style="{StaticResource SectionHint}" Margin="0,4,0,0"
                                        Text="Navega el kiosko y toca cualquier texto para editarlo en pantalla."/>
+                            <TextBlock x:Name="EditModeServerNote" Visibility="Collapsed" Style="{StaticResource SectionHint}"
+                                       Foreground="{StaticResource CyanBrush}" TextWrapping="Wrap" Margin="0,6,0,0"
+                                       Text="Desactivado: el contenido editable inline (slides, textos, marketing) es compartido y se gestiona desde el panel del servidor. El precio y las especificaciones de este equipo se editan en los campos de arriba."/>
                         </StackPanel>
                         <Button Grid.Column="1" x:Name="EditModeButton" Content="✏  Activar"
                                 Style="{StaticResource PrimaryButton}" VerticalAlignment="Center"

@@ -24,6 +24,10 @@ namespace KioskClinicaPC.Windows
         private readonly AppConfig _detectedSpecs;
         private KioskSettings _settings = new KioskSettings();
 
+        // Con servidor de contenido, lo compartido (slides/textos/marketing) lo manda el panel: la edición
+        // local de esos campos se oculta para no editar algo que el siguiente merge del servidor pisaría.
+        private bool _serverManaged;
+
         // Slides del Attract editables (añadir/eliminar/editar). Se ligan al ItemsControl por nombre.
         private readonly ObservableCollection<AttractSlide> _attractSlides = new ObservableCollection<AttractSlide>();        // De ocasión
         private readonly ObservableCollection<AttractSlide> _attractSlidesNew = new ObservableCollection<AttractSlide>();     // Nuevo
@@ -124,6 +128,7 @@ namespace KioskClinicaPC.Windows
         private void ConditionRadio_Checked(object sender, RoutedEventArgs e)
         {
             if (NewSlidesPanel == null || UsedSlidesPanel == null) return; // aún cargando la vista
+            if (_serverManaged) return; // slides gestionados por el servidor: paneles ocultos, no re-mostrar
             bool isNew = NewRadio.IsChecked == true;
             NewSlidesPanel.Visibility = isNew ? Visibility.Visible : Visibility.Collapsed;
             UsedSlidesPanel.Visibility = isNew ? Visibility.Collapsed : Visibility.Visible;
@@ -154,6 +159,23 @@ namespace KioskClinicaPC.Windows
             SlideIntervalTextBox.Text = _settings.SlideIntervalSeconds.ToString(CultureInfo.InvariantCulture);
             ServerUrlTextBox.Text = _settings.ServerUrl;
             ServerApiKeyTextBox.Text = _settings.ServerApiKey;
+
+            _serverManaged = !string.IsNullOrWhiteSpace(_settings.ServerUrl);
+            ApplyServerManagedUi();
+        }
+
+        /// <summary>Oculta la edición de contenido compartido (slides + modo edición libre) cuando el kiosko
+        /// recibe ese contenido del servidor. El precio/specs/condición (por-máquina) siguen editables.</summary>
+        private void ApplyServerManagedUi()
+        {
+            if (!_serverManaged) return;
+
+            UsedSlidesPanel.Visibility = Visibility.Collapsed;
+            NewSlidesPanel.Visibility = Visibility.Collapsed;
+            SlidesServerNote.Visibility = Visibility.Visible;
+
+            EditModeButton.Visibility = Visibility.Collapsed;
+            EditModeServerNote.Visibility = Visibility.Visible;
         }
 
         private void SaveButton_Click(object sender, RoutedEventArgs e)
@@ -194,8 +216,12 @@ namespace KioskClinicaPC.Windows
                 _savedConfig.Condition = NewRadio.IsChecked == true ? Warranty.New : Warranty.Used;
 
                 // Slides del Attract (un set por estado): descarta los vacíos; conserva el resto en orden.
-                _savedConfig.AttractSlides = CleanSlides(_attractSlides);
-                _savedConfig.AttractSlidesNew = CleanSlides(_attractSlidesNew);
+                // Con servidor, los slides son compartidos (paneles ocultos): no los toca el guardado local.
+                if (!_serverManaged)
+                {
+                    _savedConfig.AttractSlides = CleanSlides(_attractSlides);
+                    _savedConfig.AttractSlidesNew = CleanSlides(_attractSlidesNew);
+                }
 
                 string json = JsonConvert.SerializeObject(_savedConfig, Formatting.Indented);
                 JsonStore.WriteAtomic(App.ConfigFilePath, json);
@@ -294,6 +320,7 @@ namespace KioskClinicaPC.Windows
 
         private void EditModeButton_Click(object sender, RoutedEventArgs e)
         {
+            if (_serverManaged) return; // botón oculto con servidor; guard por si acaso
             LaunchEditMode = true;
             this.Close();
         }

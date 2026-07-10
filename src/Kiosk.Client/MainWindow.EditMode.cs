@@ -17,6 +17,16 @@ namespace KioskClinicaPC
     {
         private void EnterEditMode()
         {
+            // Con servidor de contenido, lo editable inline (slides/textos/marketing) es compartido y lo
+            // gestiona el panel; editarlo local se perdería en el siguiente merge. Se bloquea la entrada.
+            if (!string.IsNullOrWhiteSpace(_settings.ServerUrl))
+            {
+                KioskDialog.Alert(this, "Contenido gestionado",
+                    "Este kiosko recibe el contenido compartido (slides, textos, marketing) del servidor y se edita en el panel. " +
+                    "El precio y las especificaciones de este equipo se editan en Ajustes.");
+                return;
+            }
+
             _timers.Stop(KioskTimer.Inactivity);
             _timers.Stop(KioskTimer.AttractAdvance);
             _timers.Stop(KioskTimer.AutoScan);
