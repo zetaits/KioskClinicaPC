@@ -47,6 +47,7 @@ namespace KioskClinicaPC
         private int _attractSlideIndex = 0;
         private bool _attractSynced = false; // true mientras el attract sigue el reloj maestro
         private volatile bool _reloadPending = false; // el servidor avisó de contenido nuevo; se aplica al volver a Attract
+        private bool _reloadInProgress = false;        // una recarga en vivo está en vuelo (evita montajes solapados)
         private int _mainShown = 0;        // specs ya mostrados en la pasada actual de Main
         private int _detailTourIndex = 0;  // índice del recorrido automático por Detail
         private bool _autoTour = false;    // true mientras el bucle conduce la pantalla Detail
@@ -96,7 +97,6 @@ namespace KioskClinicaPC
 #endif
             _settings = KioskSettings.Load(App.SettingsFilePath);
             ApplyTimerIntervals();
-            _sync.Start(); // conecta al reloj maestro si hay servidor; no-op y sin bloqueo si no lo hay
 
             GraphicsQuality.Initialize(_settings.GraphicsMode);
             ParticleField.Spawn(ParticleCanvas, GraphicsQuality.ParticleCount);
@@ -105,6 +105,10 @@ namespace KioskClinicaPC
             RefreshQr();
             EnterAttractMode();
             _ready = true; // DisplayConfig/Specs ya construidos: la interacción puede disparar el escaneo
+
+            // Sync DESPUÉS de la carga inicial: si arrancara antes, un push "ContentChanged" temprano podría
+            // colar una recarga a mitad del montaje inicial. No bloquea; si no hay servidor es no-op.
+            _sync.Start();
 
 #if !DEBUG
             // Auto-update: comprueba GitHub y deja la nueva versión lista en segundo plano. No
@@ -425,6 +429,7 @@ namespace KioskClinicaPC
         /// nuevos. No redetecta hardware ni toca el precio/specs locales.</summary>
         private async Task ApplyReloadThenAttract()
         {
+            _reloadInProgress = true;
             try
             {
                 await _viewModel.ReloadContentAsync();
@@ -434,11 +439,17 @@ namespace KioskClinicaPC
             {
                 Log.Warning(ex, "Recarga de contenido en vivo falló; se mantiene lo anterior.");
             }
+            finally { _reloadInProgress = false; }
             EnterAttractMode(); // _reloadPending ya en false → montaje normal con el contenido nuevo
         }
 
         private void EnterAttractMode()
         {
+            // Una recarga en vivo está en vuelo (tiene un await de red): no montes el muro ahora — al terminar,
+            // ApplyReloadThenAttract vuelve a entrar en Attract. Sin esto, un segundo EnterAttractMode durante
+            // el await montaría con estado a medio recargar.
+            if (_reloadInProgress) return;
+
             // Si hay contenido nuevo del servidor pendiente y estamos en idle, recárgalo antes de montar el
             // muro de slides (evita mostrar contenido viejo un ciclo).
             if (_reloadPending && !EditModeService.Instance.IsActive)
