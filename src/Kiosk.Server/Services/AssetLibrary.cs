@@ -10,8 +10,10 @@ public sealed class AssetLibrary
     /// <summary>Carpetas que el cliente ya conoce (override de imágenes empaquetadas).</summary>
     public static readonly IReadOnlyList<string> Categories = new[] { "Brands", "SpecImages" };
 
+    // SVG excluido a propósito: puede llevar <script> embebido (XSS almacenado al previsualizarlo inline en
+    // el panel) y el cliente WPF ni lo renderiza. Solo mapas de bits.
     private static readonly HashSet<string> AllowedExtensions =
-        new(StringComparer.OrdinalIgnoreCase) { ".png", ".jpg", ".jpeg", ".webp", ".svg", ".gif" };
+        new(StringComparer.OrdinalIgnoreCase) { ".png", ".jpg", ".jpeg", ".webp", ".gif" };
 
     private readonly string _root;
 

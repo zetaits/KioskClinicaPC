@@ -4,7 +4,7 @@
 @inject AssetLibrary Lib
 
 <h1>Imágenes</h1>
-<p class="muted">Marcas y componentes que descargan los kioscos. PNG/JPG/WEBP/SVG.</p>
+<p class="muted">Marcas y componentes que descargan los kioscos. PNG/JPG/WEBP/GIF.</p>
 
 @if (_message is not null)
 {
@@ -19,7 +19,7 @@
         <div class="row" style="margin-bottom:1rem">
             <div style="flex:1">
                 <label>Subir imagen</label>
-                <InputFile OnChange="e => Upload(category, e)" accept="image/*" multiple />
+                <InputFile OnChange="e => Upload(category, e)" accept=".png,.jpg,.jpeg,.webp,.gif" multiple />
             </div>
         </div>
 
