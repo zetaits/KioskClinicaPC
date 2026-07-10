@@ -6,7 +6,11 @@
 <div class="login-wrap">
     <div class="card login-card">
         <h1>Panel · ClinicaPC</h1>
-        @if (Error == 1)
+        @if (Error == "locked")
+        {
+            <div class="toast err">Demasiados intentos fallidos. Espera unos minutos antes de reintentar.</div>
+        }
+        else if (!string.IsNullOrEmpty(Error))
         {
             <div class="toast err">Contraseña incorrecta.</div>
         }
@@ -23,6 +27,6 @@
 </div>
 
 @code {
-    [SupplyParameterFromQuery] public int Error { get; set; }
+    [SupplyParameterFromQuery] public string? Error { get; set; }
     [SupplyParameterFromQuery] public string? ReturnUrl { get; set; }
 }

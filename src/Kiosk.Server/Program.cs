@@ -21,10 +21,18 @@ int slideDurationMs = builder.Configuration.GetValue<int?>("Kiosk:SlideDurationM
 // (p.ej. "Romance Standard Time" para España); vacío = zona local del servidor.
 string? tzId = builder.Configuration["Kiosk:TimeZone"];
 TimeZoneInfo storeTz = TimeZoneInfo.Local;
+string? tzWarning = null;
 if (!string.IsNullOrWhiteSpace(tzId))
 {
+    // OJO: el id de zona depende del SO del servidor (Windows "Romance Standard Time" vs Linux/IANA
+    // "Europe/Madrid"). Si no resuelve, caemos a la hora local del VPS y los eventos podrían activarse
+    // con horas corridas → se avisa a voces en el arranque en vez de tragarlo en silencio.
     try { storeTz = TimeZoneInfo.FindSystemTimeZoneById(tzId); }
-    catch (TimeZoneNotFoundException) { /* id inválido → zona local */ }
+    catch (Exception ex) when (ex is TimeZoneNotFoundException or InvalidTimeZoneException)
+    {
+        tzWarning = $"Zona horaria '{tzId}' no válida en este SO ({ex.GetType().Name}); usando la hora local " +
+                    $"del servidor ({TimeZoneInfo.Local.Id}). Los eventos pueden activarse con horas corridas.";
+    }
 }
 
 Directory.CreateDirectory(assetsDir);
@@ -42,6 +50,7 @@ builder.Services.AddHostedService<AttractBroadcaster>();
 
 // Panel de administración (Fase 3): Blazor Server + login por cookie (un solo encargado, sin roles).
 builder.Services.AddSingleton(new PanelAuthStore(dataDir));
+builder.Services.AddSingleton<LoginThrottle>();
 builder.Services.AddRazorComponents().AddInteractiveServerComponents();
 builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddAuthorization();
@@ -55,6 +64,12 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
     });
 
 var app = builder.Build();
+
+// Avisos de arranque: configuración insegura o dudosa debe verse en el log, no descubrirse en producción.
+if (tzWarning != null) app.Logger.LogWarning("{TzWarning}", tzWarning);
+app.Logger.LogInformation("Zona horaria de la tienda: {TimeZone}.", storeTz.Id);
+if (string.IsNullOrEmpty(apiKey))
+    app.Logger.LogWarning("Kiosk:ApiKey vacía: /api/* se sirve SIN autenticación. Fija una clave antes de exponer el servidor a internet.");
 
 app.UseStaticFiles();
 app.UseAuthentication();
@@ -103,16 +118,29 @@ app.MapGet("/api/assets/{**path}", (string path) =>
 
 // Login del panel: valida contraseña y emite la cookie de sesión. El formulario (SSR) incluye el token
 // antiforgery, que el middleware valida aquí. LocalRedirect evita redirecciones abiertas.
-app.MapPost("/login", async (HttpContext ctx, PanelAuthStore auth,
+app.MapPost("/login", async (HttpContext ctx, PanelAuthStore auth, LoginThrottle throttle,
     [FromForm] string password, [FromForm] string? returnUrl) =>
 {
-    if (!auth.Verify(password))
+    string ip = ctx.Connection.RemoteIpAddress?.ToString() ?? "desconocida";
+
+    static string Back(string error, string? returnUrl)
     {
-        string back = "/login?error=1";
+        string back = "/login?error=" + error;
         if (!string.IsNullOrEmpty(returnUrl)) back += "&returnUrl=" + Uri.EscapeDataString(returnUrl);
-        return Results.Redirect(back);
+        return back;
     }
 
+    // Demasiados fallos seguidos desde esta IP: rechaza sin ni siquiera comprobar la contraseña.
+    if (throttle.IsLocked(ip))
+        return Results.Redirect(Back("locked", returnUrl));
+
+    if (!auth.Verify(password))
+    {
+        throttle.RecordFailure(ip);
+        return Results.Redirect(Back("1", returnUrl));
+    }
+
+    throttle.RecordSuccess(ip);
     var identity = new ClaimsIdentity(new[] { new Claim(ClaimTypes.Name, "encargado") },
         CookieAuthenticationDefaults.AuthenticationScheme);
     await ctx.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(identity));
