@@ -31,6 +31,7 @@ namespace KioskClinicaPC.Services
         private AttractSyncState? _state;
         private long _clockOffsetMs;   // server - local, en ms (corrige desfase de reloj)
         private bool _connected;
+        private volatile bool _disposed;
         private string? _lastVersion;  // última versión de contenido vista (para detectar cambios)
 
         /// <summary>Se dispara cuando el contenido del servidor cambió (push del hub o polling de versión).
@@ -73,9 +74,20 @@ namespace KioskClinicaPC.Services
             // PUSH: el panel guardó → recarga inmediata (force: notifica aunque el poll no lo haya visto aún).
             _connection.On("ContentChanged", () => { _ = CheckVersionAsync(force: true); });
 
-            _connection.Reconnected += _ => { MarkConnected(true); return Task.CompletedTask; };
-            _connection.Closed += _ => { MarkConnected(false); return Task.CompletedTask; };
+            // Al reconectar, recomprueba la versión: los push perdidos durante la caída se recuperan sin
+            // esperar al siguiente tick de polling.
+            _connection.Reconnected += _ => { MarkConnected(true); return CheckVersionAsync(force: false); };
             _connection.Reconnecting += _ => { MarkConnected(false); return Task.CompletedTask; };
+            // WithAutomaticReconnect se rinde tras unos intentos y dispara Closed. Sin esto, una caída del
+            // servidor de más de ~40 s dejaría el kiosko sin sincronización hasta reiniciar. Relanzamos el
+            // bucle de conexión manual (que reintenta indefinidamente).
+            _connection.Closed += async _ =>
+            {
+                MarkConnected(false);
+                if (_disposed) return;
+                await Task.Delay(TimeSpan.FromSeconds(5));
+                if (!_disposed) await ConnectLoopAsync();
+            };
 
             _ = ConnectLoopAsync();
 
@@ -88,7 +100,7 @@ namespace KioskClinicaPC.Services
         /// el arranque del kiosko ni lanza.</summary>
         private async Task ConnectLoopAsync()
         {
-            while (true)
+            while (!_disposed)
             {
                 try
                 {
@@ -169,6 +181,7 @@ namespace KioskClinicaPC.Services
 
         public void Dispose()
         {
+            _disposed = true;
             _pollTimer?.Dispose();
             _http?.Dispose();
             _ = _connection?.DisposeAsync();
