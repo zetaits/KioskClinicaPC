@@ -2,6 +2,7 @@
 @attribute [Authorize]
 @rendermode InteractiveServer
 @inject ServerConfigStore Store
+@inject IHubContext<SyncHub> Hub
 @using KioskClinicaPC.Core.Config
 
 <h1>Contenido compartido</h1>
@@ -94,7 +95,7 @@ else
         _saved = false;
     }
 
-    private void Save()
+    private async Task Save()
     {
         if (_config is null) return;
         // Reconstruye el diccionario de textos (ignora claves vacías/duplicadas: gana la última).
@@ -104,6 +105,8 @@ else
             .ToDictionary(g => g.Key, g => g.Last().Value ?? "");
         Store.Write(_config);
         _saved = true;
+        // Avisa a los kioscos conectados para que recarguen sin reiniciar (el polling es el respaldo).
+        await Hub.Clients.All.SendAsync("ContentChanged");
     }
 
     private sealed class KeyVal { public string? Key { get; set; } public string? Value { get; set; } }

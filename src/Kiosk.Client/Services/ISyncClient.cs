@@ -8,6 +8,10 @@ namespace KioskClinicaPC.Services
     /// </summary>
     public interface ISyncClient
     {
+        /// <summary>Se dispara cuando el contenido compartido del servidor cambió (edición en el panel o
+        /// evento que entra/sale). El suscriptor debe recargar la config. Puede llegar en un hilo de fondo.</summary>
+        event System.Action? ContentChanged;
+
         /// <summary>true si hay conexión viva con el reloj maestro y un estado válido recibido.</summary>
         bool IsSynced { get; }
 

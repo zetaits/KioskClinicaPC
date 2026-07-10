@@ -46,6 +46,7 @@ namespace KioskClinicaPC
         private int _highlightIndex = 0;
         private int _attractSlideIndex = 0;
         private bool _attractSynced = false; // true mientras el attract sigue el reloj maestro
+        private volatile bool _reloadPending = false; // el servidor avisó de contenido nuevo; se aplica al volver a Attract
         private int _mainShown = 0;        // specs ya mostrados en la pasada actual de Main
         private int _detailTourIndex = 0;  // índice del recorrido automático por Detail
         private bool _autoTour = false;    // true mientras el bucle conduce la pantalla Detail
@@ -60,6 +61,9 @@ namespace KioskClinicaPC
             _viewModel = viewModel;
             DataContext = _viewModel;
             _sync = sync;
+            // Reload en vivo: el servidor avisa (push SignalR o polling de versión) de que el contenido
+            // compartido cambió. Se aplica al volver a la pantalla de espera, no en mitad de una interacción.
+            _sync.ContentChanged += OnServerContentChanged;
 
             _hook = new KeyboardHook();
 
@@ -404,8 +408,46 @@ namespace KioskClinicaPC
 
         /// <summary>Entra en modo espera (Attract): reinicia el recorrido de slides desde el primero.
         /// El bucle muestra todos los textos una vez y luego pasa a Scan→Main automáticamente.</summary>
+        /// <summary>El servidor avisó de contenido nuevo (push o polling; llega en hilo de fondo). Marca la
+        /// recarga como pendiente y, si ya estamos en la pantalla de espera, la aplica de inmediato; si el
+        /// cliente está en uso, se aplicará al volver a idle (no se cambia el contenido a mitad de una visita).</summary>
+        private void OnServerContentChanged()
+        {
+            _reloadPending = true;
+            Dispatcher.InvokeAsync(() =>
+            {
+                if (_viewModel.CurrentScreen == 0 && !EditModeService.Instance.IsActive)
+                    EnterAttractMode();
+            });
+        }
+
+        /// <summary>Recarga el contenido compartido del servidor y vuelve a entrar en Attract con los slides
+        /// nuevos. No redetecta hardware ni toca el precio/specs locales.</summary>
+        private async Task ApplyReloadThenAttract()
+        {
+            try
+            {
+                await _viewModel.ReloadContentAsync();
+                RefreshQr();
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, "Recarga de contenido en vivo falló; se mantiene lo anterior.");
+            }
+            EnterAttractMode(); // _reloadPending ya en false → montaje normal con el contenido nuevo
+        }
+
         private void EnterAttractMode()
         {
+            // Si hay contenido nuevo del servidor pendiente y estamos en idle, recárgalo antes de montar el
+            // muro de slides (evita mostrar contenido viejo un ciclo).
+            if (_reloadPending && !EditModeService.Instance.IsActive)
+            {
+                _reloadPending = false;
+                _ = ApplyReloadThenAttract();
+                return;
+            }
+
             _autoTour = false;
             _attractSlideIndex = 0;
 

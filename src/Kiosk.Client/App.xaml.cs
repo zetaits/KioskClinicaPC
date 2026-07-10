@@ -137,7 +137,7 @@ namespace KioskClinicaPC
                 settings.ServerUrl, settings.ServerApiKey, ConfigFilePath, HardwareFilePath));
             // Sincronización del bucle de atracción: si hay servidor, sigue el reloj maestro; si no,
             // queda deshabilitado y el kiosko rota los slides él solo (comportamiento previo).
-            services.AddSingleton<ISyncClient>(_ => new SyncClient(settings.ServerUrl));
+            services.AddSingleton<ISyncClient>(_ => new SyncClient(settings.ServerUrl, settings.ServerApiKey));
             services.AddSingleton<IDialogService, MessageBoxDialogService>();
             services.AddSingleton<MainViewModel>();
             services.AddSingleton<MainWindow>();

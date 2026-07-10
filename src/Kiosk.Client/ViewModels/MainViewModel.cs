@@ -225,6 +225,18 @@ namespace KioskClinicaPC.ViewModels
             ApplyConfig();
         }
 
+        /// <summary>Recarga en vivo del contenido COMPARTIDO desde el servidor (disparada por push/polling
+        /// de <see cref="Services.ISyncClient"/>). Vuelve a pedir la config (que funde lo compartido del
+        /// servidor sobre lo local), siembra defaults si faltan y reaplica. NO redetecta hardware ni muestra
+        /// diálogos: el precio/especificaciones de esta máquina permanecen intactos.</summary>
+        public async Task ReloadContentAsync()
+        {
+            var load = await _configRepo.LoadConfigAsync();
+            _savedConfig = load.Config;
+            SeedDefaults(_savedConfig);
+            ApplyConfig();
+        }
+
         /// <summary>Detección de hardware en vivo (no crítica: si falla, se conserva lo que hubiera).</summary>
         private async Task DetectHardwareAsync()
         {

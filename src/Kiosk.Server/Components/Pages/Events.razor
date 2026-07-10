@@ -3,6 +3,7 @@
 @rendermode InteractiveServer
 @inject EventStore Store
 @inject ContentResolver Content
+@inject IHubContext<SyncHub> Hub
 @using KioskClinicaPC.Core.Config
 @using Newtonsoft.Json
 
@@ -140,7 +141,7 @@
         _texts = _editing.UiTextOverrides.Select(kv => new KeyVal { Key = kv.Key, Value = kv.Value }).ToList();
     }
 
-    private void Save()
+    private async Task Save()
     {
         if (_editing is null) return;
         _editing.UiTextOverrides = _texts
@@ -151,15 +152,20 @@
         _message = $"Evento «{_editing.Name}» guardado.";
         _editing = null;
         Refresh();
+        await NotifyClients();
     }
 
-    private void Delete(KioskEvent ev)
+    private async Task Delete(KioskEvent ev)
     {
         Store.Delete(ev.Id);
         if (_editing?.Id == ev.Id) _editing = null;
         _message = $"Evento «{ev.Name}» borrado.";
         Refresh();
+        await NotifyClients();
     }
+
+    // Un evento que entra/sale cambia el contenido efectivo → avisa a los kioscos para que recarguen.
+    private Task NotifyClients() => Hub.Clients.All.SendAsync("ContentChanged");
 
     private void Cancel() => _editing = null;
 
