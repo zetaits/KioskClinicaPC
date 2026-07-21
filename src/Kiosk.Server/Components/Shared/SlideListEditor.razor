@@ -1,21 +1,24 @@
 @using KioskClinicaPC.Core.Config
 @* Editor reutilizable de una lista de slides de atracción (usado en Contenido y en Eventos). *@
 
-@foreach (var s in Slides)
-{
-    <div class="slide-item">
-        <div class="row">
-            <div style="flex:1"><label>Eyebrow</label><input type="text" @bind="s.Eyebrow" /></div>
-            <div style="flex:1"><label>Título 1</label><input type="text" @bind="s.Title1" /></div>
-            <div style="flex:1"><label>Título 2</label><input type="text" @bind="s.Title2" /></div>
+<div style="display:flex;flex-direction:column;gap:12px;">
+    @for (int i = 0; i < Slides.Count; i++)
+    {
+        var s = Slides[i];
+        <div class="slide-item">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+                <div class="k" style="margin:0;">Slide @((i + 1).ToString("00"))</div>
+                <button class="icon sm" title="Quitar slide" @onclick="() => Remove(s)">✕</button>
+            </div>
+            <input type="text" class="line" style="font-family:var(--font-mono);font-weight:400;font-size:11px;color:var(--muted);" placeholder="Eyebrow" @bind="s.Eyebrow" />
+            <input type="text" class="line" placeholder="Título 1" @bind="s.Title1" />
+            <input type="text" class="line accent" placeholder="Título 2 (acento)" @bind="s.Title2" />
+            <input type="text" class="line sub" placeholder="Subtítulo" @bind="s.Subtitle" />
         </div>
-        <div class="row">
-            <div style="flex:3"><label>Subtítulo</label><input type="text" @bind="s.Subtitle" /></div>
-            <button class="danger" @onclick="() => Remove(s)">Eliminar</button>
-        </div>
-    </div>
-}
-<button class="secondary" @onclick="Add">+ Añadir slide</button>
+    }
+</div>
+
+<button class="accent" style="margin-top:12px;font-size:12px;padding:8px 13px;border-radius:8px;" @onclick="Add">+ Añadir slide</button>
 
 @code {
     [Parameter, EditorRequired] public List<AttractSlide> Slides { get; set; } = new();

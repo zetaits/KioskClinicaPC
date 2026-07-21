@@ -5,81 +5,107 @@
 @inject IHubContext<SyncHub> Hub
 @using KioskClinicaPC.Core.Config
 
-<h1>Contenido compartido</h1>
-<p class="muted">Lo edita el panel y lo reciben todos los kioscos. Precio/estado/specs son de cada equipo.</p>
-
-@if (_saved)
-{
-    <div class="toast ok">Guardado. Los kioscos lo aplicarán en su próximo refresco.</div>
-}
-
 @if (_config is null)
 {
-    <p>Cargando…</p>
+    <p class="muted">Cargando…</p>
 }
 else
 {
-    <div class="card">
-        <h2>Tienda</h2>
-        <div class="field">
-            <label>Dirección</label>
-            <input type="text" @bind="_config.ShopAddress" />
-        </div>
-        <div class="field">
-            <label>Servicios</label>
-            <input type="text" @bind="_config.ShopServices" />
-        </div>
-    </div>
-
-    <div class="card">
-        <h2>Slides atracción · De ocasión</h2>
-        <SlideListEditor Slides="_config.AttractSlides" />
-    </div>
-
-    <div class="card">
-        <h2>Slides atracción · Nuevo</h2>
-        <SlideListEditor Slides="_config.AttractSlidesNew" />
-    </div>
-
-    <div class="card">
-        <h2>Textos de interfaz</h2>
-        @foreach (var t in _texts)
-        {
-            <div class="row" style="margin-bottom:.5rem">
-                <div style="flex:1"><label>Clave</label><input type="text" @bind="t.Key" /></div>
-                <div style="flex:2"><label>Texto</label><input type="text" @bind="t.Value" /></div>
-                <button class="danger" @onclick="() => _texts.Remove(t)">✕</button>
-            </div>
-        }
-        <button class="secondary" @onclick="() => _texts.Add(new KeyVal())">+ Añadir texto</button>
-    </div>
-
-    <div class="card">
-        <h2>Catálogo de marketing</h2>
-        @foreach (var m in _config.MarketingData)
-        {
-            <div class="slide-item">
-                <div class="row">
-                    <div style="flex:1"><label>Id</label><input type="text" @bind="m.Id" /></div>
-                    <div style="flex:1"><label>Familia</label><input type="text" @bind="m.Family" /></div>
-                    <div style="flex:1"><label>Etiqueta</label><input type="text" @bind="m.Label" /></div>
+    <div class="split even">
+        <div class="card">
+            <h2>Datos de la tienda</h2>
+            <p class="muted" style="margin:0 0 18px;">
+                Identidad que muestran todos los kioscos. El precio, el estado y las especificaciones son de
+                cada equipo y no se tocan aquí.
+            </p>
+            <div class="stack">
+                <div>
+                    <label>Dirección</label>
+                    <input type="text" placeholder="Calle Sevilla 58, Ronda" @bind="_config.ShopAddress" />
                 </div>
-                <div class="field"><label>Resumen</label><textarea @bind="m.Summary"></textarea></div>
-                <div class="row">
-                    <div style="flex:1"><label>Bench score</label><input type="number" @bind="m.BenchScore" /></div>
-                    <div style="flex:2"><label>Bench etiqueta</label><input type="text" @bind="m.BenchLabel" /></div>
-                    <button class="danger" @onclick="() => _config.MarketingData.Remove(m)">Eliminar</button>
+                <div>
+                    <label>Servicios</label>
+                    <input type="text" placeholder="Reparación · Montaje · Recuperación de datos" @bind="_config.ShopServices" />
                 </div>
             </div>
-        }
-        <button class="secondary" @onclick="() => _config.MarketingData.Add(new SpecMarketingData())">+ Añadir componente</button>
+        </div>
+
+        <div class="card">
+            <h2>Textos de interfaz</h2>
+            <p class="muted" style="margin:0 0 18px;">
+                Sobrescriben por clave los textos fijos de las pantallas del kiosko.
+            </p>
+            <div style="display:flex;flex-direction:column;gap:10px;">
+                @foreach (var t in _texts)
+                {
+                    <div class="slide-row">
+                        <input type="text" style="flex:1;" placeholder="Clave" @bind="t.Key" />
+                        <input type="text" style="flex:2;" placeholder="Texto" @bind="t.Value" />
+                        <button class="icon danger" title="Quitar texto" @onclick="() => _texts.Remove(t)">✕</button>
+                    </div>
+                }
+            </div>
+            <button class="accent" style="margin-top:12px;font-size:12px;padding:8px 13px;" @onclick="() => _texts.Add(new KeyVal())">+ Añadir texto</button>
+        </div>
     </div>
 
-    <div class="row" style="margin-top:1rem">
-        <button @onclick="Save">Guardar cambios</button>
-        <button class="secondary" @onclick="Reload">Descartar</button>
+    <div class="split even" style="margin-top:22px;">
+        <div class="card">
+            <div class="card-head" style="margin-bottom:6px;">
+                <h2>Pantalla de espera · De ocasión</h2>
+                <span class="mono-note">@_config.AttractSlides.Count slides</span>
+            </div>
+            <p class="muted" style="margin:0 0 18px;">Carrusel que ven los equipos marcados como de ocasión.</p>
+            <SlideListEditor Slides="_config.AttractSlides" />
+        </div>
+
+        <div class="card">
+            <div class="card-head" style="margin-bottom:6px;">
+                <h2>Pantalla de espera · Nuevo</h2>
+                <span class="mono-note">@_config.AttractSlidesNew.Count slides</span>
+            </div>
+            <p class="muted" style="margin:0 0 18px;">Carrusel que ven los equipos marcados como nuevos.</p>
+            <SlideListEditor Slides="_config.AttractSlidesNew" />
+        </div>
+    </div>
+
+    <div class="card" style="margin-top:22px;">
+        <div class="card-head" style="margin-bottom:6px;">
+            <h2>Catálogo de marketing</h2>
+            <span class="mono-note">@_config.MarketingData.Count componentes</span>
+        </div>
+        <p class="muted" style="margin:0 0 18px;">
+            Resúmenes y puntuaciones que la ficha muestra para cada CPU, GPU o sistema operativo detectado.
+        </p>
+
+        <div style="display:flex;flex-direction:column;gap:12px;">
+            @foreach (var m in _config.MarketingData)
+            {
+                <div class="slide-item">
+                    <div class="row" style="flex-wrap:nowrap;">
+                        <div style="flex:1;"><label>Id</label><input type="text" @bind="m.Id" /></div>
+                        <div style="flex:1;"><label>Familia</label><input type="text" @bind="m.Family" /></div>
+                        <div style="flex:1;"><label>Etiqueta</label><input type="text" @bind="m.Label" /></div>
+                        <button class="icon danger" title="Eliminar componente" @onclick="() => _config.MarketingData.Remove(m)">✕</button>
+                    </div>
+                    <div class="field" style="margin:14px 0 0;"><label>Resumen</label><textarea @bind="m.Summary"></textarea></div>
+                    <div class="row" style="flex-wrap:nowrap;margin-top:14px;">
+                        <div style="flex:1;"><label>Bench score</label><input type="number" @bind="m.BenchScore" /></div>
+                        <div style="flex:2;"><label>Bench etiqueta</label><input type="text" @bind="m.BenchLabel" /></div>
+                    </div>
+                </div>
+            }
+        </div>
+        <button class="accent" style="margin-top:12px;font-size:12px;padding:8px 13px;" @onclick="() => _config.MarketingData.Add(new SpecMarketingData())">+ Añadir componente</button>
+    </div>
+
+    <div style="display:flex;gap:10px;margin-top:22px;">
+        <button class="primary" style="padding:13px 22px;border-radius:10px;font-size:14px;" @onclick="Save">Guardar y publicar en la flota</button>
+        <button style="padding:13px 18px;border-radius:10px;font-size:14px;" @onclick="Reload">Descartar cambios</button>
     </div>
 }
+
+<Toast Message="@(_saved ? "Guardado. Los kioscos lo aplicarán en su próximo refresco." : null)" />
 
 @code {
     private AppConfig? _config;

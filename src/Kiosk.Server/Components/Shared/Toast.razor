@@ -1,0 +1,14 @@
+@* Aviso flotante al pie. Se muestra solo si hay mensaje; el llamante decide cuándo limpiarlo. *@
+
+@if (!string.IsNullOrEmpty(Message))
+{
+    <div class="toast @(IsError ? "err" : "")">
+        <span class="dot @(IsError ? "offline" : "online")"></span>
+        <span>@Message</span>
+    </div>
+}
+
+@code {
+    [Parameter] public string? Message { get; set; }
+    [Parameter] public bool IsError { get; set; }
+}

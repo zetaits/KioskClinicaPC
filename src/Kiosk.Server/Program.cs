@@ -42,6 +42,7 @@ builder.Services.AddSingleton(configStore);
 builder.Services.AddSingleton(eventStore);
 builder.Services.AddSingleton(new ContentResolver(configStore, eventStore, storeTz));
 builder.Services.AddSingleton(new AssetLibrary(assetsDir));
+builder.Services.AddSingleton<FleetRegistry>();
 
 // Sincronización del bucle de atracción (Fase 2): reloj maestro + hub SignalR + latido periódico.
 builder.Services.AddSingleton(new AttractClock(slideDurationMs));

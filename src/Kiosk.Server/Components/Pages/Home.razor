@@ -1,55 +1,123 @@
 @page "/"
 @attribute [Authorize]
+@rendermode InteractiveServer
 @inject ContentResolver Content
-@inject AssetLibrary Assets
+@inject FleetRegistry Fleet
+@inject IHubContext<SyncHub> Hub
 
-<h1>Panel de administración</h1>
-<p class="muted">Gestión del contenido compartido por todos los kioscos de la tienda.</p>
+<div class="stat-grid">
+    <div class="stat">
+        <div class="corner"></div>
+        <div class="k">// Equipos online</div>
+        <div class="v">@Fleet.OnlineCount<small> / @Fleet.Devices.Count</small></div>
+        <div class="bars">
+            @foreach (var d in Fleet.Devices)
+            {
+                <span class="@(d.IsOnline ? "" : "off")"></span>
+            }
+        </div>
+    </div>
 
-<div class="grid">
-    <div class="card">
-        <h2>Contenido</h2>
-        <p class="muted">Tienda, slides, textos y catálogo de marketing.</p>
-        <a href="/contenido"><button>Editar contenido</button></a>
-    </div>
-    <div class="card">
-        <h2>Imágenes</h2>
-        <p class="muted">@_brandCount marcas · @_specCount componentes</p>
-        <a href="/imagenes"><button>Gestionar imágenes</button></a>
-    </div>
-    <div class="card">
-        <h2>Eventos</h2>
+    <div class="stat accent">
+        <div class="k">// Evento activo</div>
         @if (_activeEvent is not null)
         {
-            <p class="muted">Activo ahora: <strong>@_activeEvent</strong></p>
+            <div class="v small">@_activeEvent.Name</div>
+            <div class="f">activo · hasta @_activeEvent.End.ToString("dd MMM", _es)</div>
         }
         else
         {
-            <p class="muted">Ninguno activo</p>
+            <div class="v small">Ninguno</div>
+            <div class="f">contenido base en toda la flota</div>
         }
-        <a href="/eventos"><button>Gestionar eventos</button></a>
     </div>
-    <div class="card">
-        <h2>Estado</h2>
-        <p class="muted">Versión de contenido efectivo</p>
-        <code>@_version</code>
+
+    <div class="stat">
+        <div class="k">// Análisis hoy</div>
+        <div class="v">—</div>
+        <div class="f">fichas QR generadas · sin telemetría aún</div>
+    </div>
+
+    <div class="stat @(Fleet.OfflineCount > 0 ? "alert" : "")">
+        <div class="k">// Alertas</div>
+        <div class="v">@Fleet.OfflineCount</div>
+        @if (_offline is not null)
+        {
+            <div class="f bad">@_offline.Name sin conexión</div>
+        }
+        else
+        {
+            <div class="f ok">toda la flota responde</div>
+        }
     </div>
 </div>
 
-<p class="muted" style="margin-top:1.5rem">
-    Precio, estado y especificaciones se detectan y editan en cada equipo (no aquí).
-</p>
+<div class="split">
+    <div class="card">
+        <div class="card-head">
+            <h2>Estado de la flota</h2>
+            <a class="link" href="/ordenadores">ver todos →</a>
+        </div>
+        <div class="fleet-list">
+            @foreach (var d in Fleet.Devices)
+            {
+                <div class="r">
+                    <span class="dot @FleetRegistry.StatusCss(d.Status)"></span>
+                    <div class="n">@d.Name</div>
+                    <div class="e">@d.Equipment</div>
+                    <span class="screen-badge @FleetRegistry.ScreenCss(d.Screen)">@FleetRegistry.ScreenLabel(d.Screen)</span>
+                    <div class="p">@PriceLabel(d)</div>
+                </div>
+            }
+        </div>
+    </div>
+
+    <div class="card sunken">
+        <div class="card-head" style="margin-bottom:14px;">
+            <h2 class="mono" style="display:flex;align-items:center;gap:8px;">
+                <span class="dot sm online"></span>Actividad reciente
+            </h2>
+        </div>
+        <div class="activity">
+            @foreach (var a in Fleet.RecentActivity())
+            {
+                <div><span class="t">@a.Time</span>@a.Message</div>
+            }
+        </div>
+        <div style="margin-top:20px;padding-top:18px;border-top:1px solid rgba(255,255,255,.06);display:flex;flex-direction:column;gap:9px;">
+            <button class="primary block" @onclick="SyncNow">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 12a9 9 0 1 1-2.6-6.4M21 4v4h-4" /></svg>Sincronizar contenido ahora
+            </button>
+            <button class="block" @onclick="RestartApps">Reiniciar app kiosko en todos</button>
+        </div>
+    </div>
+</div>
+
+<Toast Message="@_toast" />
 
 @code {
-    private string _version = "";
-    private string? _activeEvent;
-    private int _brandCount, _specCount;
+    private static readonly System.Globalization.CultureInfo _es = new("es-ES");
+
+    private KioskEvent? _activeEvent;
+    private FleetDevice? _offline;
+    private string? _toast;
 
     protected override void OnInitialized()
     {
-        _version = Content.Version();
-        _activeEvent = Content.ActiveEvent()?.Name;
-        _brandCount = Assets.List("Brands").Count;
-        _specCount = Assets.List("SpecImages").Count;
+        _activeEvent = Content.ActiveEvent();
+        _offline = Fleet.Devices.FirstOrDefault(d => !d.IsOnline);
     }
+
+    private static string PriceLabel(FleetDevice d) =>
+        d.Price > 0 ? d.Price.ToString("N0", _es) + " €" : "—";
+
+    // Empuja el contenido efectivo a los kioscos conectados sin esperar a su refresco periódico.
+    private async Task SyncNow()
+    {
+        await Hub.Clients.All.SendAsync("ContentChanged");
+        _toast = "Sincronización enviada a los kioscos conectados.";
+    }
+
+    private void RestartApps() =>
+        _toast = "Sin efecto: reiniciar la app en la flota todavía no está implementado.";
 }

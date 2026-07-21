@@ -3,59 +3,74 @@
 @rendermode InteractiveServer
 @inject AssetLibrary Lib
 
-<h1>Imágenes</h1>
-<p class="muted">Marcas y componentes que descargan los kioscos. PNG/JPG/WEBP/GIF.</p>
+<div class="card">
+    <div class="card-head" style="margin-bottom:6px;">
+        <h2>Marcas de equipos</h2>
+        <span class="mono-note">@Lib.List("Brands").Count marcas · sincronizan a todos los kioscos</span>
+    </div>
+    <p class="muted" style="margin:0 0 20px;">
+        Al añadir el logo de una marca nueva, todos los ordenadores cliente actualizan su base de datos y
+        podrán detectar y mostrar equipos de esa marca.
+    </p>
 
-@if (_message is not null)
-{
-    <div class="toast @(_error ? "err" : "ok")">@_message</div>
-}
-
-@foreach (var category in AssetLibrary.Categories)
-{
-    <div class="card">
-        <h2>@CategoryLabel(category)</h2>
-
-        <div class="row" style="margin-bottom:1rem">
-            <div style="flex:1">
-                <label>Subir imagen</label>
-                <InputFile OnChange="e => Upload(category, e)" accept=".png,.jpg,.jpeg,.webp,.gif" multiple />
+    <div class="brand-grid">
+        <div class="drop-tile">
+            <div class="ico">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFB069" stroke-width="2.2"><path d="M12 5v14M5 12h14" /></svg>
             </div>
+            <div class="t">Añadir marca</div>
+            <div class="s">PNG · JPG · WEBP · GIF</div>
+            <InputFile OnChange='e => Upload("Brands", e)' accept=".png,.jpg,.jpeg,.webp,.gif" multiple />
         </div>
 
-        @{ var files = Lib.List(category); }
-        @if (files.Count == 0)
+        @foreach (var f in Lib.List("Brands"))
         {
-            <p class="muted">Sin imágenes.</p>
-        }
-        else
-        {
-            <div class="asset-grid">
-                @foreach (var f in files)
-                {
-                    <div class="asset">
-                        <img src="@($"/panel/assets/{category}/{f}")" alt="@f" />
-                        <div class="name">@f</div>
-                        <button class="danger" @onclick="() => Delete(category, f)">Borrar</button>
-                    </div>
-                }
+            <div class="brand-tile">
+                <img src="@($"/panel/assets/Brands/{f}")" alt="@f" />
+                <div class="n">@f</div>
+                <button class="danger del" title="Borrar" @onclick='() => Delete("Brands", f)'>✕</button>
             </div>
         }
     </div>
-}
+</div>
+
+<div class="card">
+    <div class="card-head" style="margin-bottom:6px;">
+        <h2>Imágenes de componentes</h2>
+        <span class="mono-note">@Lib.List("SpecImages").Count imágenes</span>
+    </div>
+    <p class="muted" style="margin:0 0 20px;">
+        Ilustraciones de CPU, GPU y sistema operativo que aparecen en la ficha del equipo.
+    </p>
+
+    <div class="brand-grid">
+        <div class="drop-tile">
+            <div class="ico">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFB069" stroke-width="2.2"><path d="M12 5v14M5 12h14" /></svg>
+            </div>
+            <div class="t">Subir imagen</div>
+            <div class="s">PNG · JPG · WEBP · GIF</div>
+            <InputFile OnChange='e => Upload("SpecImages", e)' accept=".png,.jpg,.jpeg,.webp,.gif" multiple />
+        </div>
+
+        @foreach (var f in Lib.List("SpecImages"))
+        {
+            <div class="brand-tile">
+                <img src="@($"/panel/assets/SpecImages/{f}")" alt="@f" />
+                <div class="n">@f</div>
+                <button class="danger del" title="Borrar" @onclick='() => Delete("SpecImages", f)'>✕</button>
+            </div>
+        }
+    </div>
+</div>
+
+<Toast Message="@_message" IsError="_error" />
 
 @code {
     private string? _message;
     private bool _error;
 
     private const long MaxBytes = 8 * 1024 * 1024; // 8 MB por imagen
-
-    private static string CategoryLabel(string c) => c switch
-    {
-        "Brands" => "Marcas",
-        "SpecImages" => "Componentes",
-        _ => c
-    };
 
     private async Task Upload(string category, InputFileChangeEventArgs e)
     {

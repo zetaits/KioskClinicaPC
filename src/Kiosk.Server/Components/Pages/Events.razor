@@ -7,120 +7,260 @@
 @using KioskClinicaPC.Core.Config
 @using Newtonsoft.Json
 
-<h1>Eventos</h1>
-<p class="muted">
-    Sustituyen slides y textos durante un rango de fechas (hora local de la tienda: @Content.NowLocal.ToString("dd/MM/yyyy HH:mm")).
-    No tocan precio ni especificaciones.
-</p>
+<div class="split events">
+    @* ── Lista de eventos programados ── *@
+    <div>
+        <div class="card-head" style="margin-bottom:14px;">
+            <h2 class="mono">// Programados</h2>
+            <button class="primary" style="font-size:12.5px;padding:9px 14px;" @onclick="NewEvent">+ Nuevo evento</button>
+        </div>
 
-@if (_message is not null)
-{
-    <div class="toast ok">@_message</div>
-}
-
-<div class="card">
-    <div class="row" style="justify-content:space-between">
-        <h2 style="margin:0">Programados</h2>
-        <button @onclick="NewEvent">+ Nuevo evento</button>
+        @if (_events.Count == 0)
+        {
+            <div class="card">
+                <p class="muted" style="margin:0;">No hay eventos. Crea uno para programar una campaña.</p>
+            </div>
+        }
+        else
+        {
+            <div style="display:flex;flex-direction:column;gap:12px;">
+                @foreach (var ev in _events)
+                {
+                    var active = ev.IsActiveAt(_now);
+                    var upcoming = ev.Enabled && ev.Start > _now;
+                    <div class="event-card @(active ? "active" : upcoming ? "upcoming" : "") @(_editing?.Id == ev.Id ? "sel" : "")" @onclick="() => Edit(ev)">
+                        <div class="bar"></div>
+                        <div class="head">
+                            <span class="n">@(string.IsNullOrWhiteSpace(ev.Name) ? "(sin nombre)" : ev.Name)</span>
+                            @if (active)
+                            {
+                                <span class="badge ok">● ACTIVO</span>
+                            }
+                            else if (upcoming)
+                            {
+                                <span class="badge accent">PROGRAMADO</span>
+                            }
+                            else if (!ev.Enabled)
+                            {
+                                <span class="badge off">DESACTIVADO</span>
+                            }
+                            else
+                            {
+                                <span class="badge off">TERMINADO</span>
+                            }
+                        </div>
+                        <div class="range">@Range(ev)</div>
+                        <div class="caps">
+                            @foreach (var cap in Caps(ev))
+                            {
+                                <span class="chip">@cap</span>
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+        }
     </div>
 
-    @if (_events.Count == 0)
-    {
-        <p class="muted">No hay eventos.</p>
-    }
-    else
-    {
-        @foreach (var ev in _events)
+    @* ── Editor ── *@
+    <div class="card">
+        @if (_editing is null)
         {
-            <div class="slide-item">
-                <div class="row" style="justify-content:space-between; align-items:center">
-                    <div>
-                        <strong>@(string.IsNullOrWhiteSpace(ev.Name) ? "(sin nombre)" : ev.Name)</strong>
-                        @if (ev.IsActiveAt(_now))
-                        {
-                            <span class="toast ok" style="padding:.1rem .5rem; margin-left:.5rem">ACTIVO</span>
-                        }
-                        else if (!ev.Enabled)
-                        {
-                            <span class="muted" style="margin-left:.5rem">(desactivado)</span>
-                        }
-                        <div class="muted">@ev.Start.ToString("dd/MM/yyyy HH:mm") → @ev.End.ToString("dd/MM/yyyy HH:mm")</div>
-                    </div>
-                    <div class="row">
-                        <button class="secondary" @onclick="() => Edit(ev)">Editar</button>
-                        <button class="danger" @onclick="() => Delete(ev)">Borrar</button>
+            <h2>Ningún evento seleccionado</h2>
+            <p class="muted" style="margin:0;">
+                Elige un evento de la lista para editarlo, o crea uno nuevo. Un evento sustituye slides y textos
+                mientras está vigente (hora local de la tienda: @Content.NowLocal.ToString("dd/MM/yyyy HH:mm")).
+                No toca precio ni especificaciones, que son de cada equipo.
+            </p>
+        }
+        else
+        {
+            <div style="display:flex;align-items:center;gap:9px;margin-bottom:20px;">
+                <span class="dot @(_editing.IsActiveAt(_now) ? "online" : "accent")"></span>
+                <h2 style="margin:0;">@(_isNew ? "Nuevo evento" : "Editar evento")</h2>
+                @if (_isNew)
+                {
+                    <span class="badge ok">BORRADOR</span>
+                }
+            </div>
+
+            <div class="row" style="margin-bottom:18px;flex-wrap:nowrap;">
+                <div style="flex:2;">
+                    <label>Nombre del evento</label>
+                    <input type="text" placeholder="Ej. Black Friday" @bind="_editing.Name" />
+                </div>
+                <div style="text-align:center;">
+                    <label>Activo</label>
+                    <div class="toggle">
+                        <input type="checkbox" @bind="_editing.Enabled" />
+                        <span class="track"></span>
                     </div>
                 </div>
             </div>
+
+            <div class="row" style="margin-bottom:24px;flex-wrap:nowrap;">
+                <div style="flex:1;">
+                    <label>Inicio</label>
+                    <input type="datetime-local" @bind="_editing.Start" @bind:format="yyyy-MM-ddTHH:mm" />
+                </div>
+                <div style="flex:1;">
+                    <label>Fin</label>
+                    <input type="datetime-local" @bind="_editing.End" @bind:format="yyyy-MM-ddTHH:mm" />
+                </div>
+            </div>
+
+            <div class="mono-label" style="letter-spacing:.14em;color:var(--dim);margin-bottom:12px;">
+                // Qué cambia este evento · activa solo lo que necesites
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:10px;">
+                @* Slides · De ocasión *@
+                <div class="toggle-box @(_slidesOn ? "on" : "")">
+                    <div class="head">
+                        <div class="toggle">
+                            <input type="checkbox" @bind="_slidesOn" />
+                            <span class="track"></span>
+                        </div>
+                        <div class="txt">
+                            <div class="t">Slides de atracción · De ocasión</div>
+                            <div class="s">Sustituyen el mazo base de equipos de ocasión</div>
+                        </div>
+                    </div>
+                    @if (_slidesOn)
+                    {
+                        <div class="body">
+                            <SlideListEditor Slides="_editing.AttractSlides" />
+                        </div>
+                    }
+                </div>
+
+                @* Slides · Nuevo *@
+                <div class="toggle-box @(_slidesNewOn ? "on" : "")">
+                    <div class="head">
+                        <div class="toggle">
+                            <input type="checkbox" @bind="_slidesNewOn" />
+                            <span class="track"></span>
+                        </div>
+                        <div class="txt">
+                            <div class="t">Slides de atracción · Nuevo</div>
+                            <div class="s">Sustituyen el mazo base de equipos nuevos</div>
+                        </div>
+                    </div>
+                    @if (_slidesNewOn)
+                    {
+                        <div class="body">
+                            <SlideListEditor Slides="_editing.AttractSlidesNew" />
+                        </div>
+                    }
+                </div>
+
+                @* Textos de UI *@
+                <div class="toggle-box @(_textsOn ? "on" : "")">
+                    <div class="head">
+                        <div class="toggle">
+                            <input type="checkbox" @bind="_textsOn" />
+                            <span class="track"></span>
+                        </div>
+                        <div class="txt">
+                            <div class="t">Textos de interfaz</div>
+                            <div class="s">Sobreponen por clave los textos fijos de las pantallas</div>
+                        </div>
+                    </div>
+                    @if (_textsOn)
+                    {
+                        <div class="body" style="display:flex;flex-direction:column;gap:10px;">
+                            @foreach (var t in _texts)
+                            {
+                                <div class="slide-row">
+                                    <input type="text" style="flex:1;" placeholder="Clave" @bind="t.Key" />
+                                    <input type="text" style="flex:2;" placeholder="Texto" @bind="t.Value" />
+                                    <button class="icon danger" title="Quitar texto" @onclick="() => _texts.Remove(t)">✕</button>
+                                </div>
+                            }
+                            <button class="accent" style="align-self:flex-start;font-size:12px;padding:8px 13px;" @onclick="() => _texts.Add(new KeyVal())">+ Añadir texto</button>
+                        </div>
+                    }
+                </div>
+
+                @* Sin soporte en el contenido compartido: se muestran para fijar el alcance, no hacen nada. *@
+                <div class="toggle-box" style="opacity:.55;">
+                    <div class="head">
+                        <div class="toggle">
+                            <input type="checkbox" disabled />
+                            <span class="track"></span>
+                        </div>
+                        <div class="txt">
+                            <div class="t">Fondo / tema visual</div>
+                            <div class="s">Pendiente · color de acento en todas las pantallas</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="toggle-box" style="opacity:.55;">
+                    <div class="head">
+                        <div class="toggle">
+                            <input type="checkbox" disabled />
+                            <span class="track"></span>
+                        </div>
+                        <div class="txt">
+                            <div class="t">Precios / promociones</div>
+                            <div class="s">Pendiente · el precio es de cada equipo, no del contenido compartido</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div style="display:flex;gap:10px;margin-top:22px;">
+                <button class="primary" style="flex:1;padding:13px;border-radius:10px;font-size:14px;" @onclick="Save">Guardar y publicar en la flota</button>
+                <button style="padding:13px 18px;border-radius:10px;font-size:14px;" @onclick="Cancel">Cancelar</button>
+                @if (!_isNew)
+                {
+                    <button class="danger icon" style="width:48px;height:auto;border-radius:10px;" title="Eliminar evento" @onclick="AskDelete">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6" /></svg>
+                    </button>
+                }
+            </div>
         }
-    }
+    </div>
 </div>
 
-@if (_editing is not null)
-{
-    <div class="card">
-        <h2>@(_isNew ? "Nuevo evento" : "Editar evento")</h2>
-
-        <div class="row">
-            <div class="field" style="flex:2">
-                <label>Nombre</label>
-                <input type="text" @bind="_editing.Name" placeholder="Black Friday" />
-            </div>
-            <div class="field">
-                <label>Activo</label>
-                <input type="checkbox" @bind="_editing.Enabled" />
-            </div>
-        </div>
-
-        <div class="row">
-            <div class="field" style="flex:1">
-                <label>Inicio</label>
-                <input type="datetime-local" @bind="_editing.Start" @bind:format="yyyy-MM-ddTHH:mm" />
-            </div>
-            <div class="field" style="flex:1">
-                <label>Fin</label>
-                <input type="datetime-local" @bind="_editing.End" @bind:format="yyyy-MM-ddTHH:mm" />
-            </div>
-        </div>
-
-        <h2>Slides · De ocasión (sustituyen a los base si hay alguno)</h2>
-        <SlideListEditor Slides="_editing.AttractSlides" />
-
-        <h2>Slides · Nuevo</h2>
-        <SlideListEditor Slides="_editing.AttractSlidesNew" />
-
-        <h2>Textos de UI a sobreponer</h2>
-        @foreach (var t in _texts)
-        {
-            <div class="row" style="margin-bottom:.5rem">
-                <div style="flex:1"><label>Clave</label><input type="text" @bind="t.Key" /></div>
-                <div style="flex:2"><label>Texto</label><input type="text" @bind="t.Value" /></div>
-                <button class="danger" @onclick="() => _texts.Remove(t)">✕</button>
-            </div>
-        }
-        <button class="secondary" @onclick="() => _texts.Add(new KeyVal())">+ Añadir texto</button>
-
-        <div class="row" style="margin-top:1rem">
-            <button @onclick="Save">Guardar</button>
-            <button class="secondary" @onclick="Cancel">Cancelar</button>
-        </div>
-    </div>
-}
+<ConfirmDialog Model="_confirm" OnClose="() => _confirm = null" />
+<Toast Message="@_message" />
 
 @code {
+    private static readonly System.Globalization.CultureInfo _es = new("es-ES");
+
     private List<KioskEvent> _events = new();
     private DateTime _now;
     private KioskEvent? _editing;
     private bool _isNew;
     private List<KeyVal> _texts = new();
+    private bool _slidesOn, _slidesNewOn, _textsOn;
+    private ConfirmDialog.Options? _confirm;
     private string? _message;
 
-    protected override void OnInitialized() => Refresh();
+    protected override void OnInitialized()
+    {
+        Refresh();
+        // Abre el primero para que el editor no arranque vacío; el activo manda si lo hay.
+        var first = _events.FirstOrDefault(e => e.IsActiveAt(_now)) ?? _events.FirstOrDefault();
+        if (first is not null) Edit(first);
+    }
 
     private void Refresh()
     {
         _events = Store.All().OrderByDescending(e => e.Start).ToList();
         _now = Content.NowLocal;
+    }
+
+    private string Range(KioskEvent ev) =>
+        $"{ev.Start.ToString("d MMM yyyy", _es)} → {ev.End.ToString("d MMM yyyy", _es)}";
+
+    // Etiquetas de lo que sobrepone el evento; sirven de resumen en la tarjeta.
+    private static IEnumerable<string> Caps(KioskEvent ev)
+    {
+        if (ev.AttractSlides.Count > 0) yield return $"{ev.AttractSlides.Count} slides ocasión";
+        if (ev.AttractSlidesNew.Count > 0) yield return $"{ev.AttractSlidesNew.Count} slides nuevo";
+        if (ev.UiTextOverrides.Count > 0) yield return $"{ev.UiTextOverrides.Count} textos";
     }
 
     private void NewEvent()
@@ -129,7 +269,7 @@
         _isNew = true;
         var today = Content.NowLocal.Date;
         _editing = new KioskEvent { Enabled = true, Start = today, End = today.AddDays(7) };
-        _texts = new();
+        LoadOverrides();
     }
 
     private void Edit(KioskEvent ev)
@@ -138,21 +278,48 @@
         _isNew = false;
         // Clon profundo: cancelar descarta cambios sin tocar el guardado.
         _editing = JsonConvert.DeserializeObject<KioskEvent>(JsonConvert.SerializeObject(ev))!;
-        _texts = _editing.UiTextOverrides.Select(kv => new KeyVal { Key = kv.Key, Value = kv.Value }).ToList();
+        LoadOverrides();
+    }
+
+    private void LoadOverrides()
+    {
+        _texts = _editing!.UiTextOverrides.Select(kv => new KeyVal { Key = kv.Key, Value = kv.Value }).ToList();
+        // Un set vacío = el evento no sobrepone eso (así lo interpreta EventContent.Apply).
+        _slidesOn = _editing.AttractSlides.Count > 0;
+        _slidesNewOn = _editing.AttractSlidesNew.Count > 0;
+        _textsOn = _texts.Count > 0;
     }
 
     private async Task Save()
     {
         if (_editing is null) return;
-        _editing.UiTextOverrides = _texts
+
+        // Interruptor apagado = sin override: se vacía el set para que el contenido base siga vigente.
+        if (!_slidesOn) _editing.AttractSlides.Clear();
+        if (!_slidesNewOn) _editing.AttractSlidesNew.Clear();
+        _editing.UiTextOverrides = !_textsOn ? new() : _texts
             .Where(t => !string.IsNullOrWhiteSpace(t.Key))
             .GroupBy(t => t.Key!.Trim())
             .ToDictionary(g => g.Key, g => g.Last().Value ?? "");
+
         Store.Save(_editing);
-        _message = $"Evento «{_editing.Name}» guardado.";
+        _message = $"Evento «{_editing.Name}» guardado y publicado en la flota.";
         _editing = null;
         Refresh();
         await NotifyClients();
+    }
+
+    private void AskDelete()
+    {
+        if (_editing is null) return;
+        var ev = _editing;
+        _confirm = new()
+        {
+            Title = "Eliminar evento",
+            Body = $"Se borrará «{ev.Name}». Si está activo, los kioscos vuelven al contenido base al instante.",
+            Label = "Eliminar",
+            Confirmed = EventCallback.Factory.Create(this, async () => { _confirm = null; await Delete(ev); })
+        };
     }
 
     private async Task Delete(KioskEvent ev)
@@ -162,6 +329,7 @@
         _message = $"Evento «{ev.Name}» borrado.";
         Refresh();
         await NotifyClients();
+        StateHasChanged();
     }
 
     // Un evento que entra/sale cambia el contenido efectivo → avisa a los kioscos para que recarguen.

@@ -4,119 +4,119 @@
 
 # KioskClinicaPC
 
-**El kiosko que mira por dentro el ordenador que tienes delante y te lo explica.**
+**The kiosk that looks inside the computer in front of you and explains it.**
 
-Pantalla completa, táctil, pensada para el mostrador de una tienda de informática.
-Detecta el hardware real del equipo expuesto, lo muestra como una ficha bonita con precio,
-y genera un QR para que el cliente se lleve la ficha en PDF a su móvil.
+Fullscreen, touch-based, built for the counter of a computer shop.
+It detects the real hardware of the display unit, shows it as a nice spec sheet with a price,
+and generates a QR code so the customer can take the sheet as a PDF to their phone.
 
 </div>
 
 ---
 
-## Qué hace
+## What it does
 
-Pones el kiosko en un equipo de la tienda. La app:
+You set the kiosk up on a shop machine. The app:
 
-1. **Atrae** — bucle de pantallas tipo escaparate con tu marketing.
-2. **Escanea** — animación de radar mientras lee el hardware de verdad.
-3. **Muestra** — ficha con CPU, RAM, GPU, disco, pantalla, batería, etc., con precio y una nota de gama por componente.
-4. **Reparte** — QR que el cliente escanea para descargar la ficha en PDF, sin internet.
+1. **Attracts** — a storefront-style loop of screens with your marketing.
+2. **Scans** — a radar animation while it reads the real hardware.
+3. **Shows** — a spec sheet with CPU, RAM, GPU, disk, display, battery, etc., with a price and a tier note per component.
+4. **Hands out** — a QR code the customer scans to download the sheet as a PDF, no internet needed.
 
-Todo editable a mano desde la propia pantalla. Sin tocar código.
+Everything editable by hand from the screen itself. No code required.
 
-![Kiosko en mostrador] (docs/screenshots/hero.png) 
-
----
-
-## En imágenes
-
-### 1. Pantalla de atracción
-Bucle de slides con orbe wireframe, neón y tu mensaje. Llama la atención cuando nadie toca.
-
-![Atracción](docs/screenshots/01-attract.png)
-
-### 2. Escaneo
-Radar a pantalla completa mientras lee los componentes reales del equipo.
-
-<!-- CAPTURA: Screen1 Scan — el radar en plena animación -->
-![Escaneo](docs/screenshots/02-scan.png)
-
-### 3. Ficha del equipo
-La carne del asunto: specs detectadas, precio (con rebaja opcional), identidad del equipo y QR.
-
-<!-- CAPTURA: Screen2 Main — ficha completa con specs + precio + QR -->
-![Ficha](docs/screenshots/03-main.png)
-
-### 4. Detalle de componente
-Toca cualquier spec y se abre su explicación ampliada: qué es, por qué importa y dónde cae en una escala honesta (de básico a tope de gama), con su puntuación real y un par de cosas que sí notarás en el día a día.
-
-<!-- CAPTURA: Screen3 Detail — un componente abierto con gauge/detalle -->
-![Detalle](docs/screenshots/04-detail.png)
-
-### Ficha en el móvil del cliente
-El QR abre una página que **genera el PDF en el propio móvil**. Las specs viajan dentro del QR,
-así que no hace falta internet en la tienda ni servidor que guarde nada. La ficha lleva la dirección,
-el email, el teléfono y el WhatsApp de la tienda, clicables para escribir o llamar al momento.
-
-<!-- CAPTURA: el móvil mostrando la ficha PDF generada tras escanear el QR -->
-![Ficha en móvil](docs/screenshots/05-pdf-movil.png)
+![Kiosk on counter](docs/screenshots/hero.png)
 
 ---
 
-## Pensado para una tienda
+## In pictures
 
-- **Edición libre sin programar** — Ajustes → "Activar modo edición libre" → clic en cualquier texto y lo cambias en el sitio.
-- **Detección automática** — CPU, núcleos, RAM, GPU, almacenamiento, pantalla, SO, batería, WiFi, cámara y la identidad real (fabricante/modelo). Lo que el equipo no tiene, no se muestra. Y si algo no te convence, lo sobrescribes a mano.
-- **Puntúa sin mentir** — cada componente recibe una nota y una gama ("equilibrado", "tope de gama"…) calculadas del hardware real, situadas en una escala de básico a tope. Nada de números inventados.
-- **Precio que vende** — precio, precio rebajado y financiación a 6/12 meses sin intereses. La garantía (3 años nuevo · 1 año de ocasión) sale sola según el estado del equipo.
-- **Tu marca, tu equipo** — tienda, dirección, slides de atracción (un mazo para nuevo, otro para ocasión) y una foto del propio equipo que arrastras al kiosko.
-- **Modo kiosko de verdad** — arranca solo con Windows, oculta barra de tareas, bloquea el Administrador de tareas y mantiene la pantalla siempre encendida. Nadie se sale sin la contraseña.
-- **Se ve bien en cualquier equipo** — los efectos (blur, partículas) se rebajan solos en máquinas flojas.
+### 1. Attract screen
+A loop of slides with a wireframe orb, neon and your message. Grabs attention when nobody's touching.
 
-<!-- 📸 CAPTURA (opcional): panel de Ajustes y/o el modo edición libre con la barra flotante -->
-![Ajustes](docs/screenshots/06-ajustes.png)
+![Attract](docs/screenshots/01-attract.png)
+
+### 2. Scan
+Fullscreen radar while it reads the machine's real components.
+
+<!-- SHOT: Screen1 Scan — the radar mid-animation -->
+![Scan](docs/screenshots/02-scan.png)
+
+### 3. Machine spec sheet
+The meat of it: detected specs, price (with optional discount), machine identity and QR.
+
+<!-- SHOT: Screen2 Main — full sheet with specs + price + QR -->
+![Spec sheet](docs/screenshots/03-main.png)
+
+### 4. Component detail
+Tap any spec and its expanded explanation opens: what it is, why it matters and where it lands on an honest scale (from basic to top-of-the-line), with its real score and a couple of things you'll actually notice day to day.
+
+<!-- SHOT: Screen3 Detail — a component opened with gauge/detail -->
+![Detail](docs/screenshots/04-detail.png)
+
+### Spec sheet on the customer's phone
+The QR opens a page that **generates the PDF right on the phone**. The specs travel inside the QR,
+so there's no need for internet at the shop nor a server to store anything. The sheet carries the shop's address,
+email, phone and WhatsApp, clickable to message or call on the spot.
+
+<!-- SHOT: the phone showing the PDF sheet generated after scanning the QR -->
+![Sheet on phone](docs/screenshots/05-pdf-movil.png)
 
 ---
 
-## Cómo se usa
+## Built for a shop
 
-| Acción | Cómo |
+- **Free editing without coding** — Settings → "Enable free edit mode" → click any text and change it in place.
+- **Automatic detection** — CPU, cores, RAM, GPU, storage, display, OS, battery, WiFi, camera and the real identity (manufacturer/model). Whatever the machine doesn't have isn't shown. And if something doesn't convince you, override it by hand.
+- **Scores without lying** — each component gets a score and a tier ("balanced", "top-of-the-line"…) computed from the real hardware, placed on a scale from basic to top. No made-up numbers.
+- **A price that sells** — price, discounted price and 6/12-month interest-free financing. The warranty (3 years new · 1 year second-hand) sets itself based on the machine's condition.
+- **Your brand, your machine** — shop, address, attract slides (one deck for new, another for second-hand) and a photo of the machine itself that you drag into the kiosk.
+- **A real kiosk mode** — starts by itself with Windows, hides the taskbar, blocks Task Manager and keeps the screen always on. Nobody gets out without the password.
+- **Looks good on any machine** — the effects (blur, particles) scale themselves down on weak machines.
+
+<!-- 📸 SHOT (optional): the Settings panel and/or free edit mode with the floating bar -->
+![Settings](docs/screenshots/06-ajustes.png)
+
+---
+
+## How it's used
+
+| Action | How |
 |---|---|
-| Abrir Ajustes | **3 clics** en la esquina superior derecha → contraseña |
-| Salir del kiosko | Ajustes → "Salir del kiosko" |
-| Modo edición libre | Ajustes → "Activar modo edición libre" |
+| Open Settings | **3 clicks** in the top-right corner → password |
+| Exit the kiosk | Settings → "Exit kiosk" |
+| Free edit mode | Settings → "Enable free edit mode" |
 
-Contraseña por defecto: `clinicapc2025` (se cambia en Ajustes → Seguridad).
+Default password: `clinicapc2025` (changed in Settings → Security).
 
 ---
 
-## La parte técnica (como curiosidad)
+## The technical part (just out of curiosity)
 
-Nada de esto hace falta para usarlo, pero por si te pica la curiosidad:
+None of this is needed to use it, but in case you're curious:
 
-- **WPF + .NET 8**, MVVM casero, sin frameworks externos. Una sola ventana; 4 "pantallas" que se intercambian.
-- **El QR no usa internet.** Las specs se comprimen (gzip) y se meten en el `#hash` de la URL. El móvil decodifica y monta el PDF con JavaScript (`html2pdf.js`). El servidor nunca ve los datos del equipo. La web vive en `docs/` (GitHub Pages).
-- **El hardware se lee por WMI** en segundo plano para no congelar la interfaz.
-- **Lienzo fijo 1920×1080** dentro de un `Viewbox`, así escala limpio a cualquier resolución.
-- **Calidad gráfica adaptativa**: detecta render por software / GPU sin aceleración y baja blurs y partículas.
-- **Persistencia** en `%LOCALAPPDATA%\KioskClinicaPC\`: contenido, comportamiento y último hardware detectado, en JSON.
+- **WPF + .NET 8**, home-grown MVVM, no external frameworks. A single window; 4 "screens" that swap in and out.
+- **The QR uses no internet.** The specs are compressed (gzip) and put into the URL's `#hash`. The phone decodes it and builds the PDF with JavaScript (`html2pdf.js`). The server never sees the machine's data. The web page lives in `docs/` (GitHub Pages).
+- **Hardware is read via WMI** in the background so the UI doesn't freeze.
+- **Fixed 1920×1080 canvas** inside a `Viewbox`, so it scales cleanly to any resolution.
+- **Adaptive graphics quality**: it detects software rendering / GPU without acceleration and dials down blurs and particles.
+- **Persistence** in `%LOCALAPPDATA%\KioskClinicaPC\`: content, behaviour and last detected hardware, as JSON.
 
-### Compilar
+### Building
 
-WPF, `net8.0-windows`. Necesita el SDK de .NET (no solo el runtime):
+WPF, `net8.0-windows`. Needs the .NET SDK (not just the runtime):
 
 ```
 dotnet build KioskClinicaPC.sln -c Release
 ```
 
-Salida: `src\Kiosk.Client\bin\Debug\net8.0-windows\KioskClinicaPC.exe`.
+Output: `src\Kiosk.Client\bin\Debug\net8.0-windows\KioskClinicaPC.exe`.
 
-> ⚠️ Al ejecutarlo entra en modo kiosko: oculta la barra de tareas y bloquea el Administrador de tareas.
-> Para salir limpio usa Ajustes → "Salir del kiosko" o `Ctrl+Shift+K`. Matar el proceso deja el escritorio bloqueado.
+> ⚠️ Running it enters kiosk mode: it hides the taskbar and blocks Task Manager.
+> To exit cleanly use Settings → "Exit kiosk" or `Ctrl+Shift+K`. Killing the process leaves the desktop locked.
 
 ---
 
 <div align="center">
-<sub>Hecho para ClinicaPC.</sub>
+<sub>Made for ClinicaPC.</sub>
 </div>

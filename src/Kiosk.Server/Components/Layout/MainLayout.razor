@@ -1,25 +1,143 @@
 @inherits LayoutComponentBase
+@inject ContentResolver Content
+@inject FleetRegistry Fleet
+@inject NavigationManager Nav
 
-<div class="layout">
-    <header class="topbar">
-        <span class="brand">Kiosk · ClinicaPC</span>
+<div class="shell">
+    <aside class="sidebar">
+        <div class="sidebar-brand">
+            <img src="clinicapc-logo.png" alt="ClinicaPC" />
+            <div>
+                <div class="name">CLÍNICA<span>PC</span></div>
+                <div class="sub">Panel de control</div>
+            </div>
+        </div>
+
+        <nav class="nav">
+            <AuthorizeView>
+                <Authorized>
+                    <div class="nav-section">// Operación</div>
+                    <NavLink href="/" Match="NavLinkMatch.All">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="9" rx="1.5" /><rect x="14" y="3" width="7" height="5" rx="1.5" /><rect x="14" y="12" width="7" height="9" rx="1.5" /><rect x="3" y="16" width="7" height="5" rx="1.5" /></svg>
+                        <span class="label">Dashboard</span>
+                    </NavLink>
+                    <NavLink href="/ordenadores">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2.5" y="4" width="19" height="12" rx="1.5" /><path d="M8 20h8M12 16v4" /></svg>
+                        <span class="label">Ordenadores</span>
+                        <span class="count">@Fleet.OnlineCount</span>
+                    </NavLink>
+                    <NavLink href="/eventos">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4.5" width="18" height="16" rx="2" /><path d="M3 9h18M8 2.5v4M16 2.5v4" /></svg>
+                        <span class="label">Eventos</span>
+                        @if (_activeEvent is not null)
+                        {
+                            <span class="dot sm accent"></span>
+                        }
+                    </NavLink>
+
+                    <div class="nav-section">// Contenido</div>
+                    <NavLink href="/imagenes">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="16" rx="2" /><circle cx="8.5" cy="9.5" r="1.8" /><path d="M4 17l5-4 4 3 3-2.5 4 3.5" /></svg>
+                        <span class="label">Imágenes y marcas</span>
+                    </NavLink>
+                    <NavLink href="/contenido">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 4h14M5 4v16M5 20h14M9 9h8M9 13h8M9 17h5" /></svg>
+                        <span class="label">Contenido</span>
+                    </NavLink>
+
+                    <div class="nav-section">// Sistema</div>
+                    <NavLink href="/seguridad">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4.5" y="10" width="15" height="10" rx="2" /><path d="M8 10V7a4 4 0 0 1 8 0v3" /></svg>
+                        <span class="label">Seguridad</span>
+                    </NavLink>
+                </Authorized>
+            </AuthorizeView>
+        </nav>
+
         <AuthorizeView>
             <Authorized>
-                <nav class="nav">
-                    <NavLink href="/" Match="NavLinkMatch.All">Inicio</NavLink>
-                    <NavLink href="/contenido">Contenido</NavLink>
-                    <NavLink href="/imagenes">Imágenes</NavLink>
-                    <NavLink href="/eventos">Eventos</NavLink>
-                    <NavLink href="/seguridad">Seguridad</NavLink>
-                </nav>
-                <form class="logout" method="post" action="/logout">
-                    <AntiforgeryToken />
-                    <button type="submit">Salir</button>
-                </form>
+                <div class="sidebar-foot">
+                    <div class="net-box">
+                        <div class="head">
+                            <span class="dot pulse"></span>
+                            <span>Red local · online</span>
+                        </div>
+                        <div class="body">
+                            <b>@Fleet.OnlineCount</b> online
+                            @if (Fleet.OfflineCount > 0)
+                            {
+                                <text> · </text><span class="down">@Fleet.OfflineCount</span> <text>caído</text>
+                            }
+                        </div>
+                    </div>
+                    <div class="user-row">
+                        <div class="avatar">A</div>
+                        <div class="who">
+                            <div class="n">Admin</div>
+                            <div class="s">ClinicaPC · Ronda</div>
+                        </div>
+                        <form method="post" action="/logout">
+                            <AntiforgeryToken />
+                            <button type="submit" title="Cerrar sesión">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" /></svg>
+                            </button>
+                        </form>
+                    </div>
+                </div>
             </Authorized>
         </AuthorizeView>
-    </header>
-    <main class="content">
-        @Body
+    </aside>
+
+    <main class="main">
+        <header class="topbar">
+            <div class="titles">
+                <div class="eyebrow">@_eyebrow</div>
+                <h1>@_title</h1>
+            </div>
+            <AuthorizeView>
+                <Authorized>
+                    <div class="version-pill" title="@($"Versión de contenido efectiva · sincronizada con la flota ({_version})")">
+                        <span class="dot sm online"></span>contenido @_version[..6].ToLowerInvariant()
+                    </div>
+                    <div class="clock">
+                        <div class="t">@_now.ToString("HH:mm")</div>
+                        <div class="d">@_now.ToString("ddd · dd MMM yyyy", _es).ToUpperInvariant()</div>
+                    </div>
+                    <EmergencyControls />
+                </Authorized>
+            </AuthorizeView>
+        </header>
+        <div class="content">
+            @Body
+        </div>
     </main>
 </div>
+
+@code {
+    private static readonly System.Globalization.CultureInfo _es = new("es-ES");
+
+    private DateTime _now;
+    private string? _activeEvent;
+    private string _version = "";
+    private string _eyebrow = "";
+    private string _title = "";
+
+    protected override void OnParametersSet()
+    {
+        _now = Content.NowLocal;
+        _activeEvent = Content.ActiveEvent()?.Name;
+        _version = Content.Version();
+
+        // El encabezado depende de la ruta: cada página tiene su antetítulo y título en el mismo sitio.
+        string path = "/" + Nav.ToBaseRelativePath(Nav.Uri).Split('?')[0].TrimEnd('/');
+        (_eyebrow, _title) = path switch
+        {
+            "/ordenadores" => ("// Flota · tiempo real", "Ordenadores de la tienda"),
+            "/eventos" => ("// Campañas programadas", "Eventos"),
+            "/imagenes" => ("// Biblioteca de assets", "Imágenes y marcas"),
+            "/contenido" => ("// Contenido compartido", "Contenido de los kioscos"),
+            "/seguridad" => ("// Sistema", "Seguridad"),
+            _ => ("// Estado general", "Dashboard"),
+        };
+    }
+}
