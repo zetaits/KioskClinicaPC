@@ -2,6 +2,7 @@
 @attribute [Authorize]
 @rendermode InteractiveServer
 @inject ServerConfigStore Store
+@inject FleetRegistry Fleet
 @inject IHubContext<SyncHub> Hub
 @using KioskClinicaPC.Core.Config
 
@@ -130,6 +131,7 @@ else
             .GroupBy(t => t.Key!.Trim())
             .ToDictionary(g => g.Key, g => g.Last().Value ?? "");
         Store.Write(_config);
+        Fleet.LogContentPublished("Contenido base actualizado");
         _saved = true;
         // Avisa a los kioscos conectados para que recarguen sin reiniciar (el polling es el respaldo).
         await Hub.Clients.All.SendAsync("ContentChanged");

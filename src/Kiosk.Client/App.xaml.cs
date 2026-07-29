@@ -86,12 +86,14 @@ namespace KioskClinicaPC
             KioskManager.Protect();
             _protected = true;
 
-            // Asegura que exista KioskSettings.json con contraseña sembrada.
+            // Asegura que exista KioskSettings.json con contraseña sembrada e identidad de flota.
             var settings = KioskSettings.Load(SettingsFilePath);
-            if (settings.EnsurePasswordSeeded())
+            bool seeded = settings.EnsurePasswordSeeded();
+            seeded |= settings.EnsureDeviceIdentitySeeded();
+            if (seeded)
             {
                 settings.Save(SettingsFilePath);
-                Log.Information("KioskSettings creado con contraseña por defecto.");
+                Log.Information("KioskSettings sembrado (contraseña por defecto / identidad de flota).");
             }
 
             if (!File.Exists(ConfigFilePath))
@@ -138,6 +140,10 @@ namespace KioskClinicaPC
             // Sincronización del bucle de atracción: si hay servidor, sigue el reloj maestro; si no,
             // queda deshabilitado y el kiosko rota los slides él solo (comportamiento previo).
             services.AddSingleton<ISyncClient>(_ => new SyncClient(settings.ServerUrl, settings.ServerApiKey));
+            // Agente de flota: reporta estado al panel y ejecuta sus órdenes. No-op sin ServerUrl.
+            services.AddSingleton(_ => new FleetClient(
+                settings.ServerUrl, settings.ServerApiKey,
+                settings.DeviceId ?? "", settings.DeviceName ?? Environment.MachineName, SettingsFilePath));
             services.AddSingleton<IDialogService, MessageBoxDialogService>();
             services.AddSingleton<MainViewModel>();
             services.AddSingleton<MainWindow>();

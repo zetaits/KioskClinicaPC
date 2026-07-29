@@ -1,9 +1,13 @@
 @page "/"
 @attribute [Authorize]
 @rendermode InteractiveServer
+@implements IDisposable
+@using Kiosk.Server.Hubs
+@using KioskClinicaPC.Core.Sync
 @inject ContentResolver Content
 @inject FleetRegistry Fleet
 @inject IHubContext<SyncHub> Hub
+@inject IHubContext<FleetHub> FleetHubCtx
 
 <div class="stat-grid">
     <div class="stat">
@@ -33,9 +37,9 @@
     </div>
 
     <div class="stat">
-        <div class="k">// Análisis hoy</div>
-        <div class="v">—</div>
-        <div class="f">fichas QR generadas · sin telemetría aún</div>
+        <div class="k">// En uso ahora</div>
+        <div class="v">@_busyCount</div>
+        <div class="f">equipos mostrando ficha o detalle</div>
     </div>
 
     <div class="stat @(Fleet.OfflineCount > 0 ? "alert" : "")">
@@ -100,12 +104,24 @@
 
     private KioskEvent? _activeEvent;
     private FleetDevice? _offline;
+    private int _busyCount;
     private string? _toast;
 
     protected override void OnInitialized()
     {
+        Refresh();
+        Fleet.Changed += OnFleetChanged;
+    }
+
+    public void Dispose() => Fleet.Changed -= OnFleetChanged;
+
+    private void OnFleetChanged() => InvokeAsync(() => { Refresh(); StateHasChanged(); });
+
+    private void Refresh()
+    {
         _activeEvent = Content.ActiveEvent();
         _offline = Fleet.Devices.FirstOrDefault(d => !d.IsOnline);
+        _busyCount = Fleet.Devices.Count(d => d.Status == KioskStatus.Busy);
     }
 
     private static string PriceLabel(FleetDevice d) =>
@@ -118,6 +134,12 @@
         _toast = "Sincronización enviada a los kioscos conectados.";
     }
 
-    private void RestartApps() =>
-        _toast = "Sin efecto: reiniciar la app en la flota todavía no está implementado.";
+    // Reinicia la app kiosko en todos los equipos online.
+    private async Task RestartApps()
+    {
+        var ids = Fleet.OnlineConnectionIds();
+        if (ids.Count == 0) { _toast = "No hay equipos online a los que enviar la orden."; return; }
+        await FleetHubCtx.Clients.Clients(ids).SendAsync("Command", FleetCommand.RestartApp());
+        _toast = $"Reinicio de la app enviado a {ids.Count} equipo(s).";
+    }
 }

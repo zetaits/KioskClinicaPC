@@ -91,26 +91,95 @@ Default password: `clinicapc2025` (changed in Settings → Security).
 
 ---
 
+## One panel for the whole shop *(optional)*
+
+A single machine on the counter needs nothing more than the app. But a shop with several kiosks
+would have to walk to each one to change a slide or a message. So there's now an **optional server**:
+one small web app you run once (on a mini-PC in the back room or a cheap VPS) that every kiosk reads from.
+
+Point a kiosk at the server and the deal is simple:
+
+- **The shop owns the shared stuff** — brand, address, phones, attract slides, on-screen texts and the
+  image library are edited **once, in the panel**, and every kiosk picks them up **live**, without touching them.
+- **Each machine keeps what's its own** — the **price, the condition and the auto-detected specs** are
+  per-machine and the server never overwrites them. A kiosk on an RTX gaming tower and one on a used
+  laptop share the same marketing but show their own hardware and their own price tag.
+- **Nothing goes dark, ever** — if the server is down or the network drops, each kiosk falls back to the
+  last content it cached. It keeps running as if nothing happened.
+- **The attract loop marches in step** — all the kiosks in the room show the same slide at the same time,
+  synced to a master clock on the server. A wall of screens, one heartbeat.
+
+You reach the panel from any browser, log in once, and you're in.
+
+<!-- SHOT: the panel login screen -->
+![Panel login](docs/screenshots/panel-01-login.png)
+
+### The dashboard
+At a glance: how many kiosks are online, what each is showing, and quick access to everything.
+
+<!-- SHOT: panel Home — dashboard with the kiosk cards / counters -->
+![Panel dashboard](docs/screenshots/panel-02-home.png)
+
+### Editing the shared content
+The shop's identity, the marketing texts, the on-screen labels — all edited here and pushed to every kiosk.
+
+<!-- SHOT: panel Edit content page -->
+![Edit content](docs/screenshots/panel-03-content.png)
+
+### Scheduled events
+Set up a promo ("Back to school", a weekend sale) with a date range. The server serves the event's content
+while it's live and rolls back on its own when it ends — evaluated in the **shop's** local time, not the server's.
+
+<!-- SHOT: panel Events page with an event scheduled -->
+![Events](docs/screenshots/panel-04-events.png)
+
+### The image library
+Brand logos and component images, uploaded once and shared with every kiosk (bitmaps only — no SVG, on purpose).
+
+<!-- SHOT: panel Assets page -->
+![Assets](docs/screenshots/panel-05-assets.png)
+
+### The fleet *(work in progress)*
+A view of every kiosk in the shop — status, what it's showing, its hardware and price — with the groundwork
+for remote actions (restart, set price, rename). The remote-control channel isn't wired up yet, so today
+it's a monitoring view; the panel is honest about that.
+
+<!-- SHOT: panel Fleet page -->
+![Fleet](docs/screenshots/panel-06-fleet.png)
+
+> Setting the server up (where to host it, the API key, the store's time zone) is written up in
+> **[docs/SERVIDOR.md](docs/SERVIDOR.md)**.
+
+---
+
 ## The technical part (just out of curiosity)
 
 None of this is needed to use it, but in case you're curious:
 
+- **Three parts, one solution.** `Kiosk.Client` (the WPF app), `Kiosk.Server` (the optional web app + admin panel) and `Kiosk.Shared` (the content models and sync messages both sides speak). A machine runs the client alone just fine; the server only adds the shop-wide layer.
 - **WPF + .NET 8**, home-grown MVVM, no external frameworks. A single window; 4 "screens" that swap in and out.
-- **The QR uses no internet.** The specs are compressed (gzip) and put into the URL's `#hash`. The phone decodes it and builds the PDF with JavaScript (`html2pdf.js`). The server never sees the machine's data. The web page lives in `docs/` (GitHub Pages).
+- **Client ↔ server, without a single point of failure.** The client merges the server's *shared* content over its own *local* content (`SharedContent` draws the line: shop/slides/texts from the server, price/specs per-machine). If the server can't be reached it uses the last cached copy. Live updates come over **SignalR**: the panel pushes a "content changed" ping the moment you save, with slow version-polling as a backstop.
+- **The attract loop is clock-synced.** The server keeps a master clock; each kiosk computes the same slide index from it (correcting clock drift), so a row of screens stays in step without the server pushing every slide change.
+- **The admin panel is Blazor Server**, cookie login for a single manager, brute-force throttled. Content lives as JSON files on the server (no database); the image library rejects SVG on purpose (stored-XSS in the preview).
+- **The QR still uses no internet.** The specs are compressed (gzip) and put into the URL's `#hash`. The phone decodes it and builds the PDF with JavaScript (`html2pdf.js`). Nothing about the machine is ever sent anywhere. The web page lives in `docs/` (GitHub Pages).
 - **Hardware is read via WMI** in the background so the UI doesn't freeze.
 - **Fixed 1920×1080 canvas** inside a `Viewbox`, so it scales cleanly to any resolution.
 - **Adaptive graphics quality**: it detects software rendering / GPU without acceleration and dials down blurs and particles.
-- **Persistence** in `%LOCALAPPDATA%\KioskClinicaPC\`: content, behaviour and last detected hardware, as JSON.
+- **Persistence**: the client keeps content, behaviour and last hardware as JSON in `%LOCALAPPDATA%\KioskClinicaPC\`; the server keeps shared content, events, panel password and the image library under its own `data/` + `assets/`.
+
+<!-- SHOT (optional): a simple client ↔ server diagram — kiosks reading /api/config and /hub/sync from the server -->
 
 ### Building
 
-WPF, `net8.0-windows`. Needs the .NET SDK (not just the runtime):
+.NET 8. Needs the SDK (not just the runtime):
 
 ```
-dotnet build KioskClinicaPC.sln -c Release
+dotnet build KioskClinicaPC.sln -c Release      # everything
+dotnet run   --project src/Kiosk.Server         # just the server (dev)
 ```
 
-Output: `src\Kiosk.Client\bin\Debug\net8.0-windows\KioskClinicaPC.exe`.
+Client output: `src\Kiosk.Client\bin\Debug\net8.0-windows\KioskClinicaPC.exe` (the WPF project is `net8.0-windows`).
+Server setup and deployment: **[docs/SERVIDOR.md](docs/SERVIDOR.md)**.
 
 > ⚠️ Running it enters kiosk mode: it hides the taskbar and blocks Task Manager.
 > To exit cleanly use Settings → "Exit kiosk" or `Ctrl+Shift+K`. Killing the process leaves the desktop locked.

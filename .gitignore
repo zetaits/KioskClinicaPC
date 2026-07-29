@@ -57,22 +57,8 @@ _ReSharper*/
 publish/
 installer/Output/
 
-# Local agent notes
-CLAUDE.md
+# Accidental shell artifacts. The pre-commit hook rejects extensionless files
+# added at the repository root.
 
-# Claude Code / Ruflo / agent tooling (no forma parte del código del proyecto)
-.claude/
-.claude-flow/
-.swarm/
-.hive-mind/
-.ruflo/
-.roo/
-.mcp.json
-ruvector.db
-*.ruv
-memory/
-
-# Artefactos accidentales de shell (redirecciones rotas: "0", "{})", ",", "1",
-# "_isDetected"...). gitignore no distingue "fichero sin extensión" de directorio,
-# así que el filtro genérico vive en el hook .githooks/pre-commit (core.hooksPath),
-# que bloquea cualquier basura sin extensión en la raíz al hacer commit.
+# AI assistant instructions present in this project
+AGENTS.md

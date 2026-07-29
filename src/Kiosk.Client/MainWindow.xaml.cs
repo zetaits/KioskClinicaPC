@@ -36,6 +36,7 @@ namespace KioskClinicaPC
         private readonly KeyboardHook _hook;
         private readonly MainViewModel _viewModel;
         private readonly ISyncClient _sync;
+        private readonly FleetClient _fleet;
 
         private readonly KioskTimers _timers = new KioskTimers();
 
@@ -55,7 +56,7 @@ namespace KioskClinicaPC
         private KioskSettings _settings = new KioskSettings();
         private int _hotspotClicks = 0;
 
-        public MainWindow(MainViewModel viewModel, ISyncClient sync)
+        public MainWindow(MainViewModel viewModel, ISyncClient sync, FleetClient fleet)
         {
             InitializeComponent();
 
@@ -65,6 +66,15 @@ namespace KioskClinicaPC
             // Reload en vivo: el servidor avisa (push SignalR o polling de versión) de que el contenido
             // compartido cambió. Se aplica al volver a la pantalla de espera, no en mitad de una interacción.
             _sync.ContentChanged += OnServerContentChanged;
+
+            // Flota: el kiosko reporta su estado al panel y obedece sus órdenes. El estado dinámico lo
+            // aporta el ViewModel; las órdenes de precio/reinicio-app se ejecutan en el hilo de UI.
+            _fleet = fleet;
+            _fleet.SetSnapshotProvider(() => _viewModel.BuildHeartbeat());
+            _fleet.PriceOverrideReceived += (price, oldPrice) =>
+                Dispatcher.InvokeAsync(() => _viewModel.ApplyPriceOverride(price, oldPrice));
+            _fleet.RestartAppRequested += () =>
+                Dispatcher.InvokeAsync(() => { SystemPower.RelaunchApp(); ShutdownKiosk(); });
 
             _hook = new KeyboardHook();
 
@@ -109,6 +119,8 @@ namespace KioskClinicaPC
             // Sync DESPUÉS de la carga inicial: si arrancara antes, un push "ContentChanged" temprano podría
             // colar una recarga a mitad del montaje inicial. No bloquea; si no hay servidor es no-op.
             _sync.Start();
+            // Flota: registra el equipo y empieza a reportar/obedecer. No-op sin servidor.
+            _fleet.Start();
 
 #if !DEBUG
             // Auto-update: comprueba GitHub y deja la nueva versión lista en segundo plano. No

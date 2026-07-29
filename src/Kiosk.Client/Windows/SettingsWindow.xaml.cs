@@ -159,6 +159,7 @@ namespace KioskClinicaPC.Windows
             SlideIntervalTextBox.Text = _settings.SlideIntervalSeconds.ToString(CultureInfo.InvariantCulture);
             ServerUrlTextBox.Text = _settings.ServerUrl;
             ServerApiKeyTextBox.Text = _settings.ServerApiKey;
+            DeviceNameTextBox.Text = _settings.DeviceName;
 
             _serverManaged = !string.IsNullOrWhiteSpace(_settings.ServerUrl);
             ApplyServerManagedUi();
@@ -245,6 +246,9 @@ namespace KioskClinicaPC.Windows
             // (el repositorio/sync se construyen en el arranque a partir de estos valores).
             _settings.ServerUrl = Blank(ServerUrlTextBox.Text);
             _settings.ServerApiKey = Blank(ServerApiKeyTextBox.Text);
+            // El nombre nunca queda vacío: si se borra, vuelve al hostname. El cambio local se aplica al
+            // reiniciar la app (el agente de flota lee la identidad en el arranque).
+            _settings.DeviceName = Blank(DeviceNameTextBox.Text) ?? Environment.MachineName;
 
             if (!string.IsNullOrEmpty(NewPasswordBox.Password))
             {
@@ -351,30 +355,15 @@ namespace KioskClinicaPC.Windows
         private void RestartPc_Click(object sender, RoutedEventArgs e)
         {
             if (!KioskDialog.Confirm(this, "Reiniciar PC", "¿Reiniciar el equipo ahora?", "Reiniciar", danger: true)) return;
-            RunShutdown("/r /t 0");
+            SystemPower.Reboot();
+            (this.Owner as MainWindow)?.ShutdownKiosk();
         }
 
         private void ShutdownPc_Click(object sender, RoutedEventArgs e)
         {
             if (!KioskDialog.Confirm(this, "Apagar PC", "¿Apagar el equipo ahora?", "Apagar", danger: true)) return;
-            RunShutdown("/s /t 0");
-        }
-
-        private void RunShutdown(string args)
-        {
-            try
-            {
-                // Ruta completa (no "shutdown" por PATH): evita que un shutdown.exe plantado en el
-                // PATH se ejecute en su lugar.
-                string shutdownExe = System.IO.Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.System), "shutdown.exe");
-                Process.Start(new ProcessStartInfo(shutdownExe, args) { CreateNoWindow = true, UseShellExecute = false });
-                (this.Owner as MainWindow)?.ShutdownKiosk();
-            }
-            catch (Exception ex)
-            {
-                KioskDialog.Alert(this, "Error", $"No se pudo ejecutar la operación: {ex.Message}", danger: true);
-            }
+            SystemPower.Shutdown();
+            (this.Owner as MainWindow)?.ShutdownKiosk();
         }
 
         private void RestoreDefaults_Click(object sender, RoutedEventArgs e)

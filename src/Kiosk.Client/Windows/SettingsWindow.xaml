@@ -384,6 +384,10 @@
                             <TextBlock Style="{StaticResource FieldLabel}" Text="API KEY (en blanco si el servidor es abierto)"/>
                             <TextBox x:Name="ServerApiKeyTextBox" Style="{StaticResource ConfigTextBox}"/>
                         </StackPanel>
+                        <StackPanel Style="{StaticResource Field}">
+                            <TextBlock Style="{StaticResource FieldLabel}" Text="NOMBRE DE ESTE EQUIPO EN EL PANEL (p.ej. MOSTRADOR-01)"/>
+                            <TextBox x:Name="DeviceNameTextBox" Style="{StaticResource ConfigTextBox}"/>
+                        </StackPanel>
                         <StackPanel Orientation="Horizontal">
                             <Button x:Name="TestConnectionButton" Content="Probar conexión" Style="{StaticResource SecondaryButton}"
                                     Padding="16,8" Click="TestConnectionButton_Click"/>

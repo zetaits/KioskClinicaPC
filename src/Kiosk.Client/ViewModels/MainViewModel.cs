@@ -638,6 +638,79 @@ namespace KioskClinicaPC.ViewModels
             }
         }
 
+        // ── Flota: telemetría y precio remoto ─────────────────────────────────────────────────
+
+        /// <summary>Construye el estado dinámico que el kiosko reporta al panel (pantalla, precio, hardware,
+        /// versión). La identidad (Id/nombre/arranque) la completa <see cref="Services.FleetClient"/>.</summary>
+        public KioskHeartbeat BuildHeartbeat()
+        {
+            var cfg = DisplayConfig;
+            return new KioskHeartbeat
+            {
+                Screen = MapScreen(CurrentScreen),
+                Equipment = JoinNonEmpty(cfg?.ChassisName, cfg?.ModelName),
+                Cpu = cfg?.Cpu ?? "",
+                Price = ParsePrice(EffectivePrice),
+                OldPrice = HasDiscount ? ParsePrice(cfg?.Price) : 0m,
+                Condition = cfg?.Condition ?? "",
+                AppVersion = Services.UpdateService.CurrentVersion.ToString(),
+            };
+        }
+
+        /// <summary>Aplica un precio/oferta enviado por el panel: lo fija en la config del equipo, lo
+        /// persiste y refresca la barra de precio. Llamar en el hilo de UI.</summary>
+        public void ApplyPriceOverride(decimal price, decimal oldPrice)
+        {
+            // El panel manda price = precio expuesto (efectivo) y oldPrice = tachado (antes). En el kiosko,
+            // Price es el base (tachado si hay oferta) y DiscountedPrice el efectivo.
+            string basePrice, discounted;
+            if (oldPrice > 0 && oldPrice != price)
+            {
+                basePrice = FormatPrice(oldPrice);
+                discounted = FormatPrice(price);
+            }
+            else
+            {
+                basePrice = FormatPrice(price);
+                discounted = "";
+            }
+
+            DisplayConfig.Price = basePrice;
+            DisplayConfig.DiscountedPrice = discounted;
+            _savedConfig.Price = basePrice;
+            _savedConfig.DiscountedPrice = discounted;
+
+            OnPropertyChanged(nameof(FormattedPrice));
+            OnPropertyChanged(nameof(FormattedOriginalPrice));
+            OnPropertyChanged(nameof(FormattedDiscount));
+            OnPropertyChanged(nameof(FormattedMonthly));
+            OnPropertyChanged(nameof(HasDiscount));
+
+            try { _configRepo.SaveConfig(_savedConfig); }
+            catch (Exception ex) { Log.Error(ex, "Error al guardar el precio enviado por el panel."); }
+        }
+
+        private static KioskScreen MapScreen(int screen) => screen switch
+        {
+            0 => KioskScreen.Attract,
+            1 => KioskScreen.Scan,
+            2 => KioskScreen.Main,
+            3 => KioskScreen.Detail,
+            _ => KioskScreen.Attract,
+        };
+
+        private static string JoinNonEmpty(string? a, string? b) =>
+            string.Join(" ", new[] { a, b }.Where(s => !string.IsNullOrWhiteSpace(s))).Trim();
+
+        private static decimal ParsePrice(string? s) =>
+            !string.IsNullOrWhiteSpace(s) &&
+            decimal.TryParse(s, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var d)
+                ? d : 0m;
+
+        // Cadena cruda parseable en cultura invariante (los precios se guardan así; ver PriceFormatter).
+        private static string FormatPrice(decimal value) =>
+            value.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
         /// <summary>Revierte los cambios no guardados reconstruyendo desde la configuración en memoria/disco.</summary>
         public void DiscardEdits()
         {

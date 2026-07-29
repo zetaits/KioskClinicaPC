@@ -4,6 +4,7 @@
 @inject PanelAuthStore Auth
 @inject ContentResolver Content
 @inject FleetRegistry Fleet
+@inject PanelAccessLog AccessLog
 
 <div class="split even" style="max-width:920px;">
     <div class="card" style="padding:26px;">
@@ -68,24 +69,27 @@
 
         <div class="card sunken" style="padding:22px;">
             <h2 class="mono" style="margin:0 0 14px;">// Accesos recientes al panel</h2>
-            <p class="muted" style="margin:0;font-size:13px;">
-                Pendiente: el registro de accesos todavía no se guarda. El servidor ya frena los intentos
-                repetidos por IP en el login.
-            </p>
-        </div>
-
-        <div class="card" style="padding:22px;">
-            <h2 style="margin:0 0 6px;font-size:16px;">Bloqueo automático</h2>
-            <p class="muted" style="margin:0 0 16px;font-size:12.5px;">
-                Pendiente: la sesión del panel dura 7 días con renovación deslizante.
-            </p>
-            <div style="display:flex;align-items:center;justify-content:space-between;">
-                <span style="font-size:13.5px;color:var(--text);">Cerrar sesión tras 15 min inactivo</span>
-                <div class="toggle" style="opacity:.55;">
-                    <input type="checkbox" disabled />
-                    <span class="track"></span>
+            @if (_recent.Count == 0)
+            {
+                <p class="muted" style="margin:0;font-size:13px;">Todavía no hay accesos registrados.</p>
+            }
+            else
+            {
+                <div class="kv">
+                    @foreach (var a in _recent)
+                    {
+                        <div class="r">
+                            <span class="k">
+                                <span class="dot sm @OutcomeCss(a.Outcome)"></span>@OutcomeLabel(a.Outcome) · @a.Ip
+                            </span>
+                            <span class="v">@ToLocal(a.TimestampUtc).ToString("dd/MM HH:mm")</span>
+                        </div>
+                    }
                 </div>
-            </div>
+                <p class="muted" style="margin:14px 0 0;font-size:12px;">
+                    El servidor frena los intentos repetidos por IP tras varios fallos seguidos.
+                </p>
+            }
         </div>
     </div>
 </div>
@@ -96,6 +100,27 @@
     private string _current = "", _new = "", _repeat = "";
     private string? _message;
     private bool _error;
+
+    private IReadOnlyList<AccessEntry> _recent = Array.Empty<AccessEntry>();
+
+    protected override void OnInitialized() => _recent = AccessLog.Recent(12);
+
+    private DateTime ToLocal(DateTime utc) =>
+        TimeZoneInfo.ConvertTime(new DateTimeOffset(utc, TimeSpan.Zero), Content.StoreTz).DateTime;
+
+    private static string OutcomeLabel(AccessOutcome o) => o switch
+    {
+        AccessOutcome.Success => "acceso correcto",
+        AccessOutcome.Locked => "bloqueado",
+        _ => "fallo",
+    };
+
+    private static string OutcomeCss(AccessOutcome o) => o switch
+    {
+        AccessOutcome.Success => "online",
+        AccessOutcome.Locked => "busy",
+        _ => "offline",
+    };
 
     // Medidor orientativo (0-4): longitud + variedad de caracteres. No bloquea nada por sí solo.
     private int _strength => string.IsNullOrEmpty(_new) ? 0 : Score(_new);

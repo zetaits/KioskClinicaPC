@@ -1,7 +1,11 @@
 @rendermode InteractiveServer
+@using Kiosk.Server.Hubs
+@using KioskClinicaPC.Core.Sync
+@using Microsoft.AspNetCore.SignalR
 @inject FleetRegistry Fleet
+@inject IHubContext<FleetHub> Hub
 @* Botonera de emergencia del encabezado. Isla interactiva dentro del layout (que se renderiza estático).
-   PENDIENTE: el envío real de órdenes a los kioscos necesita el canal de control que aún no existe. *@
+   Envía la orden a todos los kioscos online por el hub de flota. *@
 
 <div class="emergency">
     <button @onclick="AskRestart">
@@ -25,7 +29,7 @@
         Body = $"Se reiniciarán los {Fleet.OnlineCount} equipos online. Cada uno volverá al modo kiosko en ~1 minuto." +
                (Fleet.OfflineCount > 0 ? $" Los {Fleet.OfflineCount} equipos sin conexión se omiten." : ""),
         Label = $"Reiniciar {Fleet.OnlineCount} equipos",
-        Confirmed = EventCallback.Factory.Create(this, Pending)
+        Confirmed = EventCallback.Factory.Create(this, () => Broadcast(FleetCommand.Reboot(), "Reinicio"))
     };
 
     private void AskShutdown() => _confirm = new()
@@ -33,12 +37,15 @@
         Title = "Apagar toda la flota",
         Body = $"Se apagarán los {Fleet.OnlineCount} equipos online. Habrá que encenderlos a mano en la tienda.",
         Label = $"Apagar {Fleet.OnlineCount} equipos",
-        Confirmed = EventCallback.Factory.Create(this, Pending)
+        Confirmed = EventCallback.Factory.Create(this, () => Broadcast(FleetCommand.Shutdown(), "Apagado"))
     };
 
-    private void Pending()
+    private async Task Broadcast(FleetCommand cmd, string label)
     {
         _confirm = null;
-        _toast = "Sin efecto: el envío de órdenes a la flota todavía no está implementado.";
+        var ids = Fleet.OnlineConnectionIds();
+        if (ids.Count == 0) { _toast = "No hay equipos online a los que enviar la orden."; return; }
+        await Hub.Clients.Clients(ids).SendAsync("Command", cmd);
+        _toast = $"{label} enviado a {ids.Count} equipo(s).";
     }
 }

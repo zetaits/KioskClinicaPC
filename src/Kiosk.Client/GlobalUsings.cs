@@ -3,3 +3,4 @@
 global using KioskClinicaPC.Core.Config;
 global using KioskClinicaPC.Core.Specs;
 global using KioskClinicaPC.Core.Platform;
+global using KioskClinicaPC.Core.Sync;

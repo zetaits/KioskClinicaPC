@@ -3,6 +3,7 @@
 @rendermode InteractiveServer
 @inject EventStore Store
 @inject ContentResolver Content
+@inject FleetRegistry Fleet
 @inject IHubContext<SyncHub> Hub
 @using KioskClinicaPC.Core.Config
 @using Newtonsoft.Json
@@ -182,31 +183,6 @@
                     }
                 </div>
 
-                @* Sin soporte en el contenido compartido: se muestran para fijar el alcance, no hacen nada. *@
-                <div class="toggle-box" style="opacity:.55;">
-                    <div class="head">
-                        <div class="toggle">
-                            <input type="checkbox" disabled />
-                            <span class="track"></span>
-                        </div>
-                        <div class="txt">
-                            <div class="t">Fondo / tema visual</div>
-                            <div class="s">Pendiente · color de acento en todas las pantallas</div>
-                        </div>
-                    </div>
-                </div>
-                <div class="toggle-box" style="opacity:.55;">
-                    <div class="head">
-                        <div class="toggle">
-                            <input type="checkbox" disabled />
-                            <span class="track"></span>
-                        </div>
-                        <div class="txt">
-                            <div class="t">Precios / promociones</div>
-                            <div class="s">Pendiente · el precio es de cada equipo, no del contenido compartido</div>
-                        </div>
-                    </div>
-                </div>
             </div>
 
             <div style="display:flex;gap:10px;margin-top:22px;">
@@ -303,6 +279,7 @@
             .ToDictionary(g => g.Key, g => g.Last().Value ?? "");
 
         Store.Save(_editing);
+        Fleet.LogContentPublished($"Evento «{_editing.Name}» publicado");
         _message = $"Evento «{_editing.Name}» guardado y publicado en la flota.";
         _editing = null;
         Refresh();

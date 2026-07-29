@@ -42,7 +42,8 @@ builder.Services.AddSingleton(configStore);
 builder.Services.AddSingleton(eventStore);
 builder.Services.AddSingleton(new ContentResolver(configStore, eventStore, storeTz));
 builder.Services.AddSingleton(new AssetLibrary(assetsDir));
-builder.Services.AddSingleton<FleetRegistry>();
+builder.Services.AddSingleton(new FleetRegistry(dataDir, storeTz));
+builder.Services.AddSingleton(new PanelAccessLog(dataDir));
 
 // Sincronización del bucle de atracción (Fase 2): reloj maestro + hub SignalR + latido periódico.
 builder.Services.AddSingleton(new AttractClock(slideDurationMs));
@@ -119,7 +120,7 @@ app.MapGet("/api/assets/{**path}", (string path) =>
 
 // Login del panel: valida contraseña y emite la cookie de sesión. El formulario (SSR) incluye el token
 // antiforgery, que el middleware valida aquí. LocalRedirect evita redirecciones abiertas.
-app.MapPost("/login", async (HttpContext ctx, PanelAuthStore auth, LoginThrottle throttle,
+app.MapPost("/login", async (HttpContext ctx, PanelAuthStore auth, LoginThrottle throttle, PanelAccessLog accessLog,
     [FromForm] string password, [FromForm] string? returnUrl) =>
 {
     string ip = ctx.Connection.RemoteIpAddress?.ToString() ?? "desconocida";
@@ -133,15 +134,20 @@ app.MapPost("/login", async (HttpContext ctx, PanelAuthStore auth, LoginThrottle
 
     // Demasiados fallos seguidos desde esta IP: rechaza sin ni siquiera comprobar la contraseña.
     if (throttle.IsLocked(ip))
+    {
+        accessLog.Record(ip, AccessOutcome.Locked);
         return Results.Redirect(Back("locked", returnUrl));
+    }
 
     if (!auth.Verify(password))
     {
         throttle.RecordFailure(ip);
+        accessLog.Record(ip, AccessOutcome.Fail);
         return Results.Redirect(Back("1", returnUrl));
     }
 
     throttle.RecordSuccess(ip);
+    accessLog.Record(ip, AccessOutcome.Success);
     var identity = new ClaimsIdentity(new[] { new Claim(ClaimTypes.Name, "encargado") },
         CookieAuthenticationDefaults.AuthenticationScheme);
     await ctx.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(identity));
@@ -166,6 +172,10 @@ app.MapGet("/panel/assets/{category}/{file}", (string category, string file, Ass
 // Hub de sincronización del attract. Fuera de /api → sin guardia X-Api-Key (no lleva datos sensibles,
 // solo el origen/duración del cronómetro). El cliente escucha el evento "SyncState".
 app.MapHub<SyncHub>("/hub/sync");
+
+// Hub de control de la flota: registro + heartbeat de los kioscos y órdenes dirigidas del panel. Exige
+// X-Api-Key en el handshake (validado dentro del hub) porque mueve control sensible (reiniciar/apagar).
+app.MapHub<FleetHub>("/hub/fleet");
 
 // Panel Blazor Server. Las páginas [Authorize] exigen la cookie; el resto redirige a /login.
 app.MapRazorComponents<App>().AddInteractiveServerRenderMode();

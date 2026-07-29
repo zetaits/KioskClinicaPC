@@ -1,9 +1,14 @@
 @page "/ordenadores"
 @attribute [Authorize]
 @rendermode InteractiveServer
+@implements IDisposable
+@using Kiosk.Server.Hubs
+@using KioskClinicaPC.Core.Sync
+@using Microsoft.AspNetCore.SignalR
 @inject FleetRegistry Registry
-@* Flota de kioscos de la tienda. PENDIENTE: los datos vienen de FleetRegistry, que aún es de muestra, y las
-   órdenes (reiniciar/apagar) no tienen canal de control; precio y nombre se editan solo en memoria. *@
+@inject IHubContext<FleetHub> Hub
+@* Flota REAL de kioscos: los datos vienen del registro que alimentan los heartbeats, y las órdenes
+   (reiniciar/apagar/reiniciar app, precio y nombre) viajan a cada equipo por el hub de flota. *@
 
 <div class="fleet-toolbar">
     <div class="search">
@@ -87,7 +92,7 @@ else if (_cards)
                     <button @onclick="() => AskRestart(d)">
                         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 12a9 9 0 1 1-2.6-6.4M21 4v4h-4" /></svg>Reiniciar
                     </button>
-                    <button @onclick='() => Pending($"reiniciar la app de {d.Name}")'>
+                    <button @onclick="() => RestartApp(d)">
                         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 2v6M5 8a8 8 0 1 0 14 0" /></svg>Reiniciar app
                     </button>
                     <button class="danger span" @onclick="() => AskShutdown(d)">
@@ -208,6 +213,13 @@ else
     private ConfirmDialog.Options? _confirm;
     private string? _toast;
 
+    protected override void OnInitialized() => Registry.Changed += OnFleetChanged;
+
+    public void Dispose() => Registry.Changed -= OnFleetChanged;
+
+    // El registro cambió en un hilo del hub → refresca la vista en el hilo de render.
+    private void OnFleetChanged() => InvokeAsync(StateHasChanged);
+
     private IEnumerable<FleetDevice> Shown()
     {
         var q = Registry.Devices.AsEnumerable();
@@ -238,22 +250,34 @@ else
     private void OpenPrice(FleetDevice d) =>
         _price = new PriceEdit { Device = d, Value = d.Price, OldValue = d.OldPrice };
 
-    private void SavePrice()
+    private async Task SavePrice()
     {
         if (_price is null) return;
-        Registry.SetPrice(_price.Device.Id, _price.Value, _price.OldValue);
-        _toast = $"Precio de «{_price.Device.Name}» guardado solo en el panel: aún no viaja al equipo.";
+        var d = _price.Device;
+        var connId = Registry.SetPriceOverride(d.Id, _price.Value, _price.OldValue);
+        if (connId != null)
+        {
+            await Hub.Clients.Client(connId).SendAsync("Command", FleetCommand.SetPrice(_price.Value, _price.OldValue));
+            _toast = $"Precio enviado a «{d.Name}».";
+        }
+        else
+        {
+            _toast = $"«{d.Name}» está sin conexión: el precio se aplicará cuando vuelva.";
+        }
         _price = null;
     }
 
     private void OpenRename(FleetDevice d) =>
         _rename = new RenameEdit { Device = d, Value = d.Name };
 
-    private void SaveRename()
+    private async Task SaveRename()
     {
         if (_rename is null) return;
-        Registry.Rename(_rename.Device.Id, _rename.Value);
-        _toast = $"Equipo renombrado a «{_rename.Device.Name}».";
+        var d = _rename.Device;
+        var connId = Registry.Rename(d.Id, _rename.Value);
+        if (connId != null)
+            await Hub.Clients.Client(connId).SendAsync("Command", FleetCommand.SetName(_rename.Value.Trim()));
+        _toast = $"Equipo renombrado a «{d.Name}».";
         _rename = null;
     }
 
@@ -262,7 +286,7 @@ else
         Title = $"Reiniciar {d.Name}",
         Body = "El equipo se reiniciará y volverá al modo kiosko en aproximadamente un minuto.",
         Label = "Reiniciar equipo",
-        Confirmed = EventCallback.Factory.Create(this, () => { _confirm = null; Pending($"reiniciar {d.Name}"); })
+        Confirmed = EventCallback.Factory.Create(this, () => Send(d, FleetCommand.Reboot(), $"Reinicio enviado a «{d.Name}»."))
     };
 
     private void AskShutdown(FleetDevice d) => _confirm = new()
@@ -270,9 +294,23 @@ else
         Title = $"Apagar {d.Name}",
         Body = "El equipo se apagará y habrá que encenderlo a mano en la tienda.",
         Label = "Apagar equipo",
-        Confirmed = EventCallback.Factory.Create(this, () => { _confirm = null; Pending($"apagar {d.Name}"); })
+        Confirmed = EventCallback.Factory.Create(this, () => Send(d, FleetCommand.Shutdown(), $"Apagado enviado a «{d.Name}»."))
     };
 
-    private void Pending(string what) =>
-        _toast = $"Sin efecto: {what} todavía no está implementado.";
+    private Task RestartApp(FleetDevice d) =>
+        Send(d, FleetCommand.RestartApp(), $"Reinicio de la app enviado a «{d.Name}».");
+
+    // Envía una orden a un equipo concreto por su ConnectionId (o avisa si está sin conexión).
+    private async Task Send(FleetDevice d, FleetCommand cmd, string okMessage)
+    {
+        _confirm = null;
+        var dev = Registry.Find(d.Id);
+        if (dev?.ConnectionId is not { } connId)
+        {
+            _toast = $"«{d.Name}» está sin conexión: no se puede enviar la orden.";
+            return;
+        }
+        await Hub.Clients.Client(connId).SendAsync("Command", cmd);
+        _toast = okMessage;
+    }
 }

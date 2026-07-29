@@ -24,6 +24,9 @@ public sealed class ContentResolver
         _storeTz = storeTz;
     }
 
+    /// <summary>Zona horaria de la tienda (para formatear marcas de tiempo en el panel).</summary>
+    public TimeZoneInfo StoreTz => _storeTz;
+
     /// <summary>Hora actual en la zona de la tienda.</summary>
     public DateTime NowLocal => TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, _storeTz).DateTime;
 

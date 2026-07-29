@@ -33,6 +33,15 @@ namespace KioskClinicaPC.Core.Config
         /// Vacío = no se envía cabecera (servidor en modo abierto, solo para pruebas).</summary>
         public string? ServerApiKey { get; set; }
 
+        /// <summary>Id estable del equipo en la flota (GUID). Se autogenera en el primer arranque y no
+        /// cambia; identifica el kiosko ante el panel aunque se renombre o cambie de IP. Ver
+        /// <see cref="EnsureDeviceIdentitySeeded"/>.</summary>
+        public string? DeviceId { get; set; }
+
+        /// <summary>Nombre visible del equipo en el panel de flota. Por defecto el hostname; editable en
+        /// los ajustes del kiosko y renombrable desde el panel (no toca el hostname real de Windows).</summary>
+        public string? DeviceName { get; set; }
+
         public static KioskSettings Load(string path)
         {
             try
@@ -71,6 +80,24 @@ namespace KioskClinicaPC.Core.Config
                 return true;
             }
             return false;
+        }
+
+        /// <summary>Garantiza Id y nombre de flota: genera un GUID estable la primera vez y usa el hostname
+        /// como nombre por defecto. Devuelve true si sembró algo (el llamante debe guardar).</summary>
+        public bool EnsureDeviceIdentitySeeded()
+        {
+            bool changed = false;
+            if (string.IsNullOrWhiteSpace(DeviceId))
+            {
+                DeviceId = Guid.NewGuid().ToString("N");
+                changed = true;
+            }
+            if (string.IsNullOrWhiteSpace(DeviceName))
+            {
+                DeviceName = Environment.MachineName;
+                changed = true;
+            }
+            return changed;
         }
     }
 }
