@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="Assets/clinicapc-logo.png" alt="ClinicaPC" width="120" />
+<img src="src/Kiosk.Server/wwwroot/clinicapc-logo.png" alt="ClinicaPC" width="120" />
 
 # KioskClinicaPC
 
@@ -25,7 +25,7 @@ You set the kiosk up on a shop machine. The app:
 
 Everything editable by hand from the screen itself. No code required.
 
-![Kiosk on counter](docs/screenshots/hero.png)
+<!-- TODO: add docs/screenshots/hero.png — kiosk on counter or representative overview. -->
 
 ---
 
@@ -39,19 +39,16 @@ A loop of slides with a wireframe orb, neon and your message. Grabs attention wh
 ### 2. Scan
 Fullscreen radar while it reads the machine's real components.
 
-<!-- SHOT: Screen1 Scan — the radar mid-animation -->
 ![Scan](docs/screenshots/02-scan.png)
 
 ### 3. Machine spec sheet
 The meat of it: detected specs, price (with optional discount), machine identity and QR.
 
-<!-- SHOT: Screen2 Main — full sheet with specs + price + QR -->
 ![Spec sheet](docs/screenshots/03-main.png)
 
 ### 4. Component detail
 Tap any spec and its expanded explanation opens: what it is, why it matters and where it lands on an honest scale (from basic to top-of-the-line), with its real score and a couple of things you'll actually notice day to day.
 
-<!-- SHOT: Screen3 Detail — a component opened with gauge/detail -->
 ![Detail](docs/screenshots/04-detail.png)
 
 ### Spec sheet on the customer's phone
@@ -59,8 +56,7 @@ The QR opens a page that **generates the PDF right on the phone**. The specs tra
 so there's no need for internet at the shop nor a server to store anything. The sheet carries the shop's address,
 email, phone and WhatsApp, clickable to message or call on the spot.
 
-<!-- SHOT: the phone showing the PDF sheet generated after scanning the QR -->
-![Sheet on phone](docs/screenshots/05-pdf-movil.png)
+<!-- TODO: add docs/screenshots/05-pdf-movil.png — phone showing the generated PDF sheet. -->
 
 ---
 
@@ -74,7 +70,6 @@ email, phone and WhatsApp, clickable to message or call on the spot.
 - **A real kiosk mode** — starts by itself with Windows, hides the taskbar, blocks Task Manager and keeps the screen always on. Nobody gets out without the password.
 - **Looks good on any machine** — the effects (blur, particles) scale themselves down on weak machines.
 
-<!-- 📸 SHOT (optional): the Settings panel and/or free edit mode with the floating bar -->
 ![Settings](docs/screenshots/06-ajustes.png)
 
 ---
@@ -111,41 +106,41 @@ Point a kiosk at the server and the deal is simple:
 
 You reach the panel from any browser, log in once, and you're in.
 
-<!-- SHOT: the panel login screen -->
-![Panel login](docs/screenshots/panel-01-login.png)
+![Panel login](docs/screenshots/panel-01-login.jpeg)
 
 ### The dashboard
 At a glance: how many kiosks are online, what each is showing, and quick access to everything.
 
-<!-- SHOT: panel Home — dashboard with the kiosk cards / counters -->
-![Panel dashboard](docs/screenshots/panel-02-home.png)
+![Panel dashboard](docs/screenshots/panel-02-home.jpeg)
 
 ### Editing the shared content
 The shop's identity, the marketing texts, the on-screen labels — all edited here and pushed to every kiosk.
 
-<!-- SHOT: panel Edit content page -->
-![Edit content](docs/screenshots/panel-03-content.png)
+![Edit content](docs/screenshots/panel-03-content.jpeg)
 
 ### Scheduled events
 Set up a promo ("Back to school", a weekend sale) with a date range. The server serves the event's content
 while it's live and rolls back on its own when it ends — evaluated in the **shop's** local time, not the server's.
 
-<!-- SHOT: panel Events page with an event scheduled -->
-![Events](docs/screenshots/panel-04-events.png)
+![Events](docs/screenshots/panel-04-events.jpeg)
 
 ### The image library
 Brand logos and component images, uploaded once and shared with every kiosk (bitmaps only — no SVG, on purpose).
 
-<!-- SHOT: panel Assets page -->
-![Assets](docs/screenshots/panel-05-assets.png)
+![Assets](docs/screenshots/panel-05-assets.jpeg)
 
-### The fleet *(work in progress)*
-A view of every kiosk in the shop — status, what it's showing, its hardware and price — with the groundwork
-for remote actions (restart, set price, rename). The remote-control channel isn't wired up yet, so today
-it's a monitoring view; the panel is honest about that.
+### The fleet
+A live view of every kiosk in the shop — connection status, current screen, hardware and price.
+Each kiosk reports over SignalR, and the panel can rename it, change its displayed price, restart the app,
+restart or shut down the machine. Shop-wide restart and shutdown controls are available from every page.
 
-<!-- SHOT: panel Fleet page -->
-![Fleet](docs/screenshots/panel-06-fleet.png)
+![Fleet](docs/screenshots/panel-06-fleet.jpeg)
+
+### Security
+Change the panel password, check the server's current state and review recent successful, failed or
+throttled login attempts.
+
+![Security](docs/screenshots/panel-07-seguridad.jpeg)
 
 > Setting the server up (where to host it, the API key, the store's time zone) is written up in
 > **[docs/SERVIDOR.md](docs/SERVIDOR.md)**.
