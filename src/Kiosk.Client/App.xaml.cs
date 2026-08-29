@@ -34,6 +34,7 @@ namespace KioskClinicaPC
         public static readonly string HardwareFilePath = Path.Combine(AppDataFolderPath, "KioskHardware.json");
         public static readonly string SettingsFilePath = Path.Combine(AppDataFolderPath, "KioskSettings.json");
         public static readonly string LogFilePath = Path.Combine(AppDataFolderPath, "logs", "log.txt");
+        public static readonly string ProvisioningFilePath = Path.Combine(AppContext.BaseDirectory, "KioskProvisioning.json");
 
         // Imágenes EMPAQUETADAS junto al .exe (Assets\Brands, Assets\SpecImages). El instalable las trae.
         public static readonly string BundledBrandsFolderPath = Path.Combine(AppContext.BaseDirectory, "Assets", "Brands");
@@ -42,6 +43,9 @@ namespace KioskClinicaPC
         // Override opcional en %LOCALAPPDATA% (cambiar imágenes sin recompilar). Tiene prioridad si existe.
         public static readonly string BrandsFolderPath = Path.Combine(AppDataFolderPath, "Brands");
         public static readonly string SpecImagesFolderPath = Path.Combine(AppDataFolderPath, "SpecImages");
+        public static readonly string RemoteAssetsFolderPath = Path.Combine(AppDataFolderPath, "RemoteAssets");
+        public static readonly string RemoteBrandsFolderPath = Path.Combine(RemoteAssetsFolderPath, "Brands");
+        public static readonly string RemoteSpecImagesFolderPath = Path.Combine(RemoteAssetsFolderPath, "SpecImages");
 
         protected override void OnStartup(StartupEventArgs e)
         {
@@ -50,6 +54,8 @@ namespace KioskClinicaPC
             Directory.CreateDirectory(Path.Combine(AppDataFolderPath, "logs"));
             Directory.CreateDirectory(BrandsFolderPath);
             Directory.CreateDirectory(SpecImagesFolderPath);
+            Directory.CreateDirectory(RemoteBrandsFolderPath);
+            Directory.CreateDirectory(RemoteSpecImagesFolderPath);
 
             Log.Logger = new LoggerConfiguration()
                 .WriteTo.File(LogFilePath, rollingInterval: RollingInterval.Day)
@@ -88,12 +94,13 @@ namespace KioskClinicaPC
 
             // Asegura que exista KioskSettings.json con contraseña sembrada e identidad de flota.
             var settings = KioskSettings.Load(SettingsFilePath);
-            bool seeded = settings.EnsurePasswordSeeded();
+            bool seeded = settings.ApplyProvisioningIfNew(SettingsFilePath, ProvisioningFilePath);
+            seeded |= settings.EnsurePasswordSeeded();
             seeded |= settings.EnsureDeviceIdentitySeeded();
             if (seeded)
             {
                 settings.Save(SettingsFilePath);
-                Log.Information("KioskSettings sembrado (contraseña por defecto / identidad de flota).");
+                Log.Information("KioskSettings sembrado (aprovisionamiento / contraseña / identidad de flota).");
             }
 
             if (!File.Exists(ConfigFilePath))
@@ -140,6 +147,8 @@ namespace KioskClinicaPC
             // Sincronización del bucle de atracción: si hay servidor, sigue el reloj maestro; si no,
             // queda deshabilitado y el kiosko rota los slides él solo (comportamiento previo).
             services.AddSingleton<ISyncClient>(_ => new SyncClient(settings.ServerUrl, settings.ServerApiKey));
+            services.AddSingleton<IAssetSyncService>(_ => new AssetSyncService(
+                settings.ServerUrl, settings.ServerApiKey, RemoteAssetsFolderPath));
             // Agente de flota: reporta estado al panel y ejecuta sus órdenes. No-op sin ServerUrl.
             services.AddSingleton(_ => new FleetClient(
                 settings.ServerUrl, settings.ServerApiKey,

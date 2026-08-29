@@ -4,7 +4,11 @@
 @inject NavigationManager Nav
 
 <div class="shell">
-    <aside class="sidebar">
+    @if (_navOpen)
+    {
+        <button class="sidebar-scrim" aria-label="Cerrar menú" @onclick="CloseNav"></button>
+    }
+    <aside class="sidebar @(_navOpen ? "open" : "")">
         <div class="sidebar-brand">
             <img src="clinicapc-logo.png" alt="ClinicaPC" />
             <div>
@@ -17,16 +21,16 @@
             <AuthorizeView>
                 <Authorized>
                     <div class="nav-section">// Operación</div>
-                    <NavLink href="/" Match="NavLinkMatch.All">
+                    <NavLink href="/" Match="NavLinkMatch.All" @onclick="CloseNav">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="9" rx="1.5" /><rect x="14" y="3" width="7" height="5" rx="1.5" /><rect x="14" y="12" width="7" height="9" rx="1.5" /><rect x="3" y="16" width="7" height="5" rx="1.5" /></svg>
                         <span class="label">Dashboard</span>
                     </NavLink>
-                    <NavLink href="/ordenadores">
+                    <NavLink href="/ordenadores" @onclick="CloseNav">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2.5" y="4" width="19" height="12" rx="1.5" /><path d="M8 20h8M12 16v4" /></svg>
                         <span class="label">Ordenadores</span>
                         <span class="count">@Fleet.OnlineCount</span>
                     </NavLink>
-                    <NavLink href="/eventos">
+                    <NavLink href="/eventos" @onclick="CloseNav">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4.5" width="18" height="16" rx="2" /><path d="M3 9h18M8 2.5v4M16 2.5v4" /></svg>
                         <span class="label">Eventos</span>
                         @if (_activeEvent is not null)
@@ -34,19 +38,23 @@
                             <span class="dot sm accent"></span>
                         }
                     </NavLink>
+                    <NavLink href="/aplicaciones" @onclick="CloseNav">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16v13H4zM8 7V4h8v3M9 12h6M12 9v6" /></svg>
+                        <span class="label">Aplicaciones</span>
+                    </NavLink>
 
                     <div class="nav-section">// Contenido</div>
-                    <NavLink href="/imagenes">
+                    <NavLink href="/imagenes" @onclick="CloseNav">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="16" rx="2" /><circle cx="8.5" cy="9.5" r="1.8" /><path d="M4 17l5-4 4 3 3-2.5 4 3.5" /></svg>
                         <span class="label">Imágenes y marcas</span>
                     </NavLink>
-                    <NavLink href="/contenido">
+                    <NavLink href="/contenido" @onclick="CloseNav">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 4h14M5 4v16M5 20h14M9 9h8M9 13h8M9 17h5" /></svg>
                         <span class="label">Contenido</span>
                     </NavLink>
 
                     <div class="nav-section">// Sistema</div>
-                    <NavLink href="/seguridad">
+                    <NavLink href="/seguridad" @onclick="CloseNav">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4.5" y="10" width="15" height="10" rx="2" /><path d="M8 10V7a4 4 0 0 1 8 0v3" /></svg>
                         <span class="label">Seguridad</span>
                     </NavLink>
@@ -90,6 +98,12 @@
 
     <main class="main">
         <header class="topbar">
+            <button class="mobile-menu-button"
+                    aria-label="Abrir menú"
+                    aria-expanded="@_navOpen"
+                    @onclick="() => _navOpen = !_navOpen">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
+            </button>
             <div class="titles">
                 <div class="eyebrow">@_eyebrow</div>
                 <h1>@_title</h1>
@@ -121,6 +135,9 @@
     private string _version = "";
     private string _eyebrow = "";
     private string _title = "";
+    private bool _navOpen;
+
+    private void CloseNav() => _navOpen = false;
 
     protected override void OnParametersSet()
     {
@@ -134,6 +151,7 @@
         {
             "/ordenadores" => ("// Flota · tiempo real", "Ordenadores de la tienda"),
             "/eventos" => ("// Campañas programadas", "Eventos"),
+            "/aplicaciones" => ("// Despliegue remoto", "Aplicaciones"),
             "/imagenes" => ("// Biblioteca de assets", "Imágenes y marcas"),
             "/contenido" => ("// Contenido compartido", "Contenido de los kioscos"),
             "/seguridad" => ("// Sistema", "Seguridad"),

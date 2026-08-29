@@ -37,5 +37,11 @@ namespace KioskClinicaPC.Core.Sync
 
         /// <summary>Instante de arranque del proceso (ms Unix UTC) para calcular el uptime en el panel.</summary>
         public long StartedAtUnixMs { get; set; }
+
+        /// <summary>Versión del agente privilegiado; vacío si este kiosko aún no puede instalar paquetes.</summary>
+        public string InstallerAgentVersion { get; set; } = "";
+
+        /// <summary>El agente incluye el runner desacoplado y admite autodesinstalación verificada.</summary>
+        public bool CanUninstallKiosk { get; set; }
     }
 }

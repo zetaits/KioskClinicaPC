@@ -2,6 +2,7 @@
 # No es código; se genera al ejecutar y no debe versionarse.
 src/Kiosk.Server/data/
 src/Kiosk.Server/assets/
+src/Kiosk.Server/installers/
 
 # Visual Studio / Rider files
 .vs/
@@ -55,6 +56,7 @@ _ReSharper*/
 
 # Artefactos del instalador (dotnet publish + Inno Setup)
 publish/
+publish-agent/
 installer/Output/
 
 # Accidental shell artifacts. The pre-commit hook rejects extensionless files

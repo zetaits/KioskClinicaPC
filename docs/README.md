@@ -1,49 +1,56 @@
 # Web de ficha PDF (destino del QR)
 
-Página estática que el cliente abre al **escanear el QR** del kiosko. Las specs del equipo viajan
-**dentro del propio QR** (en el `#hash` de la URL), así que:
+Aplicación web estática que se abre al escanear el QR de un kiosko. En producción se publica junto al servidor en:
 
-- No hay backend, base de datos ni almacenamiento.
-- El kiosko **no necesita internet** en el momento del escaneo.
-- Los datos del equipo **nunca se envían al servidor** (el `#hash` no forma parte de la petición HTTP).
-- Cada equipo genera un QR distinto automáticamente (sus specs son distintas).
+`https://vps-9c7061ff.vps.ovh.net/ficha/`
 
-El PDF se genera **en el móvil del cliente** (con sus datos móviles), con `html2pdf.js`.
+Las especificaciones viajan dentro del `#hash` de la URL. El servidor solo entrega HTML, CSS, JavaScript y fuentes: el fragmento no forma parte de la petición HTTP, no se registra en el proxy y no se almacena en el servidor. El PDF se genera en el propio móvil.
+
+## Despliegue
+
+`Kiosk.Server.csproj` enlaza esta carpeta en `wwwroot/ficha` y copia también las fuentes y dependencias locales. Al publicar el servidor se obtiene un único bundle autocontenido:
+
+```powershell
+& "C:\Users\zits\.dotnet\dotnet.exe" publish src\Kiosk.Server -c Release
+```
+
+Después del despliegue verifica:
+
+- `GET /health` responde `{"status":"ok"}`.
+- `GET /ficha/` carga sin autenticación.
+- La consola del navegador no intenta acceder a CDNs ni a Google Fonts.
+
+El cliente construye el destino mediante `FichaPdfUrl`: usa `/ficha/` en el mismo origen HTTPS configurado como `ServerUrl` y conserva como respaldo la URL pública de la VPS.
+
+## Compatibilidad con QR antiguos
+
+GitHub Pages se mantiene únicamente como puente. `legacy-redirect.js` detecta `zetaits.github.io` y redirige a la VPS copiando íntegro el fragmento. No desactives Pages ni cambies ese script mientras puedan quedar QRs antiguos impresos.
+
+La fuente sigue siendo esta carpeta `docs/`; no hay dos versiones de la ficha que mantener.
 
 ## Archivos
 
-- `index.html` — estructura de la ficha.
-- `styles.css` — estilo de la hoja A4.
-- `app.js` — decodifica el `#hash`, pinta la ficha y exporta el PDF.
+- `index.html` — estructura de la ficha y carga de recursos relativos.
+- `styles.css` — diseño de la hoja A4 y fuentes locales.
+- `app.js` — decodificación, presentación y exportación a PDF.
+- `legacy-redirect.js` — compatibilidad del dominio anterior.
+- `vendor/` — copias versionadas de `pako` y `html2pdf`, con sus licencias.
 
-## Despliegue con GitHub Pages (gratis, HTTPS)
+## Formato del payload
 
-Esta carpeta es `docs/` precisamente para que GitHub Pages la sirva:
+Los payloads actuales usan `Base64Url(deflateRaw(JSON))`; `app.js` sigue aceptando `Base64Url(gzip(JSON))` para QR antiguos. El JSON usa claves cortas (véase `Core/EquipmentPayload.cs`):
 
-1. Repo en GitHub → **Settings → Pages**.
-2. **Source: Deploy from a branch** → rama `master` → carpeta **`/docs`** → **Save**.
-3. Espera ~1 min. URL resultante: `https://zetaits.github.io/KioskClinicaPC/`.
-
-Esa URL está **fija en el kiosko** (constante `FichaPdfBaseUrl` en `MainWindow.xaml.cs`); no hay nada que configurar.
-Si cambias de repo/usuario/dominio, edita esa constante.
-
-> Funciona bajo subruta `/<repo>/` porque las rutas de `index.html` son relativas.
-> Pages sirve HTTPS por defecto (los móviles lo prefieren para descargar archivos).
-> Para tu propio dominio: Settings → Pages → Custom domain.
-
-## Formato del payload (referencia)
-
-`#hash` = `Base64Url( gzip( JSON ) )`. JSON con claves cortas (ver `Core/EquipmentPayload.cs` en el kiosko):
-
-```
-{ "v":1, "ch":marca, "mo":modelo, "fa":familia, "sk":sku,
-  "pr":precio, "dp":precioRebajado, "sh":tienda, "ad":direccion,
-  "c":[ { "i":id, "l":etiqueta, "v":valor, "d":detalle, "t":tecnico }, ... ] }
+```json
+{ "v":1, "ch":"marca", "mo":"modelo", "fa":"familia", "sk":"sku",
+  "pr":"precio", "dp":"precioRebajado", "sh":"tienda", "ad":"direccion",
+  "c":[ { "i":"id", "l":"etiqueta", "v":"valor", "d":"detalle", "t":"tecnico" } ] }
 ```
 
 ## Personalización
 
-- Encabezado: logo `logo.png` (copiado de `Assets/clinicapc-logo.png`). Para cambiarlo, reemplaza ese archivo.
-- Tema/colores: en `styles.css` (`:root`), misma paleta que la app (`App.xaml`).
-- Textos "qué es" por componente: editar el objeto `FRIENDLY` en `app.js`.
-- Las librerías (`pako`, `html2pdf`) se cargan por CDN; para uso 100% offline, descárgalas y sírvelas localmente.
+- Encabezado: reemplaza `logo.png`.
+- Tema y diseño de impresión: `styles.css`.
+- Explicaciones de componentes: objeto `FRIENDLY` de `app.js`.
+- Datos de contacto predeterminados: objeto `SHOP` de `app.js`.
+
+Todos los recursos necesarios están alojados en la propia VPS; el móvil necesita conexión para abrir la página, pero no depende de servicios de terceros.

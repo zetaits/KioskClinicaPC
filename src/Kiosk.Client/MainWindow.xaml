@@ -16,7 +16,7 @@
         Topmost="True"
         Loaded="Window_Loaded"
         Closing="Window_Closing"
-        KeyDown="Window_KeyDown"
+        PreviewKeyDown="Window_PreviewKeyDown"
         PreviewMouseLeftButtonDown="Window_PreviewMouseLeftButtonDown"
         PreviewMouseDown="Window_PreviewActivity"
         PreviewTouchDown="Window_PreviewTouchActivity"

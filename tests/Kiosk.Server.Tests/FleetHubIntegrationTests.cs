@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Xunit;
 
 namespace Kiosk.Server.Tests;
@@ -26,9 +27,12 @@ public sealed class FleetHubIntegrationTests : IAsyncLifetime
         Directory.CreateDirectory(_dataDir);
         _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
+            builder.ConfigureLogging(logging => logging.ClearProviders());
             builder.UseSetting("Kiosk:DataDir", _dataDir);
             builder.UseSetting("Kiosk:AssetsDir", Path.Combine(_dataDir, "assets"));
+            builder.UseSetting("Kiosk:InstallersDir", Path.Combine(_dataDir, "installers"));
             builder.UseSetting("Kiosk:ApiKey", ""); // abierto para el test
+            builder.UseSetting("Kiosk:PanelInitialPassword", "test-panel-password");
         });
         _ = _factory.Server; // fuerza el arranque
         return Task.CompletedTask;

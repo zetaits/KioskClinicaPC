@@ -6,7 +6,9 @@
 @using KioskClinicaPC.Core.Sync
 @using Microsoft.AspNetCore.SignalR
 @inject FleetRegistry Registry
+@inject MaintenanceJobStore MaintenanceJobs
 @inject IHubContext<FleetHub> Hub
+@inject NavigationManager Nav
 @* Flota REAL de kioscos: los datos vienen del registro que alimentan los heartbeats, y las órdenes
    (reiniciar/apagar/reiniciar app, precio y nombre) viajan a cada equipo por el hub de flota. *@
 
@@ -89,6 +91,7 @@ else if (_cards)
                 </div>
 
                 <div class="actions">
+                    <button disabled="@(!d.IsOnline || !d.CanInstall)" @onclick="() => NavigateInstall(d)">Instalar app</button>
                     <button @onclick="() => AskRestart(d)">
                         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 12a9 9 0 1 1-2.6-6.4M21 4v4h-4" /></svg>Reiniciar
                     </button>
@@ -97,6 +100,9 @@ else if (_cards)
                     </button>
                     <button class="danger span" @onclick="() => AskShutdown(d)">
                         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 4v8M6.4 7A8 8 0 1 0 18 8" /></svg>Apagar equipo
+                    </button>
+                    <button class="danger span" disabled="@(!d.IsOnline || !d.CanUninstallKiosk || MaintenanceJobs.HasActiveJob(d.Id))" @onclick="() => OpenUninstall(d)">
+                        Desinstalar Kiosk
                     </button>
                 </div>
             </div>
@@ -127,6 +133,7 @@ else
                 <span class="price">@PriceLabel(d)</span>
                 <span class="uptime">@d.Uptime</span>
                 <div class="acts">
+                    <button class="icon" disabled="@(!d.IsOnline || !d.CanInstall)" title="Instalar aplicación" @onclick="() => NavigateInstall(d)">+</button>
                     <button class="icon" title="Precio" style="color:var(--accent-2);font-family:var(--font-display);font-weight:700;" @onclick="() => OpenPrice(d)">€</button>
                     <button class="icon" title="Reiniciar" @onclick="() => AskRestart(d)">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 12a9 9 0 1 1-2.6-6.4M21 4v4h-4" /></svg>
@@ -134,6 +141,7 @@ else
                     <button class="icon danger" title="Apagar" @onclick="() => AskShutdown(d)">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 4v8M6.4 7A8 8 0 1 0 18 8" /></svg>
                     </button>
+                    <button class="icon danger" disabled="@(!d.IsOnline || !d.CanUninstallKiosk || MaintenanceJobs.HasActiveJob(d.Id))" title="Desinstalar Kiosk" @onclick="() => OpenUninstall(d)">×</button>
                 </div>
             </div>
         }
@@ -184,6 +192,38 @@ else
     </div>
 }
 
+@if (_uninstall is not null)
+{
+    <div class="modal-backdrop" @onclick="() => _uninstall = null">
+        <div class="modal danger" style="width:440px;" @onclick:stopPropagation="true">
+            <div class="eyebrow">// Operación irreversible</div>
+            <h2>Desinstalar Kiosk de @_uninstall.Device.Name</h2>
+            <p>El equipo dejará de estar gestionado y desaparecerá de la aplicación instalada de Windows. Escribe <b>@_uninstall.Device.Name</b> para confirmar.</p>
+            <input type="text" autocomplete="off" @bind="_uninstall.Confirmation" @bind:event="oninput" />
+            <div class="actions" style="display:flex;gap:10px;margin-top:22px;">
+                <button style="flex:1" @onclick="() => _uninstall = null">Cancelar</button>
+                <button class="solid-danger" style="flex:1.5" disabled="@(!CanConfirmUninstall)" @onclick="SendUninstall">Desinstalar Kiosk</button>
+            </div>
+        </div>
+    </div>
+}
+
+@if (MaintenanceJobs.Recent(10).Count > 0)
+{
+    <div class="card">
+        <div class="card-head"><h2>Desinstalaciones de Kiosk</h2><span class="mono-note">auditoría reciente</span></div>
+        @foreach (var job in MaintenanceJobs.Recent(10))
+        {
+            <div class="row" style="padding:10px 0;border-bottom:1px solid var(--line);">
+                <b style="flex:1">@job.DeviceName</b>
+                <span style="min-width:150px">@MaintenanceState(job.State)</span>
+                <span class="muted" style="flex:1">@job.Message</span>
+                <span class="muted">@job.UpdatedAtUtc.ToLocalTime().ToString("dd/MM HH:mm")</span>
+            </div>
+        }
+    </div>
+}
+
 <ConfirmDialog Model="_confirm" OnClose="() => _confirm = null" />
 <Toast Message="@_toast" />
 
@@ -205,17 +245,32 @@ else
         public string Value { get; set; } = "";
     }
 
+    private sealed class UninstallEdit
+    {
+        public FleetDevice Device { get; init; } = null!;
+        public string Confirmation { get; set; } = "";
+    }
+
     private string _search = "";
     private Filter _filter = Filter.All;
     private bool _cards = true;
     private PriceEdit? _price;
     private RenameEdit? _rename;
+    private UninstallEdit? _uninstall;
     private ConfirmDialog.Options? _confirm;
     private string? _toast;
 
-    protected override void OnInitialized() => Registry.Changed += OnFleetChanged;
+    protected override void OnInitialized()
+    {
+        Registry.Changed += OnFleetChanged;
+        MaintenanceJobs.Changed += OnFleetChanged;
+    }
 
-    public void Dispose() => Registry.Changed -= OnFleetChanged;
+    public void Dispose()
+    {
+        Registry.Changed -= OnFleetChanged;
+        MaintenanceJobs.Changed -= OnFleetChanged;
+    }
 
     // El registro cambió en un hilo del hub → refresca la vista en el hilo de render.
     private void OnFleetChanged() => InvokeAsync(StateHasChanged);
@@ -299,6 +354,52 @@ else
 
     private Task RestartApp(FleetDevice d) =>
         Send(d, FleetCommand.RestartApp(), $"Reinicio de la app enviado a «{d.Name}».");
+
+    private void NavigateInstall(FleetDevice d) =>
+        Nav.NavigateTo("/aplicaciones?device=" + Uri.EscapeDataString(d.Id));
+
+    private void OpenUninstall(FleetDevice d) => _uninstall = new UninstallEdit { Device = d };
+
+    private bool CanConfirmUninstall => _uninstall is not null &&
+        _uninstall.Confirmation.Equals(_uninstall.Device.Name, StringComparison.Ordinal);
+
+    private async Task SendUninstall()
+    {
+        if (!CanConfirmUninstall || _uninstall is null) return;
+        FleetDevice selected = _uninstall.Device;
+        _uninstall = null;
+        FleetDevice? device = Registry.Find(selected.Id);
+        if (device?.ConnectionId is not { } connectionId || !device.CanUninstallKiosk)
+        {
+            _toast = $"«{selected.Name}» ya no está disponible para desinstalación.";
+            return;
+        }
+        CreatedMaintenanceJob? created = null;
+        try
+        {
+            created = MaintenanceJobs.Create(device);
+            await Hub.Clients.Client(connectionId).SendAsync("Command", FleetCommand.UninstallKiosk(created.Job.Id, created.Token));
+            MaintenanceJobs.MarkDispatched(created.Job.Id);
+            _toast = $"Desinstalación enviada a «{device.Name}».";
+        }
+        catch (Exception ex)
+        {
+            if (created != null)
+                MaintenanceJobs.Update(created.Job.Id, created.Token, new MaintenanceStatusUpdate
+                { DeviceId = device.Id, State = MaintenanceJobState.Failed, Message = "No se pudo enviar la orden: " + ex.Message });
+            _toast = "No se pudo enviar la desinstalación: " + ex.Message;
+        }
+    }
+
+    private static string MaintenanceState(MaintenanceJobState state) => state switch
+    {
+        MaintenanceJobState.Pending => "Pendiente",
+        MaintenanceJobState.Dispatched => "Enviada",
+        MaintenanceJobState.Uninstalling => "Desinstalando",
+        MaintenanceJobState.Succeeded => "Completada",
+        MaintenanceJobState.RebootRequired => "Reinicio pendiente",
+        _ => "Error"
+    };
 
     // Envía una orden a un equipo concreto por su ConnectionId (o avisa si está sin conexión).
     private async Task Send(FleetDevice d, FleetCommand cmd, string okMessage)

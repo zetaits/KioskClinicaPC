@@ -1,0 +1,155 @@
+@using KioskClinicaPC.Core.Sync
+@inject AssetLibrary Lib
+@inject IHubContext<SyncHub> Hub
+
+<section class="card asset-section">
+    <div class="card-head">
+        <div>
+            <h2>@Title</h2>
+            <p class="muted section-copy">@Description</p>
+        </div>
+        <span class="mono-note">@Lib.List(Category).Count publicadas</span>
+    </div>
+
+    <div class="asset-upload">
+        <div class="asset-name-field">
+            <label class="field-label" for="@($"{Category}-name")">@NameLabel</label>
+            <input id="@($"{Category}-name")" @bind="_logicalName" placeholder="@Placeholder" />
+            <span class="field-help">El nombre se normaliza para que el kiosko pueda emparejarlo.</span>
+        </div>
+        <label class="drop-tile compact">
+            <span class="ico" aria-hidden="true">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12h14" /></svg>
+            </span>
+            <span class="t">@(_uploading ? "Procesando…" : "Seleccionar imagen")</span>
+            <span class="s">PNG · JPG · WEBP · GIF · BMP · máx. 8 MB</span>
+            <InputFile disabled="@_uploading"
+                       OnChange="Upload"
+                       accept=".png,.jpg,.jpeg,.webp,.gif,.bmp" />
+        </label>
+        <label class="check-row">
+            <input type="checkbox" @bind="_replace" />
+            <span>Reemplazar si ya existe</span>
+        </label>
+    </div>
+
+    @if (Filtered.Count == 0)
+    {
+        <div class="empty-state compact">
+            <div class="empty-icon">◇</div>
+            <div>
+                <b>@(string.IsNullOrWhiteSpace(Search) ? "Todavía no hay imágenes" : "No hay coincidencias")</b>
+                <p>@(string.IsNullOrWhiteSpace(Search) ? "Usa el selector superior para añadir la primera." : "Prueba con otro nombre.")</p>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="brand-grid">
+            @foreach (AssetManifestItem item in Filtered)
+            {
+                <article class="brand-tile" @key="item.FileName">
+                    <div class="asset-preview">
+                        <img src="@($"/panel/assets/{Category}/{item.FileName}?v={item.Sha256[..8]}")"
+                             alt="@Path.GetFileNameWithoutExtension(item.FileName)" loading="lazy" />
+                    </div>
+                    <div class="asset-info">
+                        <strong>@Path.GetFileNameWithoutExtension(item.FileName)</strong>
+                        <span>@item.Width × @item.Height · @Size(item.SizeBytes)</span>
+                        <code>@item.FileName</code>
+                    </div>
+                    <button class="danger icon asset-delete"
+                            aria-label="@($"Borrar {item.FileName}")"
+                            title="Borrar imagen"
+                            @onclick="() => AskDelete(item.FileName)">×</button>
+                </article>
+            }
+        </div>
+    }
+</section>
+
+<ConfirmDialog Model="_confirm" OnClose="() => _confirm = null" />
+<Toast Message="@_message" IsError="_error" />
+
+@code {
+    private const long MaxBytes = 8 * 1024 * 1024;
+
+    [Parameter, EditorRequired] public string Category { get; set; } = "";
+    [Parameter, EditorRequired] public string Title { get; set; } = "";
+    [Parameter, EditorRequired] public string Description { get; set; } = "";
+    [Parameter, EditorRequired] public string NameLabel { get; set; } = "";
+    [Parameter] public string Placeholder { get; set; } = "";
+    [Parameter] public string Search { get; set; } = "";
+
+    private string _logicalName = "";
+    private bool _replace;
+    private bool _uploading;
+    private string? _message;
+    private bool _error;
+    private ConfirmDialog.Options? _confirm;
+
+    private IReadOnlyList<AssetManifestItem> Filtered
+    {
+        get
+        {
+            IEnumerable<AssetManifestItem> items = Lib.ListDetails(Category);
+            if (!string.IsNullOrWhiteSpace(Search))
+                items = items.Where(x => x.FileName.Contains(Search.Trim(), StringComparison.OrdinalIgnoreCase));
+            return items.ToList();
+        }
+    }
+
+    private async Task Upload(InputFileChangeEventArgs e)
+    {
+        _message = null;
+        _uploading = true;
+        try
+        {
+            IBrowserFile file = e.File;
+            await using Stream stream = file.OpenReadStream(MaxBytes);
+            AssetManifestItem saved = await Lib.SaveAsync(
+                Category, _logicalName, file.Name, stream, _replace);
+            await Hub.Clients.All.SendAsync("ContentChanged");
+            _logicalName = "";
+            _error = false;
+            _message = $"«{saved.FileName}» publicada y enviada a la flota.";
+        }
+        catch (Exception ex)
+        {
+            _error = true;
+            _message = "No se pudo publicar: " + ex.Message;
+        }
+        finally
+        {
+            _uploading = false;
+        }
+    }
+
+    private void AskDelete(string file) => _confirm = new()
+    {
+        Title = $"Borrar {file}",
+        Body = "Se eliminará de la biblioteca compartida y desaparecerá de los kioscos en la próxima sincronización.",
+        Label = "Borrar imagen",
+        Confirmed = EventCallback.Factory.Create(this, () => Delete(file))
+    };
+
+    private async Task Delete(string file)
+    {
+        _confirm = null;
+        try
+        {
+            Lib.Delete(Category, file);
+            await Hub.Clients.All.SendAsync("ContentChanged");
+            _error = false;
+            _message = $"«{file}» eliminada de la biblioteca.";
+        }
+        catch (Exception ex)
+        {
+            _error = true;
+            _message = "No se pudo borrar: " + ex.Message;
+        }
+    }
+
+    private static string Size(long bytes) =>
+        bytes >= 1024 * 1024 ? $"{bytes / 1024d / 1024d:N1} MB" : $"{bytes / 1024d:N0} KB";
+}

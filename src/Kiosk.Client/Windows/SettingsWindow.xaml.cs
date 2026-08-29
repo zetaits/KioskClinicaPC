@@ -7,7 +7,6 @@ using System.IO;
 using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
-using System.Reflection;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using KioskClinicaPC.Core;
@@ -424,99 +423,101 @@ namespace KioskClinicaPC.Windows
             }
         }
 
-        private void UninstallButton_Click(object sender, RoutedEventArgs e)
+        private async void UninstallButton_Click(object sender, RoutedEventArgs e)
         {
             try
             {
-                const string registryKeyPath = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Run";
-
-                if (!KioskDialog.Confirm(this, "Desinstalar", "Se eliminará la configuración y el inicio automático, y la app se cerrará. ¿Continuar?", "Desinstalar", danger: true))
+                if (!KioskDialog.Confirm(this, "Desinstalar Kiosk",
+                    "Se eliminarán la aplicación, su entrada de Windows, el servicio de instalaciones, " +
+                    "el inicio automático y la configuración local. ¿Continuar?", "Desinstalar", danger: true))
                     return;
 
-                // Si la app está instalada vía Inno, hay un unins000.exe junto al ejecutable.
-                // Lanzarlo = desinstalación real del sistema (borra Program Files, accesos directos,
-                // entrada de Agregar/quitar programas, y vía [Code] del .iss: autostart + config).
-                // La app corre como asInvoker y no puede borrar Program Files por sí misma.
-                string? exeDir = Path.GetDirectoryName(Process.GetCurrentProcess().MainModule?.FileName);
-                string? uninstaller = exeDir != null ? Path.Combine(exeDir, "unins000.exe") : null;
-                if (uninstaller != null && File.Exists(uninstaller))
+                UninstallButton.IsEnabled = false;
+                var response = await InstallerAgentClient.UninstallKioskAsync(App.AppDataFolderPath);
+                if (response.Accepted)
                 {
-                    KioskManager.Release(); // restaura taskbar/Task Manager antes de soltar el control
+                    KioskManager.Release();
                     Log.CloseAndFlush();
-                    Process.Start(new ProcessStartInfo(uninstaller) { UseShellExecute = true });
-                    // Cierra el kiosko para liberar los archivos que el desinstalador va a borrar.
                     if (this.Owner is MainWindow installedKiosk)
                         installedKiosk.ShutdownKiosk();
                     return;
                 }
 
-                // Fallback (build portable / desarrollo, sin instalador): limpieza manual.
-                string? currentExeName = Path.GetFileName(Assembly.GetEntryAssembly()?.Location);
-                if (string.IsNullOrEmpty(currentExeName))
+                // Compatibilidad con instalaciones anteriores al servicio de mantenimiento.
+                if (TryGetRegisteredUninstaller(out string? uninstaller, out bool registrationExists, out string? registrationError))
                 {
-                    KioskDialog.Alert(this, "Error", "No se pudo determinar el nombre del ejecutable actual.", danger: true);
+                    Process.Start(new ProcessStartInfo(uninstaller!)
+                    {
+                        UseShellExecute = true, Verb = "runas",
+                        Arguments = "/SILENT /SUPPRESSMSGBOXES /NORESTART /LOG"
+                    });
+                    KioskManager.Release();
+                    Log.CloseAndFlush();
+                    if (this.Owner is MainWindow legacyKiosk) legacyKiosk.ShutdownKiosk();
                     return;
                 }
 
-                int deletedKeysCount = 0;
-                var keysToDelete = new List<string>();
-                bool configFolderDeleted = false;
-
-                using (RegistryKey? key = Registry.CurrentUser.OpenSubKey(registryKeyPath, true))
+                if (registrationExists)
                 {
-                    if (key != null)
-                    {
-                        foreach (string valueName in key.GetValueNames())
-                        {
-                            string? path = key.GetValue(valueName) as string;
-                            if (!string.IsNullOrEmpty(path))
-                            {
-                                string cleanPath = path.Trim('\"');
-                                if (Path.GetFileName(cleanPath).Equals(currentExeName, StringComparison.OrdinalIgnoreCase))
-                                {
-                                    keysToDelete.Add(valueName);
-                                }
-                            }
-                        }
-                        foreach (string keyName in keysToDelete)
-                        {
-                            key.DeleteValue(keyName);
-                            deletedKeysCount++;
-                        }
-                    }
+                    KioskDialog.Alert(this, "Instalación dañada",
+                        (registrationError ?? response.Error ?? "No se encontró un desinstalador válido.") +
+                        "\n\nReinstala Kiosk para reparar el desinstalador y vuelve a intentarlo.", danger: true);
+                    return;
                 }
 
+                // Build portable/desarrollo: borra datos, pero no afirma haber desinstalado una app de Windows.
+                using (RegistryKey? run = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Run", true))
+                    run?.DeleteValue("KioskHardwareDisplay", false);
                 if (Directory.Exists(App.AppDataFolderPath))
                 {
-                    KioskManager.Release(); // Restore system before deleting files
-                    Log.CloseAndFlush(); // Release the Serilog log file handle before deleting the folder
+                    KioskManager.Release();
+                    Log.CloseAndFlush();
                     Directory.Delete(App.AppDataFolderPath, true);
-                    configFolderDeleted = true;
                 }
-
-                if (deletedKeysCount > 0 || configFolderDeleted)
-                {
-                    string message = "Desinstalación completada.\n";
-                    if (deletedKeysCount > 0) message += $"- Se eliminaron {deletedKeysCount} entrada(s) de inicio automático.\n";
-                    if (configFolderDeleted) message += "- Se eliminó la carpeta de configuración.\n";
-                    message += "La aplicación se cerrará ahora.";
-
-                    KioskDialog.Alert(this, "Desinstalación completada", message);
-
-                    if (this.Owner is MainWindow mainWindow)
-                    {
-                        mainWindow.ShutdownKiosk();
-                    }
-                }
-                else
-                {
-                    KioskDialog.Alert(this, "Información", "No se encontraron rastros de la aplicación (inicio automático o configuración).");
-                }
+                KioskDialog.Alert(this, "Datos locales eliminados",
+                    "Esta copia no estaba registrada como aplicación instalada. Se eliminaron sus datos locales y se cerrará ahora.");
+                if (this.Owner is MainWindow portableKiosk) portableKiosk.ShutdownKiosk();
             }
             catch (Exception ex)
             {
                 KioskDialog.Alert(this, "Error", $"Error al desinstalar: {ex.Message}", danger: true);
             }
+            finally { UninstallButton.IsEnabled = true; }
+        }
+
+        private static bool TryGetRegisteredUninstaller(out string? path, out bool registrationExists, out string? error)
+        {
+            const string keyPath = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\{A7E3C9F1-2B4D-4E6A-9C8B-1F0D5E2A6B33}_is1";
+            path = null; error = null;
+            using RegistryKey hklm = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64);
+            using RegistryKey? key = hklm.OpenSubKey(keyPath);
+            registrationExists = key != null;
+            if (key == null) return false;
+            string? command = key.GetValue("UninstallString") as string;
+            if (string.IsNullOrWhiteSpace(command)) { error = "La entrada de Windows no contiene UninstallString."; return false; }
+            command = command.Trim();
+            if (command.StartsWith('"'))
+            {
+                int end = command.IndexOf('"', 1);
+                if (end > 1) path = command[1..end];
+            }
+            else
+            {
+                int end = command.IndexOf(".exe", StringComparison.OrdinalIgnoreCase);
+                if (end >= 0) path = command[..(end + 4)];
+            }
+            string? appRoot = Path.GetDirectoryName(Process.GetCurrentProcess().MainModule?.FileName);
+            if (path == null || appRoot == null) { error = "UninstallString no es válido."; return false; }
+            path = Path.GetFullPath(path);
+            string root = Path.GetFullPath(appRoot).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+            if (!path.StartsWith(root, StringComparison.OrdinalIgnoreCase) ||
+                !System.Text.RegularExpressions.Regex.IsMatch(Path.GetFileName(path), @"^unins\d{3}\.exe$", System.Text.RegularExpressions.RegexOptions.IgnoreCase) ||
+                !File.Exists(path))
+            {
+                error = "El desinstalador registrado no existe o no pertenece a esta instalación.";
+                return false;
+            }
+            return true;
         }
     }
 }

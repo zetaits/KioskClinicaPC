@@ -4,12 +4,12 @@
 {
     <div class="modal-backdrop" @onclick="Close">
         @* El clic dentro del cuadro no debe cerrarlo. *@
-        <div class="modal danger" @onclick:stopPropagation="true">
+        <div class="modal danger" role="alertdialog" aria-modal="true" aria-labelledby="confirm-dialog-title" @onclick:stopPropagation="true">
             <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
                 <div class="icon-badge" style="width:40px;height:40px;border-radius:11px;background:rgba(224,72,61,.14);border:none;">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ff8a80" stroke-width="2"><path d="M12 9v4M12 17h.01M10.3 3.9 2.4 18a2 2 0 0 0 1.7 3h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" /></svg>
                 </div>
-                <h2 style="margin:0;font-size:19px;font-weight:600;">@Model.Title</h2>
+                <h2 id="confirm-dialog-title" style="margin:0;font-size:19px;font-weight:600;">@Model.Title</h2>
             </div>
             <p style="margin:0 0 22px;font-size:14px;">@Model.Body</p>
             <div class="actions">

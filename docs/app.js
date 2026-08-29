@@ -1,9 +1,10 @@
 /*
  * Ficha técnica del equipo — generación de PDF en el navegador del cliente.
  *
- * Flujo: el kiosko codifica las specs del equipo en el #hash de la URL (JSON → gzip → Base64Url).
+ * Flujo: el kiosko codifica las specs del equipo en el #hash de la URL (JSON → deflate → Base64Url).
  * Aquí hacemos el camino inverso, pintamos la ficha y la exportamos a PDF con html2pdf.
- * No hay servidor: los datos nunca salen del dispositivo (el #hash no se envía en la petición HTTP).
+ * El servidor solo entrega esta aplicación estática: los datos nunca salen del dispositivo
+ * porque el #hash no se envía en la petición HTTP.
  */
 
 // Texto "qué es" por componente (estático). Enriquece el PDF sin engordar el QR.

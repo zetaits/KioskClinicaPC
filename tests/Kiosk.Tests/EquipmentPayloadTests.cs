@@ -10,7 +10,7 @@ namespace KioskClinicaPC.Tests
 {
     public class EquipmentPayloadTests
     {
-        private const string BaseUrl = "https://zetaits.github.io/KioskClinicaPC/";
+        private const string BaseUrl = "https://vps-9c7061ff.vps.ovh.net/ficha/";
 
         private static AppConfig MakeConfig() => new AppConfig
         {

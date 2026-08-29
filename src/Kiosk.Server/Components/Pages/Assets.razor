@@ -3,109 +3,31 @@
 @rendermode InteractiveServer
 @inject AssetLibrary Lib
 
-<div class="card">
-    <div class="card-head" style="margin-bottom:6px;">
-        <h2>Marcas de equipos</h2>
-        <span class="mono-note">@Lib.List("Brands").Count marcas · sincronizan a todos los kioscos</span>
+<div class="asset-toolbar">
+    <div class="search">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7" /><path d="m20 20-4-4" /></svg>
+        <input aria-label="Buscar imágenes" placeholder="Buscar por nombre…" @bind="_search" @bind:event="oninput" />
     </div>
-    <p class="muted" style="margin:0 0 20px;">
-        Al añadir el logo de una marca nueva, todos los ordenadores cliente actualizan su base de datos y
-        podrán detectar y mostrar equipos de esa marca.
-    </p>
-
-    <div class="brand-grid">
-        <div class="drop-tile">
-            <div class="ico">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFB069" stroke-width="2.2"><path d="M12 5v14M5 12h14" /></svg>
-            </div>
-            <div class="t">Añadir marca</div>
-            <div class="s">PNG · JPG · WEBP · GIF</div>
-            <InputFile OnChange='e => Upload("Brands", e)' accept=".png,.jpg,.jpeg,.webp,.gif" multiple />
-        </div>
-
-        @foreach (var f in Lib.List("Brands"))
-        {
-            <div class="brand-tile">
-                <img src="@($"/panel/assets/Brands/{f}")" alt="@f" />
-                <div class="n">@f</div>
-                <button class="danger del" title="Borrar" @onclick='() => Delete("Brands", f)'>✕</button>
-            </div>
-        }
+    <div class="asset-summary">
+        <span class="dot online"></span>
+        @Lib.Manifest().Files.Count imágenes publicadas · sincronización automática
     </div>
 </div>
 
-<div class="card">
-    <div class="card-head" style="margin-bottom:6px;">
-        <h2>Imágenes de componentes</h2>
-        <span class="mono-note">@Lib.List("SpecImages").Count imágenes</span>
-    </div>
-    <p class="muted" style="margin:0 0 20px;">
-        Ilustraciones de CPU, GPU y sistema operativo que aparecen en la ficha del equipo.
-    </p>
+<AssetSection Category="Brands"
+              Title="Marcas de equipos"
+              Description="Logos que se muestran al reconocer el fabricante del ordenador."
+              NameLabel="Nombre de la marca"
+              Placeholder="Ej. Lenovo"
+              Search="@_search" />
 
-    <div class="brand-grid">
-        <div class="drop-tile">
-            <div class="ico">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFB069" stroke-width="2.2"><path d="M12 5v14M5 12h14" /></svg>
-            </div>
-            <div class="t">Subir imagen</div>
-            <div class="s">PNG · JPG · WEBP · GIF</div>
-            <InputFile OnChange='e => Upload("SpecImages", e)' accept=".png,.jpg,.jpeg,.webp,.gif" multiple />
-        </div>
-
-        @foreach (var f in Lib.List("SpecImages"))
-        {
-            <div class="brand-tile">
-                <img src="@($"/panel/assets/SpecImages/{f}")" alt="@f" />
-                <div class="n">@f</div>
-                <button class="danger del" title="Borrar" @onclick='() => Delete("SpecImages", f)'>✕</button>
-            </div>
-        }
-    </div>
-</div>
-
-<Toast Message="@_message" IsError="_error" />
+<AssetSection Category="SpecImages"
+              Title="Imágenes de componentes"
+              Description="Ilustraciones para CPU, GPU y sistema operativo en la ficha del equipo."
+              NameLabel="Identificador del componente"
+              Placeholder="Ej. intel core i7"
+              Search="@_search" />
 
 @code {
-    private string? _message;
-    private bool _error;
-
-    private const long MaxBytes = 8 * 1024 * 1024; // 8 MB por imagen
-
-    private async Task Upload(string category, InputFileChangeEventArgs e)
-    {
-        _message = null;
-        int ok = 0;
-        try
-        {
-            foreach (var file in e.GetMultipleFiles(maximumFileCount: 20))
-            {
-                await using var stream = file.OpenReadStream(MaxBytes);
-                await Lib.SaveAsync(category, file.Name, stream);
-                ok++;
-            }
-            _error = false;
-            _message = $"{ok} imagen(es) subidas.";
-        }
-        catch (Exception ex)
-        {
-            _error = true;
-            _message = "Error al subir: " + ex.Message;
-        }
-    }
-
-    private void Delete(string category, string file)
-    {
-        try
-        {
-            Lib.Delete(category, file);
-            _error = false;
-            _message = $"Borrada «{file}».";
-        }
-        catch (Exception ex)
-        {
-            _error = true;
-            _message = "Error al borrar: " + ex.Message;
-        }
-    }
+    private string _search = "";
 }

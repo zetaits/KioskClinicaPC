@@ -16,7 +16,13 @@ namespace KioskClinicaPC.Core.Sync
         SetPrice,
 
         /// <summary>Renombrar el equipo (<see cref="Name"/>); se persiste en el propio kiosko.</summary>
-        SetName
+        SetName,
+
+        /// <summary>Instalar un paquete previamente autorizado por el panel.</summary>
+        InstallPackage,
+
+        /// <summary>Desinstalar de forma completa la propia aplicación Kiosk.</summary>
+        UninstallKiosk
     }
 
     /// <summary>
@@ -37,6 +43,18 @@ namespace KioskClinicaPC.Core.Sync
         /// <summary>Nuevo nombre (solo <see cref="FleetCommandKind.SetName"/>).</summary>
         public string? Name { get; set; }
 
+        /// <summary>Trabajo de instalación autorizado (solo <see cref="FleetCommandKind.InstallPackage"/>).</summary>
+        public string? InstallationJobId { get; set; }
+
+        /// <summary>Token efímero de ese trabajo; no permite elegir archivo, URL ni argumentos.</summary>
+        public string? InstallationToken { get; set; }
+
+        /// <summary>Trabajo de mantenimiento autorizado para una autodesinstalación.</summary>
+        public string? MaintenanceJobId { get; set; }
+
+        /// <summary>Token efímero ligado al equipo y al trabajo de mantenimiento.</summary>
+        public string? MaintenanceToken { get; set; }
+
         public static FleetCommand Reboot() => new() { Kind = FleetCommandKind.Reboot };
         public static FleetCommand Shutdown() => new() { Kind = FleetCommandKind.Shutdown };
         public static FleetCommand RestartApp() => new() { Kind = FleetCommandKind.RestartApp };
@@ -44,5 +62,9 @@ namespace KioskClinicaPC.Core.Sync
             new() { Kind = FleetCommandKind.SetPrice, Price = price, OldPrice = oldPrice };
         public static FleetCommand SetName(string name) =>
             new() { Kind = FleetCommandKind.SetName, Name = name };
+        public static FleetCommand InstallPackage(string jobId, string token) =>
+            new() { Kind = FleetCommandKind.InstallPackage, InstallationJobId = jobId, InstallationToken = token };
+        public static FleetCommand UninstallKiosk(string jobId, string token) =>
+            new() { Kind = FleetCommandKind.UninstallKiosk, MaintenanceJobId = jobId, MaintenanceToken = token };
     }
 }

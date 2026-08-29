@@ -36,6 +36,7 @@ namespace KioskClinicaPC
         private readonly KeyboardHook _hook;
         private readonly MainViewModel _viewModel;
         private readonly ISyncClient _sync;
+        private readonly IAssetSyncService _assetSync;
         private readonly FleetClient _fleet;
 
         private readonly KioskTimers _timers = new KioskTimers();
@@ -56,13 +57,14 @@ namespace KioskClinicaPC
         private KioskSettings _settings = new KioskSettings();
         private int _hotspotClicks = 0;
 
-        public MainWindow(MainViewModel viewModel, ISyncClient sync, FleetClient fleet)
+        public MainWindow(MainViewModel viewModel, ISyncClient sync, IAssetSyncService assetSync, FleetClient fleet)
         {
             InitializeComponent();
 
             _viewModel = viewModel;
             DataContext = _viewModel;
             _sync = sync;
+            _assetSync = assetSync;
             // Reload en vivo: el servidor avisa (push SignalR o polling de versión) de que el contenido
             // compartido cambió. Se aplica al volver a la pantalla de espera, no en mitad de una interacción.
             _sync.ContentChanged += OnServerContentChanged;
@@ -75,6 +77,8 @@ namespace KioskClinicaPC
                 Dispatcher.InvokeAsync(() => _viewModel.ApplyPriceOverride(price, oldPrice));
             _fleet.RestartAppRequested += () =>
                 Dispatcher.InvokeAsync(() => { SystemPower.RelaunchApp(); ShutdownKiosk(); });
+            _fleet.KioskUninstallAccepted += () =>
+                Dispatcher.InvokeAsync(() => { KioskManager.Release(); ShutdownKiosk(); });
 
             _hook = new KeyboardHook();
 
@@ -115,6 +119,7 @@ namespace KioskClinicaPC
             RefreshQr();
             EnterAttractMode();
             _ready = true; // DisplayConfig/Specs ya construidos: la interacción puede disparar el escaneo
+            _ = SyncAssetsInBackground();
 
             // Sync DESPUÉS de la carga inicial: si arrancara antes, un push "ContentChanged" temprano podría
             // colar una recarga a mitad del montaje inicial. No bloquea; si no hay servidor es no-op.
@@ -131,9 +136,6 @@ namespace KioskClinicaPC
         }
 
         private void ApplyTimerIntervals() => _timers.ApplyIntervals(_settings);
-
-        /// <summary>URL de la web (GitHub Pages) que genera el PDF de la ficha. El QR apunta a "{url}#{datos}".</summary>
-        private const string FichaPdfBaseUrl = "https://zetaits.github.io/KioskClinicaPC/";
 
         // Píxeles útiles de cada hueco de QR (tamaño del Border menos su Padding). El bitmap se
         // genera al múltiplo entero de módulos que quepa y se muestra 1:1: reescalarlo emborrona.
@@ -156,14 +158,15 @@ namespace KioskClinicaPC
                 // Degradación: ficha completa → ficha sin detalles. Sin escalón de URL base: la
                 // landing sin datos no puede generar la ficha, así que un QR a ella no sirve de
                 // nada — si ni el payload recortado cabe, mejor ocultar el QR (qr == null).
-                string? url = EquipmentPayload.BuildUrl(FichaPdfBaseUrl, _viewModel.DisplayConfig, specs, shopName: null);
+                string fichaPdfBaseUrl = FichaPdfUrl.Resolve(_settings.ServerUrl);
+                string? url = EquipmentPayload.BuildUrl(fichaPdfBaseUrl, _viewModel.DisplayConfig, specs, shopName: null);
                 if (url != null) Log.Information("QR payload longitud {Len} caracteres.", url.Length);
                 var qr = QrGenerator.Generate(url, QrCardPixels);
 
                 if (qr == null)
                 {
                     Log.Warning("QR con ficha completa falló (payload demasiado grande); probando sin detalles.");
-                    url = EquipmentPayload.BuildUrl(FichaPdfBaseUrl, _viewModel.DisplayConfig, specs, shopName: null, includeDetails: false);
+                    url = EquipmentPayload.BuildUrl(fichaPdfBaseUrl, _viewModel.DisplayConfig, specs, shopName: null, includeDetails: false);
                     qr = QrGenerator.Generate(url, QrCardPixels);
                     if (qr == null) Log.Warning("QR sin detalles también falló; se oculta el QR.");
                 }
@@ -444,6 +447,7 @@ namespace KioskClinicaPC
             _reloadInProgress = true;
             try
             {
+                await _assetSync.SyncAsync();
                 await _viewModel.ReloadContentAsync();
                 RefreshQr();
             }
@@ -453,6 +457,16 @@ namespace KioskClinicaPC
             }
             finally { _reloadInProgress = false; }
             EnterAttractMode(); // _reloadPending ya en false → montaje normal con el contenido nuevo
+        }
+
+        private async Task SyncAssetsInBackground()
+        {
+            if (!await _assetSync.SyncAsync()) return;
+            await Dispatcher.InvokeAsync(() =>
+            {
+                _viewModel.RefreshAssets();
+                RefreshQr();
+            });
         }
 
         private void EnterAttractMode()
@@ -637,44 +651,52 @@ namespace KioskClinicaPC
             Application.Current.Shutdown();
         }
 
-        private void Window_KeyDown(object sender, KeyEventArgs e)
+        private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
         {
             ResetInactivityTimer();
-            if (Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
+
+            switch (KioskKeyPolicy.Resolve(
+                _viewModel.CurrentScreen,
+                EditModeService.Instance.IsActive,
+                e.Key,
+                Keyboard.Modifiers))
             {
-                if (e.Key == Key.K) ShutdownKiosk();
-                if (e.Key == Key.S) OpenSettingsDialog();
-                if (e.Key == Key.P)
-                {
+                case KioskKeyAction.Shutdown:
+                    e.Handled = true;
+                    ShutdownKiosk();
+                    break;
+
+                case KioskKeyAction.OpenSettings:
+                    e.Handled = true;
+                    OpenSettingsDialog();
+                    break;
+
+                case KioskKeyAction.ToggleWindowsKey:
+                    e.Handled = true;
                     KeyboardHook.AllowWindowsKey = !KeyboardHook.AllowWindowsKey;
                     KioskDialog.Alert(this, "Capturas",
                         KeyboardHook.AllowWindowsKey
                             ? "Tecla Windows DESBLOQUEADA. Win+Impr Pant guardará captura en Imágenes\\Capturas de pantalla."
                             : "Tecla Windows BLOQUEADA.");
-                }
-            }
-            if (e.Key == Key.Escape && _viewModel.CurrentScreen > 0 && !EditModeService.Instance.IsActive) NavigateToScreen(0);
+                    break;
 
-            // En la pantalla de atracción, cualquier tecla (no modificadora) inicia el escaneo, igual que un clic.
-            if (_viewModel.CurrentScreen == 0 && !EditModeService.Instance.IsActive
-                && Keyboard.Modifiers == ModifierKeys.None
-                && e.Key != Key.System && e.Key != Key.LeftCtrl && e.Key != Key.RightCtrl
-                && e.Key != Key.LeftShift && e.Key != Key.RightShift
-                && e.Key != Key.LWin && e.Key != Key.RWin)
-            {
-                StartScanSequence();
-            }
+                case KioskKeyAction.GoToAttract:
+                    e.Handled = true;
+                    NavigateToScreen(0);
+                    break;
 
-            // En Detalle, cualquier tecla (no modificadora, salvo Escape) vuelve al resumen (Main).
-            if (_viewModel.CurrentScreen == 3 && !EditModeService.Instance.IsActive
-                && Keyboard.Modifiers == ModifierKeys.None
-                && e.Key != Key.Escape
-                && e.Key != Key.System && e.Key != Key.LeftCtrl && e.Key != Key.RightCtrl
-                && e.Key != Key.LeftShift && e.Key != Key.RightShift
-                && e.Key != Key.LWin && e.Key != Key.RWin)
-            {
-                EndAutoTour();
-                NavigateToScreen(2);
+                case KioskKeyAction.StartScan:
+                    // PreviewKeyDown ocurre antes que el KeyDown del control enfocado. Marcarlo como
+                    // gestionado impide que Espacio/Enter activen además un Button de la pantalla.
+                    e.Handled = true;
+                    StartScanSequence();
+                    break;
+
+                case KioskKeyAction.GoToMain:
+                    e.Handled = true;
+                    EndAutoTour();
+                    NavigateToScreen(2);
+                    break;
             }
         }
 

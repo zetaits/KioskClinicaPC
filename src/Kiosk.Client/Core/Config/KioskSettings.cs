@@ -59,6 +59,44 @@ namespace KioskClinicaPC.Core.Config
             return new KioskSettings();
         }
 
+        /// <summary>
+        /// Aplica la URL y la clave sembradas por el instalador únicamente para un perfil nuevo. El Setup
+        /// deja el fichero junto al exe para no depender de qué cuenta aceptó el UAC; el kiosko lo lee ya
+        /// ejecutándose como el usuario interactivo correcto. Un KioskSettings existente nunca se modifica.
+        /// </summary>
+        public bool ApplyProvisioningIfNew(string settingsPath, string provisioningPath)
+        {
+            if (File.Exists(settingsPath) || !File.Exists(provisioningPath)) return false;
+
+            try
+            {
+                var provisioning = JsonConvert.DeserializeObject<ServerProvisioning>(File.ReadAllText(provisioningPath));
+                string? url = provisioning?.ServerUrl?.Trim().TrimEnd('/');
+                string? key = provisioning?.ServerApiKey?.Trim();
+                if (!Uri.TryCreate(url, UriKind.Absolute, out Uri? uri) ||
+                    uri.Scheme != Uri.UriSchemeHttps || string.IsNullOrWhiteSpace(key))
+                {
+                    Log.Warning("El aprovisionamiento del servidor no es válido; se omite.");
+                    return false;
+                }
+
+                ServerUrl = url;
+                ServerApiKey = key;
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "No se pudo leer el aprovisionamiento del servidor.");
+                return false;
+            }
+        }
+
+        private sealed class ServerProvisioning
+        {
+            public string? ServerUrl { get; set; }
+            public string? ServerApiKey { get; set; }
+        }
+
         public void Save(string path)
         {
             try

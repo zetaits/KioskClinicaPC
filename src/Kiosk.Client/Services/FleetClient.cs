@@ -1,7 +1,10 @@
 using System;
 using System.Diagnostics;
+using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Net.Http;
+using System.Net.Http.Json;
 using KioskClinicaPC.Core;
 using KioskClinicaPC.Core.Config;
 using KioskClinicaPC.Core.Sync;
@@ -37,12 +40,18 @@ namespace KioskClinicaPC.Services
         private HubConnection? _connection;
         private Timer? _heartbeatTimer;
         private volatile bool _disposed;
+        private string _installerAgentVersion = "";
+        private bool _canUninstallKiosk;
+        private int _agentProbeRunning;
 
         /// <summary>El panel fijó un precio para este equipo. Aplícalo y persístelo (hilo de UI).</summary>
         public event Action<decimal, decimal>? PriceOverrideReceived;
 
         /// <summary>El panel pidió reiniciar la app kiosko (hilo de UI: relanzar + cerrar).</summary>
         public event Action? RestartAppRequested;
+
+        /// <summary>El runner privilegiado aceptó una autodesinstalación; la UI debe cerrarse limpiamente.</summary>
+        public event Action? KioskUninstallAccepted;
 
         public FleetClient(string? serverUrl, string? apiKey, string deviceId, string deviceName, string settingsPath)
         {
@@ -81,6 +90,7 @@ namespace KioskClinicaPC.Services
             };
 
             _ = ConnectLoopAsync();
+            _ = ProbeInstallerAgent();
             _heartbeatTimer = new Timer(_ => _ = SafeSend("Heartbeat"), null, HeartbeatPeriod, HeartbeatPeriod);
         }
 
@@ -127,6 +137,10 @@ namespace KioskClinicaPC.Services
                 hb.Name = _deviceName;
             }
             hb.StartedAtUnixMs = _startedAtUnixMs;
+            hb.InstallerAgentVersion = _installerAgentVersion;
+            hb.CanUninstallKiosk = _canUninstallKiosk;
+            if (string.IsNullOrEmpty(_installerAgentVersion) && Interlocked.Exchange(ref _agentProbeRunning, 1) == 0)
+                _ = ProbeInstallerAgent();
             return hb;
         }
 
@@ -155,12 +169,96 @@ namespace KioskClinicaPC.Services
                     case FleetCommandKind.SetName:
                         ApplyName(cmd.Name);
                         break;
+                    case FleetCommandKind.InstallPackage:
+                        _ = DispatchInstallation(cmd);
+                        break;
+                    case FleetCommandKind.UninstallKiosk:
+                        _ = DispatchKioskUninstall(cmd);
+                        break;
                 }
             }
             catch (Exception ex)
             {
                 Log.Error(ex, "Flota: error al ejecutar la orden {Kind}.", cmd.Kind);
             }
+        }
+
+        private async Task ProbeInstallerAgent()
+        {
+            try
+            {
+                var response = await InstallerAgentClient.HealthAsync(_hubUrl == null ? null : _hubUrl[..^"/hub/fleet".Length]);
+                if (response.Accepted && !string.IsNullOrWhiteSpace(response.AgentVersion))
+                {
+                    _installerAgentVersion = response.AgentVersion;
+                    _canUninstallKiosk = response.CanUninstallKiosk;
+                }
+            }
+            finally { Interlocked.Exchange(ref _agentProbeRunning, 0); }
+        }
+
+        private async Task DispatchInstallation(FleetCommand cmd)
+        {
+            string? jobId = cmd.InstallationJobId;
+            string? token = cmd.InstallationToken;
+            if (string.IsNullOrWhiteSpace(jobId) || string.IsNullOrWhiteSpace(token)) return;
+            var response = await InstallerAgentClient.InstallAsync(_hubUrl == null ? null : _hubUrl[..^"/hub/fleet".Length],
+                _apiKey, _deviceId, jobId, token);
+            if (response.Accepted)
+            {
+                if (!string.IsNullOrWhiteSpace(response.AgentVersion)) _installerAgentVersion = response.AgentVersion;
+                Log.Information("Flota: trabajo de instalación {JobId} aceptado por el agente.", jobId);
+                return;
+            }
+            Log.Warning("Flota: el agente rechazó {JobId}: {Error}", jobId, response.Error);
+            await ReportInstallationFailure(jobId, token, response.Error ?? "El agente rechazó el trabajo.");
+        }
+
+        private async Task ReportInstallationFailure(string jobId, string token, string error)
+        {
+            if (_hubUrl == null) return;
+            try
+            {
+                using var http = new HttpClient { BaseAddress = new Uri(_hubUrl[..^"/hub/fleet".Length].TrimEnd('/') + "/"), Timeout = TimeSpan.FromSeconds(10) };
+                if (!string.IsNullOrWhiteSpace(_apiKey)) http.DefaultRequestHeaders.Add("X-Api-Key", _apiKey);
+                http.DefaultRequestHeaders.Add("X-Install-Token", token);
+                await http.PostAsJsonAsync($"api/installations/{jobId}/status", new InstallationStatusUpdate
+                {
+                    DeviceId = _deviceId, State = InstallationJobState.Failed, Message = error
+                });
+            }
+            catch (Exception ex) { Log.Debug(ex, "No se pudo reportar el rechazo de instalación {JobId}.", jobId); }
+        }
+
+        private async Task DispatchKioskUninstall(FleetCommand cmd)
+        {
+            string? jobId = cmd.MaintenanceJobId;
+            string? token = cmd.MaintenanceToken;
+            if (_hubUrl == null || string.IsNullOrWhiteSpace(jobId) || string.IsNullOrWhiteSpace(token)) return;
+            string serverUrl = _hubUrl[..^"/hub/fleet".Length];
+            var response = await InstallerAgentClient.UninstallKioskAsync(
+                Path.GetDirectoryName(_settingsPath)!, serverUrl, _apiKey, _deviceId, jobId, token);
+            if (response.Accepted)
+            {
+                Log.Warning("Flota: autodesinstalación {JobId} aceptada por el agente.", jobId);
+                KioskUninstallAccepted?.Invoke();
+                return;
+            }
+            Log.Warning("Flota: el agente rechazó la autodesinstalación {JobId}: {Error}", jobId, response.Error);
+            await ReportMaintenanceFailure(serverUrl, jobId, token, response.Error ?? "El agente rechazó la autodesinstalación.");
+        }
+
+        private async Task ReportMaintenanceFailure(string serverUrl, string jobId, string token, string error)
+        {
+            try
+            {
+                using var http = new HttpClient { BaseAddress = new Uri(serverUrl.TrimEnd('/') + "/"), Timeout = TimeSpan.FromSeconds(10) };
+                if (!string.IsNullOrWhiteSpace(_apiKey)) http.DefaultRequestHeaders.Add("X-Api-Key", _apiKey);
+                http.DefaultRequestHeaders.Add("X-Maintenance-Token", token);
+                await http.PostAsJsonAsync($"api/maintenance/{jobId}/status", new MaintenanceStatusUpdate
+                { DeviceId = _deviceId, State = MaintenanceJobState.Failed, Message = error });
+            }
+            catch (Exception ex) { Log.Debug(ex, "No se pudo reportar el rechazo del mantenimiento {JobId}.", jobId); }
         }
 
         // Renombrado remoto: persiste en KioskSettings (releyendo del disco para no pisar otros ajustes)

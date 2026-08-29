@@ -1,0 +1,27 @@
+[Unit]
+Description=Kiosk ClinicaPC Server
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=kiosk-server
+Group=kiosk-server
+WorkingDirectory=/opt/kiosk-server/app
+ExecStart=/usr/bin/dotnet /opt/kiosk-server/app/Kiosk.Server.dll
+Restart=on-failure
+RestartSec=5s
+TimeoutStopSec=30s
+KillSignal=SIGINT
+Environment=ASPNETCORE_ENVIRONMENT=Production
+Environment=ASPNETCORE_URLS=http://127.0.0.1:5080
+EnvironmentFile=/etc/kiosk-server/kiosk-server.env
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/kiosk-server
+UMask=0027
+
+[Install]
+WantedBy=multi-user.target

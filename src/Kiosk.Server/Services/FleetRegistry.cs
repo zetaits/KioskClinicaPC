@@ -4,7 +4,7 @@ using Newtonsoft.Json;
 namespace Kiosk.Server.Services;
 
 /// <summary>Conectividad del kiosko vista desde el servidor (derivada del heartbeat, no la reporta el cliente).</summary>
-public enum KioskStatus { Online, Busy, Offline }
+public enum KioskStatus { Online, Busy, Offline, Uninstalled }
 
 /// <summary>Un kiosko de la tienda tal como lo pinta el panel. Se construye a partir del último
 /// <see cref="KioskHeartbeat"/> recibido más los overrides del panel (nombre) y el estado de conexión.</summary>
@@ -22,6 +22,9 @@ public sealed class FleetDevice
     public decimal Price { get; set; }
     public decimal OldPrice { get; set; }
     public string AppVersion { get; set; } = "";
+    public string InstallerAgentVersion { get; set; } = "";
+    public bool CanInstall => !string.IsNullOrWhiteSpace(InstallerAgentVersion);
+    public bool CanUninstallKiosk { get; set; }
 
     /// <summary>ConnectionId del hub mientras está conectado; null si está caído.</summary>
     public string? ConnectionId { get; set; }
@@ -29,7 +32,7 @@ public sealed class FleetDevice
     public long StartedAtUnixMs { get; set; }
 
     public KioskStatus Status { get; set; }
-    public bool IsOnline => Status != KioskStatus.Offline;
+    public bool IsOnline => Status is KioskStatus.Online or KioskStatus.Busy;
     public bool HasOldPrice => OldPrice > 0 && OldPrice > Price;
 
     /// <summary>Uptime legible calculado desde <see cref="StartedAtUnixMs"/> (o "—" si caído/desconocido).</summary>
@@ -37,7 +40,7 @@ public sealed class FleetDevice
     {
         get
         {
-            if (Status == KioskStatus.Offline)
+            if (Status is KioskStatus.Offline or KioskStatus.Uninstalled)
                 return LastSeenUtc == default ? "—" : "hace " + Humanize(DateTime.UtcNow - LastSeenUtc);
             if (StartedAtUnixMs <= 0) return "—";
             var up = DateTime.UtcNow - DateTimeOffset.FromUnixTimeMilliseconds(StartedAtUnixMs).UtcDateTime;
@@ -78,6 +81,7 @@ public sealed class FleetRegistry
         public string? Name { get; set; }
         public decimal? Price { get; set; }
         public decimal? OldPrice { get; set; }
+        public bool Decommissioned { get; set; }
         public bool HasName => !string.IsNullOrWhiteSpace(Name);
         public bool HasPrice => Price.HasValue;
     }
@@ -173,12 +177,14 @@ public sealed class FleetRegistry
             d.Price = hb.Price;
             d.OldPrice = hb.OldPrice;
             d.AppVersion = hb.AppVersion ?? "";
+            d.InstallerAgentVersion = hb.InstallerAgentVersion ?? "";
+            d.CanUninstallKiosk = hb.CanUninstallKiosk;
             d.StartedAtUnixMs = hb.StartedAtUnixMs;
             d.LastSeenUtc = DateTime.UtcNow;
 
             var ov = _overrides.TryGetValue(hb.DeviceId, out var o) ? o : null;
             d.Name = ov?.HasName == true ? ov.Name! : d.ReportedName;
-            d.Status = DeriveStatus(d);
+            d.Status = ov?.Decommissioned == true ? KioskStatus.Uninstalled : DeriveStatus(d);
             name = d.Name;
 
             // Overrides no reflejados aún por el equipo → reenviar.
@@ -202,7 +208,7 @@ public sealed class FleetRegistry
             var d = _devices.Values.FirstOrDefault(x => x.ConnectionId == connectionId);
             if (d == null) return;
             d.ConnectionId = null;
-            d.Status = KioskStatus.Offline;
+            if (d.Status != KioskStatus.Uninstalled) d.Status = KioskStatus.Offline;
             d.Screen = KioskScreen.Off;
             name = d.Name;
         }
@@ -219,7 +225,7 @@ public sealed class FleetRegistry
         {
             foreach (var d in _devices.Values)
             {
-                if (d.Status != KioskStatus.Offline && now - d.LastSeenUtc > OfflineAfter)
+                if (d.Status is not KioskStatus.Offline and not KioskStatus.Uninstalled && now - d.LastSeenUtc > OfflineAfter)
                 {
                     d.ConnectionId = null;
                     d.Status = KioskStatus.Offline;
@@ -277,6 +283,26 @@ public sealed class FleetRegistry
 
     /// <summary>Anota una publicación de contenido en el registro de actividad (la llama el panel al guardar).</summary>
     public void LogContentPublished(string what) => Log(what);
+
+    public void MarkUninstalled(string id)
+    {
+        string name = id;
+        lock (_gate)
+        {
+            var ov = GetOrCreateOverride(id);
+            ov.Decommissioned = true;
+            SaveOverrides();
+            if (_devices.TryGetValue(id, out var device))
+            {
+                device.ConnectionId = null;
+                device.Status = KioskStatus.Uninstalled;
+                device.Screen = KioskScreen.Off;
+                name = device.Name;
+            }
+        }
+        Log($"Kiosk desinstalado de {name}");
+        Changed?.Invoke();
+    }
 
     // ── Internos ──────────────────────────────────────────────────────────────────────────────
 
@@ -362,6 +388,7 @@ public sealed class FleetRegistry
     {
         KioskStatus.Online => "online",
         KioskStatus.Busy => "busy",
+        KioskStatus.Uninstalled => "offline",
         _ => "offline",
     };
 
@@ -369,6 +396,7 @@ public sealed class FleetRegistry
     {
         KioskStatus.Online => "online",
         KioskStatus.Busy => "en uso",
+        KioskStatus.Uninstalled => "desinstalado",
         _ => "sin conexión",
     };
 }

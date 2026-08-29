@@ -11,7 +11,7 @@ namespace KioskClinicaPC.Tests
         {
             // Payload realista (~450 chars): el bitmap debe salir a escala entera de módulos,
             // nunca mayor que el hueco (Stretch=None lo muestra 1:1).
-            string url = "https://zetaits.github.io/KioskClinicaPC/#" + string.Concat(Enumerable.Repeat("Abc123_-", 51));
+            string url = "https://vps-9c7061ff.vps.ovh.net/ficha/#" + string.Concat(Enumerable.Repeat("Abc123_-", 51));
             var qr = QrGenerator.Generate(url, 232);
 
             Assert.NotNull(qr);
@@ -22,7 +22,7 @@ namespace KioskClinicaPC.Tests
         [Fact]
         public void Generate_TextoCorto_TambienCabe()
         {
-            var qr = QrGenerator.Generate("https://zetaits.github.io/KioskClinicaPC/", 72);
+            var qr = QrGenerator.Generate("https://vps-9c7061ff.vps.ovh.net/ficha/", 72);
             Assert.NotNull(qr);
             Assert.True(qr!.PixelWidth <= 72);
         }

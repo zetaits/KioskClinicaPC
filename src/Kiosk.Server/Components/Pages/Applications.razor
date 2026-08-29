@@ -1,0 +1,328 @@
+@page "/aplicaciones"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@implements IDisposable
+@using KioskClinicaPC.Core.Sync
+@inject InstallerCatalog Catalog
+@inject InstallationJobStore Jobs
+@inject FleetRegistry Fleet
+@inject IHubContext<FleetHub> Hub
+
+@if (!string.IsNullOrWhiteSpace(Error))
+{
+    <div class="alert error" role="alert"><span class="dot offline"></span>@Error</div>
+}
+@if (!string.IsNullOrWhiteSpace(Ok))
+{
+    <div class="alert success" role="status"><span class="dot online"></span>@Ok</div>
+}
+
+<section class="card">
+    <div class="card-head">
+        <div>
+            <h2>Añadir aplicación</h2>
+            <p class="muted section-copy">El binario queda privado y solo se entrega a equipos autorizados.</p>
+        </div>
+        <span class="mono-note">MSI · Inno Setup · NSIS · máx. @(Catalog.MaxBytes / 1024 / 1024) MB</span>
+    </div>
+
+    <form method="post"
+          action="/panel/installers/upload"
+          enctype="multipart/form-data"
+          class="installer-upload"
+          data-installer-upload>
+        <AntiforgeryToken />
+        <div class="installer-fields">
+            <div class="field">
+                <label class="field-label" for="installer-name">Nombre visible</label>
+                <input id="installer-name" required maxlength="100" name="displayName" placeholder="Ej. Google Chrome" />
+            </div>
+            <label class="installer-drop">
+                <span class="ico" aria-hidden="true">＋</span>
+                <span>
+                    <b>Seleccionar instalador</b>
+                    <small>Archivo .msi o .exe</small>
+                </span>
+                <span class="selected-file" data-selected-file>Ningún archivo seleccionado</span>
+                <input required type="file" name="installer" accept=".msi,.exe" data-installer-file />
+            </label>
+            <button class="primary upload-submit" type="submit">
+                <span data-upload-label>Subir al catálogo</span>
+            </button>
+        </div>
+        <label class="check-row warning">
+            <input type="checkbox" name="allowUnsigned" />
+            <span>Permitir instaladores sin firma digital. El agente seguirá verificando tamaño y SHA-256.</span>
+        </label>
+        <div class="upload-progress" data-upload-progress hidden>
+            <div class="track"><span data-upload-bar></span></div>
+            <span class="mono-note" data-upload-status>Preparando subida…</span>
+        </div>
+        <div class="inline-error" data-upload-error hidden role="alert"></div>
+    </form>
+</section>
+
+<section class="card">
+    <div class="card-head">
+        <h2>Catálogo</h2>
+        <span class="mono-note">@Catalog.List().Count aplicaciones disponibles</span>
+    </div>
+    @if (Catalog.List().Count == 0)
+    {
+        <div class="empty-state">
+            <div class="empty-icon">▣</div>
+            <div><b>El catálogo está vacío</b><p>Sube un MSI, Inno Setup o NSIS para empezar.</p></div>
+        </div>
+    }
+    else
+    {
+        <div class="catalog-list">
+            @foreach (InstallerPackage package in Catalog.List())
+            {
+                <article class="catalog-item" @key="package.Id">
+                    <div class="app-mark">@KindShort(package.Kind)</div>
+                    <div class="catalog-main">
+                        <strong>@package.DisplayName</strong>
+                        <span>@package.OriginalFileName · @Size(package.SizeBytes)</span>
+                        <code>SHA-256 @package.Sha256[..12]…</code>
+                    </div>
+                    <div class="catalog-meta">
+                        <span class="badge accent">@Kind(package.Kind)</span>
+                        <span class="badge @(package.HasEmbeddedSignature ? "ok" : "warn")">
+                            @(package.HasEmbeddedSignature ? "Firma incluida" : "Sin firma")
+                        </span>
+                        <time>@package.UploadedAtUtc.ToLocalTime().ToString("dd/MM/yyyy")</time>
+                    </div>
+                    <div class="catalog-actions">
+                        <button type="button" @onclick="() => BeginRename(package)">Renombrar</button>
+                        <button type="button" class="danger" @onclick="() => AskDelete(package)">Retirar</button>
+                    </div>
+                </article>
+            }
+        </div>
+    }
+</section>
+
+<section class="card">
+    <div class="card-head">
+        <div>
+            <h2>Instalar aplicación</h2>
+            <p class="muted section-copy">Solo aparecen conectados; los incompatibles explican qué falta.</p>
+        </div>
+        <span class="mono-note">@CompatibleDevices.Count compatibles ahora</span>
+    </div>
+
+    <div class="deploy-toolbar">
+        <div class="field app-select">
+            <label class="field-label" for="package-select">Aplicación</label>
+            <select id="package-select" @bind="_packageId">
+                <option value="">Selecciona una aplicación…</option>
+                @foreach (InstallerPackage package in Catalog.List())
+                {
+                    <option value="@package.Id">@package.DisplayName</option>
+                }
+            </select>
+        </div>
+        <button type="button" @onclick="SelectAllCompatible" disabled="@(CompatibleDevices.Count == 0)">Seleccionar compatibles</button>
+        <button type="button" class="primary" disabled="@(!CanDeploy)" @onclick="() => _confirmDeploy = true">
+            Instalar en @_selected.Count equipo(s)
+        </button>
+    </div>
+
+    @if (!OnlineDevices.Any())
+    {
+        <div class="empty-state compact">
+            <div class="empty-icon">○</div>
+            <div><b>No hay equipos online</b><p>La selección aparecerá cuando un kiosko se conecte.</p></div>
+        </div>
+    }
+    else
+    {
+        <div class="device-choice-grid">
+            @foreach (FleetDevice device in OnlineDevices)
+            {
+                bool available = device.CanInstall && !Jobs.HasActiveJob(device.Id);
+                <label class="device-choice @(available ? "" : "disabled")">
+                    <input type="checkbox"
+                           disabled="@(!available)"
+                           checked="@_selected.Contains(device.Id)"
+                           @onchange="e => Select(device.Id, (bool)(e.Value ?? false))" />
+                    <span class="dot @(device.IsOnline ? "online" : "offline")"></span>
+                    <span>
+                        <b>@device.Name</b>
+                        <small>@DeviceReason(device)</small>
+                    </span>
+                </label>
+            }
+        </div>
+    }
+</section>
+
+<section class="card">
+    <div class="card-head"><h2>Historial</h2><span class="mono-note">últimos 50 trabajos</span></div>
+    @if (!RecentJobs.Any())
+    {
+        <div class="empty-state compact">
+            <div class="empty-icon">↺</div>
+            <div><b>Sin instalaciones todavía</b><p>Los avances y resultados aparecerán aquí.</p></div>
+        </div>
+    }
+    else
+    {
+        <div class="job-list">
+            @foreach (InstallationJob job in RecentJobs)
+            {
+                <article class="job-row">
+                    <div class="job-title"><b>@job.PackageName</b><span>→ @job.DeviceName</span></div>
+                    <span class="badge @StateCss(job.State)">@State(job.State)</span>
+                    <div class="job-progress">
+                        <div class="track"><span style="@($"width:{job.ProgressPercent ?? (job.IsTerminal ? 100 : 8)}%")"></span></div>
+                        <small>@(job.ProgressPercent is { } progress ? $"{progress}%" : job.Message ?? "Esperando respuesta")</small>
+                    </div>
+                    <time>@job.UpdatedAtUtc.ToLocalTime().ToString("dd/MM HH:mm")</time>
+                </article>
+            }
+        </div>
+    }
+</section>
+
+@if (_rename is not null)
+{
+    <div class="modal-backdrop" @onclick="() => _rename = null">
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="rename-title" @onclick:stopPropagation="true">
+            <h2 id="rename-title">Renombrar aplicación</h2>
+            <input aria-label="Nuevo nombre" maxlength="100" @bind="_renameValue" />
+            <div class="actions"><button @onclick="() => _rename = null">Cancelar</button><button class="primary" @onclick="SaveRename">Guardar</button></div>
+        </div>
+    </div>
+}
+
+@if (_confirmDeploy)
+{
+    <div class="modal-backdrop" @onclick="() => _confirmDeploy = false">
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="deploy-title" @onclick:stopPropagation="true">
+            <div class="icon-badge">⇩</div>
+            <h2 id="deploy-title">Confirmar instalación remota</h2>
+            <p>Se enviará <b>@SelectedPackage?.DisplayName</b> a <b>@_selected.Count equipo(s)</b>. Cada agente volverá a verificar firma, tamaño y SHA-256.</p>
+            <div class="actions">
+                <button disabled="@_deploying" @onclick="() => _confirmDeploy = false">Cancelar</button>
+                <button class="primary" disabled="@_deploying" @onclick="Deploy">@(_deploying ? "Enviando…" : "Enviar instalación")</button>
+            </div>
+        </div>
+    </div>
+}
+
+<ConfirmDialog Model="_confirm" OnClose="() => _confirm = null" />
+<Toast Message="@_toast" IsError="@_toastError" />
+
+@code {
+    [SupplyParameterFromQuery] public string? Error { get; set; }
+    [SupplyParameterFromQuery] public string? Ok { get; set; }
+    [SupplyParameterFromQuery(Name = "device")] public string? InitialDevice { get; set; }
+
+    private readonly HashSet<string> _selected = new(StringComparer.OrdinalIgnoreCase);
+    private string _packageId = "";
+    private InstallerPackage? _rename;
+    private string _renameValue = "";
+    private ConfirmDialog.Options? _confirm;
+    private bool _confirmDeploy;
+    private bool _deploying;
+    private string? _toast;
+    private bool _toastError;
+
+    private IReadOnlyList<FleetDevice> OnlineDevices => Fleet.Devices.Where(d => d.IsOnline).ToList();
+    private IReadOnlyList<FleetDevice> CompatibleDevices =>
+        OnlineDevices.Where(d => d.CanInstall && !Jobs.HasActiveJob(d.Id)).ToList();
+    private IReadOnlyList<InstallationJob> RecentJobs => Jobs.Recent(50);
+    private InstallerPackage? SelectedPackage => Catalog.Find(_packageId);
+    private bool CanDeploy => !_deploying && _selected.Count > 0 && SelectedPackage != null;
+
+    protected override void OnInitialized()
+    {
+        Jobs.Changed += Refresh;
+        Fleet.Changed += Refresh;
+        if (!string.IsNullOrWhiteSpace(InitialDevice) &&
+            Fleet.Find(InitialDevice) is { IsOnline: true, CanInstall: true } device &&
+            !Jobs.HasActiveJob(device.Id))
+            _selected.Add(device.Id);
+    }
+
+    public void Dispose() { Jobs.Changed -= Refresh; Fleet.Changed -= Refresh; }
+    private void Refresh() => InvokeAsync(StateHasChanged);
+    private void Select(string id, bool selected) { if (selected) _selected.Add(id); else _selected.Remove(id); }
+    private void SelectAllCompatible() { _selected.Clear(); foreach (FleetDevice d in CompatibleDevices) _selected.Add(d.Id); }
+    private void BeginRename(InstallerPackage package) { _rename = package; _renameValue = package.DisplayName; }
+
+    private void SaveRename()
+    {
+        if (_rename == null) return;
+        try { Catalog.Rename(_rename.Id, _renameValue); _rename = null; _toast = "Nombre actualizado."; _toastError = false; }
+        catch (Exception ex) { _toast = ex.Message; _toastError = true; }
+    }
+
+    private void AskDelete(InstallerPackage package) => _confirm = new()
+    {
+        Title = $"Retirar {package.DisplayName}",
+        Body = "Dejará de estar disponible para nuevas instalaciones. No se desinstalará de los equipos donde ya exista.",
+        Label = "Retirar del catálogo",
+        Confirmed = EventCallback.Factory.Create(this, () => Delete(package))
+    };
+
+    private void Delete(InstallerPackage package)
+    {
+        _confirm = null;
+        if (Jobs.HasActivePackage(package.Id)) { _toast = "No se puede retirar mientras tenga instalaciones activas."; _toastError = true; return; }
+        try { Catalog.Archive(package.Id); _toast = "Instalador retirado del catálogo."; _toastError = false; }
+        catch (Exception ex) { _toast = "No se pudo retirar: " + ex.Message; _toastError = true; }
+    }
+
+    private async Task Deploy()
+    {
+        InstallerPackage? package = SelectedPackage;
+        if (package == null) return;
+        _deploying = true;
+        int sent = 0;
+        var errors = new List<string>();
+        try
+        {
+            foreach (string id in _selected.ToList())
+            {
+                FleetDevice? device = Fleet.Find(id);
+                if (device?.ConnectionId == null || !device.CanInstall) { errors.Add(device?.Name ?? id); continue; }
+                CreatedInstallationJob? created = null;
+                try
+                {
+                    created = Jobs.Create(device, package);
+                    await Hub.Clients.Client(device.ConnectionId).SendAsync(
+                        "Command", FleetCommand.InstallPackage(created.Job.Id, created.Token));
+                    Jobs.MarkDispatched(created.Job.Id);
+                    sent++;
+                }
+                catch (Exception ex)
+                {
+                    if (created != null)
+                        Jobs.Update(created.Job.Id, created.Token, new InstallationStatusUpdate
+                        { DeviceId = device.Id, State = InstallationJobState.Failed, Message = "No se pudo enviar la orden: " + ex.Message });
+                    errors.Add($"{device.Name}: {ex.Message}");
+                }
+            }
+        }
+        finally
+        {
+            _deploying = false;
+            _confirmDeploy = false;
+            _selected.Clear();
+        }
+        _toastError = errors.Count > 0;
+        _toast = errors.Count == 0 ? $"Instalación enviada a {sent} equipo(s)." : $"Enviadas: {sent}. Errores: {string.Join("; ", errors)}";
+    }
+
+    private string DeviceReason(FleetDevice d) =>
+        JobsReason(d) ?? (d.CanInstall ? $"Agente {d.InstallerAgentVersion}" : "Actualiza el kiosko para habilitar instalaciones");
+    private string? JobsReason(FleetDevice d) => Jobs.HasActiveJob(d.Id) ? "Ya tiene una instalación activa" : null;
+    private static string Kind(InstallerPackageKind k) => k switch { InstallerPackageKind.Msi => "MSI", InstallerPackageKind.InnoSetup => "Inno Setup", _ => "NSIS" };
+    private static string KindShort(InstallerPackageKind k) => k == InstallerPackageKind.Msi ? "MSI" : "EXE";
+    private static string Size(long n) => n >= 1024 * 1024 ? $"{n / 1024d / 1024d:N1} MB" : $"{n / 1024d:N0} KB";
+    private static string State(InstallationJobState s) => s switch { InstallationJobState.Pending => "Pendiente", InstallationJobState.Dispatched => "Enviada", InstallationJobState.Downloading => "Descargando", InstallationJobState.Verifying => "Verificando", InstallationJobState.Installing => "Instalando", InstallationJobState.Succeeded => "Instalada", InstallationJobState.RebootRequired => "Reinicio pendiente", _ => "Error" };
+    private static string StateCss(InstallationJobState s) => s switch { InstallationJobState.Succeeded => "ok", InstallationJobState.RebootRequired => "warn", InstallationJobState.Failed => "off", _ => "accent" };
+}

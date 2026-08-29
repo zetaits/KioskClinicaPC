@@ -32,7 +32,7 @@ namespace KioskClinicaPC.Core
             string norm = Normalize(brand);
             if (norm.Length == 0) return null;
             return BestMatch(fileNorm => norm.Contains(fileNorm) || fileNorm.Contains(norm),
-                             App.BrandsFolderPath, App.BundledBrandsFolderPath);
+                             App.BrandsFolderPath, App.RemoteBrandsFolderPath, App.BundledBrandsFolderPath);
         }
 
         /// <summary>
@@ -45,7 +45,7 @@ namespace KioskClinicaPC.Core
             var norms = candidates.Select(Normalize).Where(n => n.Length > 0).ToList();
             if (norms.Count == 0) return null;
             return BestMatch(fileNorm => norms.Any(n => n.Contains(fileNorm)),
-                             App.SpecImagesFolderPath, App.BundledSpecImagesFolderPath);
+                             App.SpecImagesFolderPath, App.RemoteSpecImagesFolderPath, App.BundledSpecImagesFolderPath);
         }
 
         /// <summary>Recorre las carpetas en orden: la primera que dé match gana (override antes que empaquetado).</summary>

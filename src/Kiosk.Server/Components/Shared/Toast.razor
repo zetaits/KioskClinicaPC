@@ -2,7 +2,7 @@
 
 @if (!string.IsNullOrEmpty(Message))
 {
-    <div class="toast @(IsError ? "err" : "")">
+    <div class="toast @(IsError ? "err" : "")" role="@(IsError ? "alert" : "status")" aria-live="polite">
         <span class="dot @(IsError ? "offline" : "online")"></span>
         <span>@Message</span>
     </div>

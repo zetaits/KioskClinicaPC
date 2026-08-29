@@ -237,6 +237,9 @@ namespace KioskClinicaPC.ViewModels
             ApplyConfig();
         }
 
+        /// <summary>Recalcula las rutas visuales tras actualizar la caché remota de imágenes.</summary>
+        public void RefreshAssets() => ApplyConfig();
+
         /// <summary>Detección de hardware en vivo (no crítica: si falla, se conserva lo que hubiera).</summary>
         private async Task DetectHardwareAsync()
         {

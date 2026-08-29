@@ -7,12 +7,38 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>Kiosk.Server</RootNamespace>
+    <!-- El artefacto se ejecuta con `dotnet Kiosk.Server.dll` tanto en Linux como en Windows. -->
+    <UseAppHost>false</UseAppHost>
+    <IsTransformWebConfigDisabled>true</IsTransformWebConfigDisabled>
   </PropertyGroup>
+
+  <!-- Estado generado en ejecución. Nunca debe filtrarse al bundle (puede contener hashes, actividad y
+       contenido real de una tienda). Producción lo guarda fuera de /opt, bajo /var/lib/kiosk-server. -->
+  <ItemGroup>
+    <Content Remove="data\**;assets\**;installers\**" />
+    <None Remove="data\**;assets\**;installers\**" />
+  </ItemGroup>
 
   <ItemGroup>
     <!-- Newtonsoft para (de)serializar AppConfig EXACTAMENTE igual que el cliente (PascalCase).
          System.Text.Json usaría camelCase por defecto y el cliente no lo reconocería. -->
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
+    <PackageReference Include="SkiaSharp" Version="4.151.1" />
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="4.151.1" />
+  </ItemGroup>
+
+  <!-- La ficha que abren los QR comparte fuente con la página de compatibilidad de GitHub Pages.
+       En publish queda integrada en wwwroot/ficha para desplegar servidor + ficha como un solo bundle. -->
+  <ItemGroup>
+    <Content Include="..\..\docs\index.html" Link="wwwroot\ficha\index.html" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="..\..\docs\legacy-redirect.js" Link="wwwroot\ficha\legacy-redirect.js" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="..\..\docs\app.js" Link="wwwroot\ficha\app.js" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="..\..\docs\styles.css" Link="wwwroot\ficha\styles.css" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="..\..\docs\logo.png" Link="wwwroot\ficha\logo.png" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="..\..\docs\vendor\**\*" Link="wwwroot\ficha\vendor\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="..\Kiosk.Client\Fonts\*.ttf" Link="wwwroot\ficha\fonts\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="..\Kiosk.Client\Assets\Brands\**\*" Link="seed-assets\Brands\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="..\Kiosk.Client\Assets\SpecImages\**\*" Link="seed-assets\SpecImages\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>
