@@ -14,11 +14,12 @@ namespace Kiosk.Server.Tests;
 /// <summary>
 /// Levanta el servidor real en memoria y comprueba el ciclo de flota de punta a punta: un cliente SignalR
 /// se registra en <c>/hub/fleet</c>, aparece online en el <see cref="FleetRegistry"/>, y una orden del panel
-/// (por <see cref="IHubContext{FleetHub}"/>) llega al cliente. Con ApiKey vacía = servidor abierto (sin
-/// guardia), suficiente para el test.
+/// (por <see cref="IHubContext{FleetHub}"/>) llega al cliente. También fija el contrato de autenticación
+/// del canal de control: solo una conexión con la API key correcta puede registrarse.
 /// </summary>
 public sealed class FleetHubIntegrationTests : IAsyncLifetime
 {
+    private const string ApiKey = "fleet-test-api-key";
     private readonly string _dataDir = Path.Combine(Path.GetTempPath(), "kiosk-hub-tests", Guid.NewGuid().ToString("N"));
     private WebApplicationFactory<Program> _factory = null!;
 
@@ -31,7 +32,7 @@ public sealed class FleetHubIntegrationTests : IAsyncLifetime
             builder.UseSetting("Kiosk:DataDir", _dataDir);
             builder.UseSetting("Kiosk:AssetsDir", Path.Combine(_dataDir, "assets"));
             builder.UseSetting("Kiosk:InstallersDir", Path.Combine(_dataDir, "installers"));
-            builder.UseSetting("Kiosk:ApiKey", ""); // abierto para el test
+            builder.UseSetting("Kiosk:ApiKey", ApiKey);
             builder.UseSetting("Kiosk:PanelInitialPassword", "test-panel-password");
         });
         _ = _factory.Server; // fuerza el arranque
@@ -45,13 +46,39 @@ public sealed class FleetHubIntegrationTests : IAsyncLifetime
         return Task.CompletedTask;
     }
 
-    private HubConnection BuildClient()
+    private HubConnection BuildClient(string? apiKey = ApiKey)
     {
         var handler = _factory.Server.CreateHandler();
         return new HubConnectionBuilder()
             .WithUrl(new Uri(_factory.Server.BaseAddress, "hub/fleet"),
-                o => o.HttpMessageHandlerFactory = _ => handler)
+                o =>
+                {
+                    o.HttpMessageHandlerFactory = _ => handler;
+                    if (apiKey != null) o.Headers.Add("X-Api-Key", apiKey);
+                })
             .Build();
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("wrong-key")]
+    public async Task Missing_or_wrong_api_key_cannot_register_a_device(string? apiKey)
+    {
+        var conn = BuildClient(apiKey);
+        Exception? error = await Record.ExceptionAsync(async () =>
+        {
+            await conn.StartAsync();
+            await conn.InvokeAsync("Register", new KioskHeartbeat
+            {
+                DeviceId = "unauthorized-device",
+                Name = "NO-AUTORIZADO",
+                Screen = KioskScreen.Attract
+            });
+        });
+
+        Assert.NotNull(error);
+        Assert.Null(_factory.Services.GetRequiredService<FleetRegistry>().Find("unauthorized-device"));
+        await conn.DisposeAsync();
     }
 
     [Fact]

@@ -53,6 +53,25 @@ public sealed class InstallerCatalogTests : IDisposable
     }
 
     [Fact]
+    public async Task Initial_setup_flags_are_opt_in_ordered_and_persisted()
+    {
+        byte[] msi = { 0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1 };
+        var catalog = Catalog();
+        var first = await catalog.AddAsync("Primera", "one.msi", new MemoryStream(msi), true);
+        var second = await catalog.AddAsync("Segunda", "two.msi", new MemoryStream(msi), true);
+
+        catalog.ConfigureInitialSetup(first.Id, true, true, 20);
+        catalog.ConfigureInitialSetup(second.Id, true, false, 10);
+
+        Assert.Equal(new[] { second.Id, first.Id }, catalog.InitialSetupList().Select(p => p.Id));
+        var reloaded = Catalog().Find(first.Id)!;
+        Assert.True(reloaded.AvailableInInitialSetup);
+        Assert.True(reloaded.SelectedByDefault);
+        catalog.ConfigureInitialSetup(first.Id, false, true, 20);
+        Assert.False(catalog.Find(first.Id)!.SelectedByDefault);
+    }
+
+    [Fact]
     public async Task Archive_removes_binary_but_keeps_historical_metadata()
     {
         byte[] msi = { 0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1 };

@@ -251,17 +251,12 @@ namespace KioskClinicaPC.Windows
 
             if (!string.IsNullOrEmpty(NewPasswordBox.Password))
             {
-                if (!PasswordService.Verify(CurrentPasswordBox.Password, _settings.PasswordHash))
+                if (!_settings.TrySetPassword(CurrentPasswordBox.Password, NewPasswordBox.Password,
+                        ConfirmPasswordBox.Password, out string passwordError))
                 {
-                    KioskDialog.Alert(this, "Seguridad", "La contraseña actual no es correcta.", danger: true);
+                    KioskDialog.Alert(this, "Seguridad", passwordError, danger: true);
                     return false;
                 }
-                if (NewPasswordBox.Password != ConfirmPasswordBox.Password)
-                {
-                    KioskDialog.Alert(this, "Seguridad", "La nueva contraseña y su confirmación no coinciden.", danger: true);
-                    return false;
-                }
-                _settings.PasswordHash = PasswordService.Hash(NewPasswordBox.Password);
             }
 
             _settings.Save(App.SettingsFilePath);

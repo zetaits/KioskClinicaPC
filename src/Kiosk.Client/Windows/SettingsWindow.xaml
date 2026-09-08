@@ -401,7 +401,7 @@
                 <Border Style="{StaticResource SectionCard}">
                     <StackPanel>
                         <TextBlock Style="{StaticResource SectionTitle}" Text="Seguridad · Cambiar contraseña"/>
-                        <TextBlock Style="{StaticResource SectionHint}" Text="Deja los campos en blanco para mantener la contraseña actual."/>
+                        <TextBlock Style="{StaticResource SectionHint}" Text="Deja los campos en blanco para mantenerla. La nueva contraseña debe tener al menos 12 caracteres."/>
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>

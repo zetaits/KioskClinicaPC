@@ -29,6 +29,12 @@ namespace KioskClinicaPC.Core.Config
                 from = 1;
             }
 
+            if (from < 2)
+            {
+                // 1 -> 2: tema visual efectivo opcional. La ausencia equivale al tema normal.
+                from = 2;
+            }
+
             if (from != AppConfig.CurrentSchemaVersion || root.Value<int?>("SchemaVersion") == null)
                 changed = true;
 

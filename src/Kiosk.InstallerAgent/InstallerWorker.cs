@@ -13,6 +13,7 @@ using System.Threading.Channels;
 using KioskClinicaPC.Core.Sync;
 using Microsoft.Win32;
 using Microsoft.Win32.SafeHandles;
+using Kiosk.InstallerCore;
 
 namespace Kiosk.InstallerAgent;
 
@@ -110,7 +111,7 @@ public sealed class InstallerWorker : BackgroundService
             string expected = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "KioskClinicaPC.exe"));
             if (actual == null || !Path.GetFullPath(actual).Equals(expected, StringComparison.OrdinalIgnoreCase)) return null;
             string? sid = null;
-            pipe.RunAsClient(() => sid = WindowsIdentity.GetCurrent(true).User?.Value);
+            pipe.RunAsClient(() => sid = WindowsIdentity.GetCurrent(true)?.User?.Value);
             return string.IsNullOrWhiteSpace(sid) ? null : new ClientIdentity((int)pid, sid);
         }
         catch { return null; }
@@ -143,18 +144,14 @@ public sealed class InstallerWorker : BackgroundService
             Directory.CreateDirectory(folder);
             string file = Path.Combine(folder, "package" + (manifest.Kind == InstallerPackageKind.Msi ? ".msi" : ".exe"));
             await TryReport(http, jobId, request.DeviceId!, InstallationJobState.Downloading, 0, null, null, serviceCt);
-            await DownloadResumable(http, $"api/installations/{jobId}/download", file, manifest.SizeBytes,
+            await PackageInstallation.DownloadResumable(http, $"api/installations/{jobId}/download", file, manifest.SizeBytes,
                 p => TryReport(http, jobId, request.DeviceId!, InstallationJobState.Downloading, p, null, null, serviceCt), serviceCt);
 
             await TryReport(http, jobId, request.DeviceId!, InstallationJobState.Verifying, 100, null, null, serviceCt);
-            if (new FileInfo(file).Length != manifest.SizeBytes || !Hash(file).Equals(manifest.Sha256, StringComparison.OrdinalIgnoreCase))
-                throw new InvalidDataException("Tamaño o SHA-256 incorrecto.");
-            SignatureResult signature = Authenticode.Verify(file);
-            if (signature == SignatureResult.Invalid || (signature == SignatureResult.Unsigned && !manifest.AllowUnsigned))
-                throw new InvalidDataException(signature == SignatureResult.Invalid ? "La firma digital no es válida." : "El instalador no está firmado.");
+            PackageInstallation.Verify(file, manifest.SizeBytes, manifest.Sha256, manifest.AllowUnsigned);
 
             await TryReport(http, jobId, request.DeviceId!, InstallationJobState.Installing, 100, null, null, serviceCt);
-            int exit = await ExecuteInstaller(file, manifest.Kind, serviceCt);
+            int exit = await PackageInstallation.Execute(file, manifest.Kind, serviceCt);
             bool reboot = exit is 1641 or 3010;
             if (exit != 0 && !reboot) throw new InstallerExitException(exit);
             await TryReport(http, jobId, request.DeviceId!, reboot ? InstallationJobState.RebootRequired : InstallationJobState.Succeeded,
@@ -176,62 +173,6 @@ public sealed class InstallerWorker : BackgroundService
         if (!string.IsNullOrWhiteSpace(apiKey)) http.DefaultRequestHeaders.Add("X-Api-Key", apiKey);
         http.DefaultRequestHeaders.Add("X-Install-Token", token);
         return http;
-    }
-
-    private static async Task DownloadResumable(HttpClient http, string relativeUrl, string path, long expected,
-        Func<int, Task> progress, CancellationToken ct)
-    {
-        Exception? last = null;
-        for (int attempt = 0; attempt < 3; attempt++)
-        {
-            try
-            {
-                long offset = File.Exists(path) ? new FileInfo(path).Length : 0;
-                if (offset > expected) { File.Delete(path); offset = 0; }
-                using var req = new HttpRequestMessage(HttpMethod.Get, relativeUrl);
-                if (offset > 0) req.Headers.Range = new RangeHeaderValue(offset, null);
-                using var resp = await http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, ct);
-                if (offset > 0 && resp.StatusCode == HttpStatusCode.OK) { File.Delete(path); offset = 0; }
-                resp.EnsureSuccessStatusCode();
-                await using var input = await resp.Content.ReadAsStreamAsync(ct);
-                await using var output = new FileStream(path, FileMode.Append, FileAccess.Write, FileShare.None, 81920, true);
-                byte[] buffer = new byte[81920]; int read; long total = offset; int lastPercent = -1;
-                while ((read = await input.ReadAsync(buffer, ct)) > 0)
-                {
-                    await output.WriteAsync(buffer.AsMemory(0, read), ct); total += read;
-                    int percent = expected == 0 ? 0 : (int)Math.Min(99, total * 100 / expected);
-                    if (percent >= lastPercent + 5) { lastPercent = percent; await progress(percent); }
-                }
-                if (total == expected) return;
-                throw new IOException("Descarga incompleta.");
-            }
-            catch (Exception ex) when (attempt < 2 && ex is HttpRequestException or IOException or TaskCanceledException) { last = ex; }
-        }
-        throw new IOException("No se pudo descargar el instalador tras tres intentos.", last);
-    }
-
-    private static async Task<int> ExecuteInstaller(string file, InstallerPackageKind kind, CancellationToken ct)
-    {
-        string exe; string[] args;
-        switch (kind)
-        {
-            case InstallerPackageKind.Msi:
-                exe = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "msiexec.exe");
-                args = new[] { "/i", file, "/qn", "/norestart" }; break;
-            case InstallerPackageKind.InnoSetup:
-                exe = file; args = new[] { "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/NOCANCEL" }; break;
-            case InstallerPackageKind.Nsis:
-                exe = file; args = new[] { "/S" }; break;
-            default: throw new InvalidDataException("Tipo de instalador no permitido.");
-        }
-        var psi = new ProcessStartInfo(exe) { UseShellExecute = false, CreateNoWindow = true, WorkingDirectory = Path.GetDirectoryName(file)! };
-        foreach (string arg in args) psi.ArgumentList.Add(arg);
-        using var process = System.Diagnostics.Process.Start(psi) ?? throw new InvalidOperationException("No se pudo iniciar el instalador.");
-        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        timeout.CancelAfter(InstallTimeout);
-        try { await process.WaitForExitAsync(timeout.Token); }
-        catch (OperationCanceledException) { try { process.Kill(true); } catch { } throw new TimeoutException("La instalación superó 60 minutos."); }
-        return process.ExitCode;
     }
 
     private static async Task Report(HttpClient http, string job, string device, InstallationJobState state,
@@ -406,42 +347,9 @@ public sealed class InstallerWorker : BackgroundService
     }
 
     private static bool IsHex(string? value, int length) => value?.Length == length && value.All(Uri.IsHexDigit);
-    private static string Hash(string path) { using var sha = SHA256.Create(); using var fs = File.OpenRead(path); return Convert.ToHexString(sha.ComputeHash(fs)); }
     private static void TryDeleteDirectory(string path) { try { Directory.Delete(path, true); } catch { } }
     private static string Version => Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.0.0";
     private static bool RunnerAvailable => File.Exists(Path.Combine(AppContext.BaseDirectory, "Maintenance", "KioskMaintenanceRunner.exe"));
 
     private sealed record ClientIdentity(int ProcessId, string UserSid);
-}
-
-internal sealed class InstallerExitException(int exitCode) : Exception($"El instalador terminó con código {exitCode}.") { public int ExitCode { get; } = exitCode; }
-
-internal enum SignatureResult { Valid, Unsigned, Invalid }
-
-internal static class Authenticode
-{
-    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
-    private sealed class WinTrustFileInfo
-    {
-        public int StructSize = Marshal.SizeOf<WinTrustFileInfo>(); public IntPtr FilePath; public IntPtr FileHandle; public IntPtr KnownSubject;
-        public WinTrustFileInfo(string path) { FilePath = Marshal.StringToCoTaskMemUni(path); }
-        ~WinTrustFileInfo() { if (FilePath != IntPtr.Zero) Marshal.FreeCoTaskMem(FilePath); }
-    }
-    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
-    private sealed class WinTrustData
-    {
-        public int StructSize = Marshal.SizeOf<WinTrustData>(); public IntPtr PolicyCallbackData; public IntPtr SIPClientData;
-        public int UIChoice = 2; public int RevocationChecks = 0; public int UnionChoice = 1; public IntPtr FileInfo;
-        public int StateAction = 0; public IntPtr StateData; public string? URLReference; public int ProvFlags = 0x1000; public int UIContext;
-        public WinTrustData(WinTrustFileInfo file) { FileInfo = Marshal.AllocCoTaskMem(Marshal.SizeOf<WinTrustFileInfo>()); Marshal.StructureToPtr(file, FileInfo, false); }
-        ~WinTrustData() { if (FileInfo != IntPtr.Zero) Marshal.FreeCoTaskMem(FileInfo); }
-    }
-    [DllImport("wintrust.dll", ExactSpelling = true, PreserveSig = true, SetLastError = false)]
-    private static extern uint WinVerifyTrust(IntPtr hwnd, [MarshalAs(UnmanagedType.LPStruct)] Guid action, WinTrustData data);
-    public static SignatureResult Verify(string file)
-    {
-        var info = new WinTrustFileInfo(file); var data = new WinTrustData(info);
-        uint result = WinVerifyTrust(new IntPtr(-1), new Guid("00AAC56B-CD44-11d0-8CC2-00C04FC295EE"), data);
-        return result switch { 0 => SignatureResult.Valid, 0x800B0100 or 0x800B0003 or 0x800B0001 => SignatureResult.Unsigned, _ => SignatureResult.Invalid };
-    }
 }

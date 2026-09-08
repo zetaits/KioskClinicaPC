@@ -25,8 +25,6 @@ You set the kiosk up on a shop machine. The app:
 
 Everything editable by hand from the screen itself. No code required.
 
-<!-- TODO: add docs/screenshots/hero.png — kiosk on counter or representative overview. -->
-
 ---
 
 ## In pictures
@@ -56,8 +54,6 @@ The QR opens a page that **generates the PDF right on the phone**. The specs tra
 so there's no need for internet at the shop nor a server to store anything. The sheet carries the shop's address,
 email, phone and WhatsApp, clickable to message or call on the spot.
 
-<!-- TODO: add docs/screenshots/05-pdf-movil.png — phone showing the generated PDF sheet. -->
-
 ---
 
 ## Built for a shop
@@ -82,7 +78,8 @@ email, phone and WhatsApp, clickable to message or call on the spot.
 | Exit the kiosk | Settings → "Exit kiosk" |
 | Free edit mode | Settings → "Enable free edit mode" |
 
-Default password: `clinicapc2025` (changed in Settings → Security).
+On first launch, the kiosk requires the manager to create a local password of at least 12 characters.
+Existing installations request a one-time password renewal after upgrading; no shared default password exists.
 
 ---
 
@@ -151,8 +148,8 @@ throttled login attempts.
 
 None of this is needed to use it, but in case you're curious:
 
-- **Three parts, one solution.** `Kiosk.Client` (the WPF app), `Kiosk.Server` (the optional web app + admin panel) and `Kiosk.Shared` (the content models and sync messages both sides speak). A machine runs the client alone just fine; the server only adds the shop-wide layer.
-- **WPF + .NET 8**, home-grown MVVM, no external frameworks. A single window; 4 "screens" that swap in and out.
+- **Installation is shared, not duplicated.** `Kiosk.InstallerCore` contains the verifier/executor used by both the LocalSystem agent and `Kiosk.SetupHelper`. The internal Setup can install Kiosk, a server-managed application pack, or both; the public update Setup remains Kiosk-only. The solution also contains the client, server, shared contracts, maintenance runner and two test projects.
+- **WPF + .NET 10**, home-grown MVVM, no external frameworks. A single window; 4 "screens" that swap in and out.
 - **Client ↔ server, without a single point of failure.** The client merges the server's *shared* content over its own *local* content (`SharedContent` draws the line: shop/slides/texts from the server, price/specs per-machine). If the server can't be reached it uses the last cached copy. Live updates come over **SignalR**: the panel pushes a "content changed" ping the moment you save, with slow version-polling as a backstop.
 - **The attract loop is clock-synced.** The server keeps a master clock; each kiosk computes the same slide index from it (correcting clock drift), so a row of screens stays in step without the server pushing every slide change.
 - **The admin panel is Blazor Server**, cookie login for a single manager, brute-force throttled. Content lives as JSON files on the server (no database); the image library rejects SVG on purpose (stored-XSS in the preview).
@@ -166,14 +163,14 @@ None of this is needed to use it, but in case you're curious:
 
 ### Building
 
-.NET 8. Needs the SDK (not just the runtime):
+.NET 10. Needs the SDK (not just the runtime):
 
 ```
 dotnet build KioskClinicaPC.sln -c Release      # everything
 dotnet run   --project src/Kiosk.Server         # just the server (dev)
 ```
 
-Client output: `src\Kiosk.Client\bin\Debug\net8.0-windows\KioskClinicaPC.exe` (the WPF project is `net8.0-windows`).
+Client output: `src\Kiosk.Client\bin\Debug\net10.0-windows\KioskClinicaPC.exe` (the WPF project is `net10.0-windows`).
 Server setup and deployment: **[docs/SERVIDOR.md](docs/SERVIDOR.md)**.
 
 > ⚠️ Running it enters kiosk mode: it hides the taskbar and blocks Task Manager.

@@ -1,6 +1,7 @@
 @using KioskClinicaPC.Core.Sync
 @inject AssetLibrary Lib
 @inject IHubContext<SyncHub> Hub
+@inject EventStore Events
 
 <section class="card asset-section">
     <div class="card-head">
@@ -138,6 +139,8 @@
         _confirm = null;
         try
         {
+            if (Category == "ThemeAssets" && Events.ReferencesThemeAsset(file))
+                throw new InvalidOperationException("La imagen está utilizada por un evento. Sustitúyela allí antes de borrarla.");
             Lib.Delete(Category, file);
             await Hub.Clients.All.SendAsync("ContentChanged");
             _error = false;

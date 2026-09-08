@@ -12,12 +12,13 @@ namespace Kiosk.Server.Services;
 /// </summary>
 public sealed class AssetLibrary
 {
-    public static readonly IReadOnlyList<string> Categories = new[] { "Brands", "SpecImages" };
+    public static readonly IReadOnlyList<string> Categories = new[] { "Brands", "SpecImages", "ThemeAssets" };
     private static readonly HashSet<string> AllowedInputExtensions =
         new(StringComparer.OrdinalIgnoreCase) { ".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp" };
     private const long MaxInputBytes = 8 * 1024 * 1024;
     private const long MaxPixels = 40_000_000;
-    private const string SeedMarker = ".default-assets-v1";
+    // v2 añade ThemeAssets; un marcador nuevo vuelve a sembrar solo los ficheros ausentes.
+    private const string SeedMarker = ".default-assets-v2";
 
     private readonly string _root;
     private readonly object _gate = new();

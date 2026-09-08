@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Media;
+using KioskClinicaPC.Core.Theming;
 
 namespace KioskClinicaPC.Core.Specs
 {
@@ -79,12 +80,18 @@ namespace KioskClinicaPC.Core.Specs
         // TryFindResource (no FindResource): si faltara una clave de tema, FindResource lanza. Con
         // fallback al hex degrada en vez de romper. El color resuelto sirve de respaldo para su brush.
         private static Color ResolveColor(string key, string hex)
-            => Application.Current?.TryFindResource(key) is Color c
-                ? c
-                : (Color)ColorConverter.ConvertFromString(hex);
+            => key switch
+            {
+                "CyanColor" => ThemeRuntime.Primary,
+                "MagentaColor" => ThemeRuntime.Secondary,
+                "OkColor" => ThemeRuntime.Highlight,
+                "AmberColor" => ThemeRuntime.Secondary,
+                _ => Application.Current?.TryFindResource(key) is Color c
+                    ? c
+                    : (Color)ColorConverter.ConvertFromString(hex)
+            };
 
         private static SolidColorBrush ResolveBrush(string key, Color fallback)
-            => Application.Current?.TryFindResource(key) as SolidColorBrush
-               ?? new SolidColorBrush(fallback);
+            => new SolidColorBrush(fallback);
     }
 }

@@ -10,16 +10,19 @@ namespace KioskClinicaPC.Core.Config
         /// evento no borran nada (se conserva el contenido base).</summary>
         public static void Apply(AppConfig baseConfig, KioskEvent ev)
         {
-            if (ev.AttractSlides.Count > 0) baseConfig.AttractSlides = ev.AttractSlides;
-            if (ev.AttractSlidesNew.Count > 0) baseConfig.AttractSlidesNew = ev.AttractSlidesNew;
+            if (ev.AttractSlides?.Count > 0) baseConfig.AttractSlides = ev.AttractSlides;
+            if (ev.AttractSlidesNew?.Count > 0) baseConfig.AttractSlidesNew = ev.AttractSlidesNew;
 
-            if (ev.UiTextOverrides.Count > 0)
+            if (ev.UiTextOverrides?.Count > 0)
             {
                 // Copia para no mutar el diccionario base compartido (Read() puede devolver referencias).
                 var texts = new Dictionary<string, string>(baseConfig.UiTexts);
                 foreach (var kv in ev.UiTextOverrides) texts[kv.Key] = kv.Value;
                 baseConfig.UiTexts = texts;
             }
+
+            if (ev.Theme != null)
+                baseConfig.VisualTheme = ThemePresetCatalog.Resolve(ev.Theme);
         }
 
         /// <summary>Evento vigente en <paramref name="nowLocal"/>. Si varios se solapan, gana el de inicio

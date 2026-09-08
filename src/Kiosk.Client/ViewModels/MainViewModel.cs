@@ -7,6 +7,8 @@ using System.Windows.Threading;
 using KioskClinicaPC.Core;
 using KioskClinicaPC.Services;
 using KioskClinicaPC.Models;
+using KioskClinicaPC.Core.Config;
+using KioskClinicaPC.Core.Theming;
 using Serilog;
 
 namespace KioskClinicaPC.ViewModels
@@ -44,6 +46,13 @@ namespace KioskClinicaPC.ViewModels
         {
             get => _currentScreenName;
             set => SetProperty(ref _currentScreenName, value);
+        }
+
+        private ResolvedVisualTheme _visualTheme = ThemePresetCatalog.Resolve(null);
+        public ResolvedVisualTheme VisualTheme
+        {
+            get => _visualTheme;
+            private set => SetProperty(ref _visualTheme, value);
         }
 
         private AppConfig _displayConfig = null!; // late-init en ApplyConfig (siempre antes de cualquier acceso)
@@ -320,6 +329,7 @@ namespace KioskClinicaPC.ViewModels
         /// <summary>Reconstruye DisplayConfig/Texts/Slides/Specs desde _savedConfig (sin redetectar hardware).</summary>
         private void ApplyConfig()
         {
+            VisualTheme = ThemeRuntime.Set(_savedConfig.VisualTheme);
             DisplayConfig = new AppConfig
             {
                 Cpu = ConfigMerger.Display(_savedConfig.Cpu, _detectedSpecs.Cpu),

@@ -4,7 +4,7 @@ El kiosko funciona **solo**, sin nada más. Este servidor es la capa **para vari
 que edita el contenido compartido de toda la tienda y sincroniza el bucle de atracción. Si no lo despliegas,
 cada PC sigue siendo autónoma (modo local puro).
 
-- **Proyecto:** `src/Kiosk.Server` (ASP.NET Core, net8.0). Todo el cableado está en `Program.cs`.
+- **Proyecto:** `src/Kiosk.Server` (ASP.NET Core, net10.0). Todo el cableado está en `Program.cs`.
 - **Qué expone:** API de contenido (`/api/*`), biblioteca de imágenes, hub de sincronización (SignalR) y el
   **panel de administración** (Blazor Server).
 - **Reparto de responsabilidades:** el servidor manda en el contenido **compartido** (identidad de tienda,
@@ -30,7 +30,7 @@ Para desplegar, genera el bundle publicable y cópialo al host (mini-PC de la tr
 dotnet publish src/Kiosk.Server -c Release -o publish
 ```
 
-El host solo necesita el **runtime** de ASP.NET Core 8 (no el SDK). Arranca con `dotnet Kiosk.Server.dll`.
+El host solo necesita el **runtime** de ASP.NET Core 10 (no el SDK). Arranca con `dotnet Kiosk.Server.dll`.
 En Linux conviene ponerlo como servicio (`systemd`) o en un contenedor; en Windows, como servicio o tarea.
 
 Comprobación de vida (sin auth): `GET /health` → `{"status":"ok"}`.
@@ -46,10 +46,12 @@ bajo). Todas las claves cuelgan de la sección `Kiosk`:
 | Clave | Env var | Para qué | Por defecto |
 |---|---|---|---|
 | `ApiKey` | `Kiosk__ApiKey` | Protege **`/api/*`**. Los kioscos la mandan en la cabecera `X-Api-Key`. Es obligatoria fuera de Development. | vacía solo en Development |
+| `InitialSetupKey` | `Kiosk__InitialSetupKey` | Clave de 64 hex separada y limitada al catálogo/descarga del pack durante la instalación inicial. Vacía deshabilita esa función. | vacía |
 | `PanelInitialPassword` | `Kiosk__PanelInitialPassword` | Contraseña del panel que se hashea al crear `panel.json`. Mínimo 12 caracteres; después puede quitarse del entorno. | sin valor; el primer arranque falla de forma segura |
 | `DataDir` | `Kiosk__DataDir` | Carpeta de los JSON de datos. | `data/` bajo el ContentRoot |
 | `AssetsDir` | `Kiosk__AssetsDir` | Carpeta de la biblioteca de imágenes. | `assets/` bajo el ContentRoot |
 | `InstallersDir` | `Kiosk__InstallersDir` | Binarios privados del catálogo de aplicaciones. | `installers/` bajo el ContentRoot |
+| `SetupDir` | `Kiosk__SetupDir` | Instaladores internos y manifiestos que el panel ofrece para descarga. | `setups/` bajo el ContentRoot |
 | `MaxInstallerBytes` | `Kiosk__MaxInstallerBytes` | Tamaño máximo de cada instalador subido. | `1073741824` (1 GiB) |
 | `SlideDurationMs` | `Kiosk__SlideDurationMs` | Duración de cada slide del attract. **Debe coincidir con el default del cliente (5200).** | `5200` |
 | `TimeZone` | `Kiosk__TimeZone` | Zona horaria de **la tienda** (no la del VPS) para evaluar la vigencia de los eventos. Id de Windows (p.ej. `Romance Standard Time`) o IANA en Linux (`Europe/Madrid`). Si no resuelve, cae a la hora local del servidor y **avisa en el log**. | zona local del servidor |
@@ -58,6 +60,7 @@ Ejemplo de variables de entorno (no guardes secretos reales en `appsettings.json
 
 ```text
 Kiosk__ApiKey=una-clave-larga-y-secreta
+Kiosk__InitialSetupKey=otra-clave-hexadecimal-de-64-caracteres
 Kiosk__PanelInitialPassword=otra-contraseña-larga-y-distinta
 Kiosk__TimeZone=Europe/Madrid
 ```
@@ -134,6 +137,11 @@ contraseña, identidad y ajustes existentes, incluso si el UAC se aprobó con ot
 | `GET /api/installations/{id}/manifest` | API key + token de trabajo | Manifiesto inmutable ligado al equipo y paquete. |
 | `GET /api/installations/{id}/download` | API key + token de trabajo | Descarga privada con soporte de rangos. |
 | `POST /api/installations/{id}/status` | API key + token de trabajo | Progreso y resultado del agente. |
+| `GET /api/setup/catalog` | clave de Setup | Aplicaciones permitidas y selección predeterminada del instalador inicial. |
+| `POST /api/setup/sessions` | clave de Setup | Crea una sesión auditable y fija los paquetes seleccionados. |
+| `GET /api/setup/sessions/{id}/packages/{packageId}/download` | clave + token de sesión | Descarga privada y reanudable para el Setup. |
+| `POST /api/setup/sessions/{id}/packages/{packageId}/status` | clave + token de sesión | Resultado de cada aplicación del pack. |
+| `GET /panel/setup/download` | cookie | Descarga el último Setup interno cuyo tamaño y SHA-256 sean válidos. |
 | `POST /api/maintenance/{id}/status` | API key + token de mantenimiento | Resultado verificado de una autodesinstalación de Kiosk. |
 | `POST /panel/installers/upload` | cookie + antiforgery | Añade un MSI/Inno/NSIS al catálogo. |
 | `POST /login` · `POST /logout` | cookie | Sesión del panel (con antiforgery + throttle). |
@@ -157,12 +165,16 @@ Bajo `DataDir` (`data/` por defecto):
 - `panel.json` — hash de la contraseña del panel (`PanelAuthStore`).
 - `fleet.json` + `fleet-activity.json` — overrides y registro de actividad de la flota (`FleetRegistry`).
 - `installers.json` + `install-jobs.json` — catálogo y últimos 500 trabajos de instalación.
+- `setup-installations.json` — últimas 500 sesiones de instalación inicial y sus resultados.
 - `maintenance-jobs.json` — últimos 500 trabajos de mantenimiento/desinstalación y su resultado.
 
 Bajo `AssetsDir` (`assets/` por defecto): `Brands/` y `SpecImages/` con las imágenes normalizadas de la
 biblioteca, más el marcador interno que evita resembrar imágenes borradas deliberadamente.
 
 Bajo `InstallersDir` (`installers/` por defecto): binarios MSI/EXE privados, con nombres internos aleatorios.
+
+Bajo `SetupDir` (`setups/` por defecto): el `Setup-EquipoClinicaPC-*.exe` interno y su
+`*.bundle.json`. El panel selecciona la versión válida más alta y nunca sirve un binario cuyo hash no coincida.
 
 Son ficheros JSON planos, sin base de datos. Para una copia de seguridad guarda `data/`, `assets/` e `installers/`.
 
@@ -193,6 +205,28 @@ En **Aplicaciones**, **Retirar del catálogo** solo impide nuevos despliegues y 
 desinstalar esa aplicación en los ordenadores donde ya estuviera instalada. Esta separación evita confundir
 la gestión del catálogo del servidor con una desinstalación remota del software de terceros.
 
+### Instalador inicial de equipos
+
+Cada aplicación del catálogo puede marcarse como **visible en el Setup**, **preseleccionada** y recibir un
+orden. La página **Instalador** permite descargar el Setup interno y consultar el resultado por equipo y
+aplicación. El asistente ofrece Kiosk y el pack por separado; descarga e instala el pack secuencialmente con
+los mismos controles de tamaño, SHA-256, firma y argumentos silenciosos que el agente remoto.
+
+Genera una clave distinta de la API principal, configúrala como `Kiosk__InitialSetupKey` y usa la misma solo
+durante el build interno:
+
+```powershell
+$env:KIOSK_SERVER_API_KEY = '<api key de 64 hex>'
+$env:KIOSK_INITIAL_SETUP_KEY = '<setup key distinta de 64 hex>'
+.\build-installer.ps1 -ServerUrl 'https://panel.mitienda.com'
+Remove-Item Env:KIOSK_SERVER_API_KEY, Env:KIOSK_INITIAL_SETUP_KEY
+```
+
+El build genera dos variantes. `Setup-KioskClinicaPC-*` no contiene secretos y es la única que puede
+publicarse para auto-update. Copia `Setup-EquipoClinicaPC-*.exe` y su `*.bundle.json` a `SetupDir`; no copies
+solo uno de los dos. Rotar la clave invalida la descarga del pack en Setups internos antiguos, aunque estos
+siguen pudiendo instalar Kiosk.
+
 En el primer arranque con `ServerUrl`, el agente empareja ese origen HTTPS en
 `HKLM\SOFTWARE\ClinicaPC\Kiosk\InstallerServerUrl`; además, el pipe solo acepta al `KioskClinicaPC.exe`
 instalado junto al agente. Si se migra el panel a otro dominio, un administrador debe detener el servicio,
@@ -202,18 +236,12 @@ borrar ese valor y arrancar de nuevo el kiosko para realizar un nuevo emparejami
 
 ## Despliegue en Ubuntu 26.04 con Caddy
 
-El bundle es framework-dependent y requiere el runtime ASP.NET Core 8. En Ubuntu 26.04 está en el repositorio
-de backports de Canonical:
-
-> .NET 8 finaliza su soporte el 10 de noviembre de 2026. Este despliegue es válido para probar ahora, pero el
-> servidor debe migrarse a .NET 10 antes de esa fecha para seguir recibiendo actualizaciones de seguridad.
+El bundle es framework-dependent y requiere el runtime ASP.NET Core 10. En Ubuntu 26.04 está disponible
+directamente en el repositorio oficial de Ubuntu:
 
 ```bash
 sudo apt update
-sudo apt install -y software-properties-common
-sudo add-apt-repository -y ppa:dotnet/backports
-sudo apt update
-sudo apt install -y aspnetcore-runtime-8.0
+sudo apt install -y aspnetcore-runtime-10.0
 dotnet --list-runtimes
 ```
 
@@ -225,6 +253,7 @@ sudo install -d -o root -g root -m 755 /opt/kiosk-server/app
 sudo install -d -o kiosk-server -g kiosk-server -m 750 /var/lib/kiosk-server/data
 sudo install -d -o kiosk-server -g kiosk-server -m 750 /var/lib/kiosk-server/assets
 sudo install -d -o kiosk-server -g kiosk-server -m 750 /var/lib/kiosk-server/installers
+sudo install -d -o kiosk-server -g kiosk-server -m 750 /var/lib/kiosk-server/setups
 sudo install -d -o root -g root -m 700 /etc/kiosk-server
 ```
 

@@ -28,7 +28,7 @@ Copy-Item -LiteralPath (Join-Path $PSScriptRoot "deploy\ubuntu\Caddyfile.example
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot "docs\SERVIDOR.md") -Destination (Join-Path $output "LEEME-DESPLIEGUE.md")
 
 $forbidden = Get-ChildItem -LiteralPath $output -Directory -Recurse |
-    Where-Object Name -in @("data", "assets", "installers")
+    Where-Object Name -in @("data", "assets", "installers", "setups")
 if ($forbidden) {
     throw "El paquete contiene directorios de datos runtime y no es seguro subirlo: $($forbidden.FullName -join ', ')"
 }

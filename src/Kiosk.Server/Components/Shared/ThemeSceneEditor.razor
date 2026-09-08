@@ -1,0 +1,16 @@
+@using KioskClinicaPC.Core.Config
+
+<div class="theme-scene-editor">
+    <div class="theme-scene-title">@Title</div>
+    <ThemeSlotEditor Label="Adorno principal" Slot="Scene.Primary"
+                     PresetAsset="PresetScene.PrimaryAssetKey" Assets="Assets" />
+    <ThemeSlotEditor Label="Adorno secundario" Slot="Scene.Secondary"
+                     PresetAsset="PresetScene.SecondaryAssetKey" Assets="Assets" />
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Title { get; set; } = "";
+    [Parameter, EditorRequired] public ThemeSceneOverride Scene { get; set; } = new();
+    [Parameter, EditorRequired] public ResolvedThemeScene PresetScene { get; set; } = new();
+    [Parameter] public IReadOnlyList<string> Assets { get; set; } = Array.Empty<string>();
+}

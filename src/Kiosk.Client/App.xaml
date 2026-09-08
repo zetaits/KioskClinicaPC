@@ -31,22 +31,31 @@
             <Color x:Key="Line1Color">#14FFFFFF</Color>
             <Color x:Key="Line2Color">#29FFFFFF</Color>
 
-            <SolidColorBrush x:Key="Bg0Brush" Color="{StaticResource Bg0Color}" />
-            <SolidColorBrush x:Key="Bg1Brush" Color="{StaticResource Bg1Color}" />
-            <SolidColorBrush x:Key="Bg2Brush" Color="{StaticResource Bg2Color}" />
-            <SolidColorBrush x:Key="Bg3Brush" Color="{StaticResource Bg3Color}" />
-            <SolidColorBrush x:Key="CyanBrush" Color="{StaticResource CyanColor}" />
-            <SolidColorBrush x:Key="Cyan2Brush" Color="{StaticResource Cyan2Color}" />
-            <SolidColorBrush x:Key="MagentaBrush" Color="{StaticResource MagentaColor}" />
-            <SolidColorBrush x:Key="Magenta2Brush" Color="{StaticResource Magenta2Color}" />
-            <SolidColorBrush x:Key="OkBrush" Color="{StaticResource OkColor}" />
-            <SolidColorBrush x:Key="AmberBrush" Color="{StaticResource AmberColor}" />
-            <SolidColorBrush x:Key="Text0Brush" Color="{StaticResource Text0Color}" />
-            <SolidColorBrush x:Key="Text1Brush" Color="{StaticResource Text1Color}" />
-            <SolidColorBrush x:Key="Text2Brush" Color="{StaticResource Text2Color}" />
-            <SolidColorBrush x:Key="Text3Brush" Color="{StaticResource Text3Color}" />
-            <SolidColorBrush x:Key="Line1Brush" Color="{StaticResource Line1Color}" />
-            <SolidColorBrush x:Key="Line2Brush" Color="{StaticResource Line2Color}" />
+            <!-- Variantes con alfa usadas por degradados; ThemeRuntime las reemplaza dentro de MainWindow. -->
+            <Color x:Key="PrimaryTransparentColor">#00F37A4A</Color>
+            <Color x:Key="PrimaryHalfColor">#80F37A4A</Color>
+            <Color x:Key="PrimaryDeepColor">#CC3D00</Color>
+            <Color x:Key="PrimaryDeepTransparentColor">#003D0000</Color>
+            <Color x:Key="SecondaryTransparentColor">#00FFB069</Color>
+            <Color x:Key="SecondaryDeepColor">#66331A66</Color>
+            <Color x:Key="SecondaryDeepTransparentColor">#00331A66</Color>
+
+            <SolidColorBrush x:Key="Bg0Brush" Color="{DynamicResource Bg0Color}" />
+            <SolidColorBrush x:Key="Bg1Brush" Color="{DynamicResource Bg1Color}" />
+            <SolidColorBrush x:Key="Bg2Brush" Color="{DynamicResource Bg2Color}" />
+            <SolidColorBrush x:Key="Bg3Brush" Color="{DynamicResource Bg3Color}" />
+            <SolidColorBrush x:Key="CyanBrush" Color="{DynamicResource CyanColor}" />
+            <SolidColorBrush x:Key="Cyan2Brush" Color="{DynamicResource Cyan2Color}" />
+            <SolidColorBrush x:Key="MagentaBrush" Color="{DynamicResource MagentaColor}" />
+            <SolidColorBrush x:Key="Magenta2Brush" Color="{DynamicResource Magenta2Color}" />
+            <SolidColorBrush x:Key="OkBrush" Color="{DynamicResource OkColor}" />
+            <SolidColorBrush x:Key="AmberBrush" Color="{DynamicResource AmberColor}" />
+            <SolidColorBrush x:Key="Text0Brush" Color="{DynamicResource Text0Color}" />
+            <SolidColorBrush x:Key="Text1Brush" Color="{DynamicResource Text1Color}" />
+            <SolidColorBrush x:Key="Text2Brush" Color="{DynamicResource Text2Color}" />
+            <SolidColorBrush x:Key="Text3Brush" Color="{DynamicResource Text3Color}" />
+            <SolidColorBrush x:Key="Line1Brush" Color="{DynamicResource Line1Color}" />
+            <SolidColorBrush x:Key="Line2Brush" Color="{DynamicResource Line2Color}" />
 
             <!-- ═══ FONT FAMILY ═══ -->
             <FontFamily x:Key="SpaceGrotesk">pack://application:,,,/KioskClinicaPC;component/Fonts/#Space Grotesk</FontFamily>
@@ -55,8 +64,8 @@
 
             <!-- ═══ GLASS CARD STYLE ═══ -->
             <Style x:Key="GlassCard" TargetType="Border">
-                <Setter Property="Background" Value="{StaticResource Bg2Brush}" />
-                <Setter Property="BorderBrush" Value="{StaticResource Line1Brush}" />
+                <Setter Property="Background" Value="{DynamicResource Bg2Brush}" />
+                <Setter Property="BorderBrush" Value="{DynamicResource Line1Brush}" />
                 <Setter Property="BorderThickness" Value="1" />
                 <Setter Property="CornerRadius" Value="12" />
                 <Setter Property="Padding" Value="20" />
@@ -67,8 +76,8 @@
                 <Setter Property="Background">
                     <Setter.Value>
                         <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
-                            <GradientStop Color="{StaticResource CyanColor}" Offset="0"/>
-                            <GradientStop Color="{StaticResource MagentaColor}" Offset="1"/>
+                            <GradientStop Color="{DynamicResource CyanColor}" Offset="0"/>
+                            <GradientStop Color="{DynamicResource MagentaColor}" Offset="1"/>
                         </LinearGradientBrush>
                     </Setter.Value>
                 </Setter>
@@ -119,9 +128,9 @@
                  fondo translúcido, esquinas rectas, borde sutil; hover sube fondo/borde. -->
             <Style x:Key="GhostNavButton" TargetType="Button">
                 <Setter Property="Background" Value="#14FFFFFF" />
-                <Setter Property="BorderBrush" Value="{StaticResource Line1Brush}" />
+                <Setter Property="BorderBrush" Value="{DynamicResource Line1Brush}" />
                 <Setter Property="BorderThickness" Value="1" />
-                <Setter Property="Foreground" Value="{StaticResource Text1Brush}" />
+                <Setter Property="Foreground" Value="{DynamicResource Text1Brush}" />
                 <Setter Property="FontFamily" Value="{StaticResource SpaceGrotesk}" />
                 <Setter Property="FontSize" Value="18" />
                 <Setter Property="Padding" Value="22,14" />
@@ -140,7 +149,7 @@
                             <ControlTemplate.Triggers>
                                 <Trigger Property="IsMouseOver" Value="True">
                                     <Setter TargetName="border" Property="Background" Value="#1AFFFFFF" />
-                                    <Setter TargetName="border" Property="BorderBrush" Value="{StaticResource Line2Brush}" />
+                                    <Setter TargetName="border" Property="BorderBrush" Value="{DynamicResource Line2Brush}" />
                                 </Trigger>
                             </ControlTemplate.Triggers>
                         </ControlTemplate>
@@ -174,10 +183,10 @@
             <Style x:Key="ConfigTextBox" TargetType="TextBox">
                 <Setter Property="FontSize" Value="14" />
                 <Setter Property="FontFamily" Value="{StaticResource JetBrainsMono}" />
-                <Setter Property="Background" Value="{StaticResource Bg1Brush}" />
-                <Setter Property="Foreground" Value="{StaticResource Text0Brush}" />
-                <Setter Property="CaretBrush" Value="{StaticResource CyanBrush}" />
-                <Setter Property="BorderBrush" Value="{StaticResource Line1Brush}" />
+                <Setter Property="Background" Value="{DynamicResource Bg1Brush}" />
+                <Setter Property="Foreground" Value="{DynamicResource Text0Brush}" />
+                <Setter Property="CaretBrush" Value="{DynamicResource CyanBrush}" />
+                <Setter Property="BorderBrush" Value="{DynamicResource Line1Brush}" />
                 <Setter Property="BorderThickness" Value="1" />
                 <Setter Property="Padding" Value="10,8" />
                 <Setter Property="Template">
@@ -198,7 +207,7 @@
             <!-- ═══ SECTION CARD ═══ -->
             <Style x:Key="SectionCard" TargetType="Border">
                 <Setter Property="Background" Value="#FF0A0716" />
-                <Setter Property="BorderBrush" Value="{StaticResource Line1Brush}" />
+                <Setter Property="BorderBrush" Value="{DynamicResource Line1Brush}" />
                 <Setter Property="BorderThickness" Value="1" />
                 <Setter Property="CornerRadius" Value="12" />
                 <Setter Property="Padding" Value="22" />
@@ -274,13 +283,13 @@
                  de acento y punto relleno. Sustituye al RadioButton nativo (gris, sin pulir). -->
             <Style x:Key="ChoiceCard" TargetType="RadioButton">
                 <Setter Property="Cursor" Value="Hand"/>
-                <Setter Property="Foreground" Value="{StaticResource Text0Brush}"/>
+                <Setter Property="Foreground" Value="{DynamicResource Text0Brush}"/>
                 <Setter Property="FontFamily" Value="{StaticResource SpaceGrotesk}"/>
                 <Setter Property="Template">
                     <Setter.Value>
                         <ControlTemplate TargetType="RadioButton">
                             <Border x:Name="bd" CornerRadius="10" BorderThickness="1.5"
-                                    Background="{StaticResource Bg1Brush}" BorderBrush="{StaticResource Line1Brush}"
+                                    Background="{DynamicResource Bg1Brush}" BorderBrush="{DynamicResource Line1Brush}"
                                     Padding="16,13">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
@@ -289,24 +298,24 @@
                                     </Grid.ColumnDefinitions>
                                     <StackPanel Grid.Column="0" VerticalAlignment="Center">
                                         <TextBlock Text="{TemplateBinding Content}" FontSize="15" FontWeight="SemiBold"
-                                                   Foreground="{StaticResource Text0Brush}"/>
+                                                   Foreground="{DynamicResource Text0Brush}"/>
                                         <TextBlock Text="{TemplateBinding Tag}" FontSize="11" Margin="0,3,0,0"
-                                                   FontFamily="{StaticResource JetBrainsMono}" Foreground="{StaticResource Text2Brush}"/>
+                                                   FontFamily="{StaticResource JetBrainsMono}" Foreground="{DynamicResource Text2Brush}"/>
                                     </StackPanel>
                                     <Grid Grid.Column="1" Width="22" Height="22" VerticalAlignment="Center" Margin="12,0,0,0">
-                                        <Ellipse x:Name="ring" Stroke="{StaticResource Line2Brush}" StrokeThickness="2" Fill="Transparent"/>
-                                        <Ellipse x:Name="dot" Width="10" Height="10" Fill="{StaticResource CyanBrush}" Opacity="0"/>
+                                        <Ellipse x:Name="ring" Stroke="{DynamicResource Line2Brush}" StrokeThickness="2" Fill="Transparent"/>
+                                        <Ellipse x:Name="dot" Width="10" Height="10" Fill="{DynamicResource CyanBrush}" Opacity="0"/>
                                     </Grid>
                                 </Grid>
                             </Border>
                             <ControlTemplate.Triggers>
                                 <Trigger Property="IsMouseOver" Value="True">
-                                    <Setter TargetName="bd" Property="BorderBrush" Value="{StaticResource Line2Brush}"/>
+                                    <Setter TargetName="bd" Property="BorderBrush" Value="{DynamicResource Line2Brush}"/>
                                 </Trigger>
                                 <Trigger Property="IsChecked" Value="True">
-                                    <Setter TargetName="bd" Property="BorderBrush" Value="{StaticResource CyanBrush}"/>
+                                    <Setter TargetName="bd" Property="BorderBrush" Value="{DynamicResource CyanBrush}"/>
                                     <Setter TargetName="bd" Property="Background" Value="#1FF37A4A"/>
-                                    <Setter TargetName="ring" Property="Stroke" Value="{StaticResource CyanBrush}"/>
+                                    <Setter TargetName="ring" Property="Stroke" Value="{DynamicResource CyanBrush}"/>
                                     <Setter TargetName="dot" Property="Opacity" Value="1"/>
                                 </Trigger>
                             </ControlTemplate.Triggers>
@@ -319,7 +328,7 @@
                  Pista + pulgar que se desliza. On = acento. Reemplaza el CheckBox cuadrado nativo. -->
             <Style x:Key="ToggleSwitch" TargetType="CheckBox">
                 <Setter Property="Cursor" Value="Hand"/>
-                <Setter Property="Foreground" Value="{StaticResource Text1Brush}"/>
+                <Setter Property="Foreground" Value="{DynamicResource Text1Brush}"/>
                 <Setter Property="FontFamily" Value="{StaticResource SpaceGrotesk}"/>
                 <Setter Property="FontSize" Value="14"/>
                 <Setter Property="Template">
@@ -327,22 +336,22 @@
                         <ControlTemplate TargetType="CheckBox">
                             <StackPanel Orientation="Horizontal" Background="Transparent">
                                 <Border x:Name="track" Width="48" Height="28" CornerRadius="14"
-                                        Background="{StaticResource Bg3Brush}" BorderBrush="{StaticResource Line2Brush}" BorderThickness="1">
+                                        Background="{DynamicResource Bg3Brush}" BorderBrush="{DynamicResource Line2Brush}" BorderThickness="1">
                                     <Ellipse x:Name="thumb" Width="20" Height="20" HorizontalAlignment="Left" Margin="4,0,0,0"
-                                             Fill="{StaticResource Text2Brush}"/>
+                                             Fill="{DynamicResource Text2Brush}"/>
                                 </Border>
                                 <ContentPresenter VerticalAlignment="Center" Margin="12,0,0,0"/>
                             </StackPanel>
                             <ControlTemplate.Triggers>
                                 <Trigger Property="IsMouseOver" Value="True">
-                                    <Setter TargetName="track" Property="BorderBrush" Value="{StaticResource Text2Brush}"/>
+                                    <Setter TargetName="track" Property="BorderBrush" Value="{DynamicResource Text2Brush}"/>
                                 </Trigger>
                                 <Trigger Property="IsChecked" Value="True">
                                     <Setter TargetName="thumb" Property="HorizontalAlignment" Value="Right"/>
                                     <Setter TargetName="thumb" Property="Margin" Value="0,0,4,0"/>
                                     <Setter TargetName="thumb" Property="Fill" Value="White"/>
-                                    <Setter TargetName="track" Property="Background" Value="{StaticResource CyanBrush}"/>
-                                    <Setter TargetName="track" Property="BorderBrush" Value="{StaticResource CyanBrush}"/>
+                                    <Setter TargetName="track" Property="Background" Value="{DynamicResource CyanBrush}"/>
+                                    <Setter TargetName="track" Property="BorderBrush" Value="{DynamicResource CyanBrush}"/>
                                 </Trigger>
                             </ControlTemplate.Triggers>
                         </ControlTemplate>
@@ -354,10 +363,10 @@
             <Style x:Key="ConfigPasswordBox" TargetType="PasswordBox">
                 <Setter Property="FontSize" Value="16" />
                 <Setter Property="FontFamily" Value="{StaticResource JetBrainsMono}" />
-                <Setter Property="Background" Value="{StaticResource Bg1Brush}" />
-                <Setter Property="Foreground" Value="{StaticResource Text0Brush}" />
-                <Setter Property="CaretBrush" Value="{StaticResource CyanBrush}" />
-                <Setter Property="BorderBrush" Value="{StaticResource Line1Brush}" />
+                <Setter Property="Background" Value="{DynamicResource Bg1Brush}" />
+                <Setter Property="Foreground" Value="{DynamicResource Text0Brush}" />
+                <Setter Property="CaretBrush" Value="{DynamicResource CyanBrush}" />
+                <Setter Property="BorderBrush" Value="{DynamicResource Line1Brush}" />
                 <Setter Property="BorderThickness" Value="1" />
                 <Setter Property="Padding" Value="10,8" />
             </Style>

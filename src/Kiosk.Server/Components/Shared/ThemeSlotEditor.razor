@@ -1,0 +1,47 @@
+@using KioskClinicaPC.Core.Config
+
+<div class="theme-slot-editor">
+    <label>@Label</label>
+    <select value="@Value" @onchange="Changed">
+        <option value="preset">Usar adorno del tema@(string.IsNullOrWhiteSpace(PresetAsset) ? " (ninguno)" : $" · {PresetAsset}")</option>
+        <option value="hidden">Sin adorno</option>
+        @foreach (string asset in Assets)
+        {
+            <option value="@($"asset:{asset}")">Biblioteca · @asset</option>
+        }
+    </select>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Label { get; set; } = "";
+    [Parameter, EditorRequired] public ThemeSlotOverride Slot { get; set; } = new();
+    [Parameter] public string? PresetAsset { get; set; }
+    [Parameter] public IReadOnlyList<string> Assets { get; set; } = Array.Empty<string>();
+
+    private string Value => Slot.Mode switch
+    {
+        ThemeSlotMode.Hidden => "hidden",
+        ThemeSlotMode.Library when !string.IsNullOrWhiteSpace(Slot.AssetKey) => "asset:" + Slot.AssetKey,
+        _ => "preset"
+    };
+
+    private void Changed(ChangeEventArgs args)
+    {
+        string value = args.Value?.ToString() ?? "preset";
+        if (value == "hidden")
+        {
+            Slot.Mode = ThemeSlotMode.Hidden;
+            Slot.AssetKey = null;
+        }
+        else if (value.StartsWith("asset:", StringComparison.Ordinal))
+        {
+            Slot.Mode = ThemeSlotMode.Library;
+            Slot.AssetKey = value[6..];
+        }
+        else
+        {
+            Slot.Mode = ThemeSlotMode.Preset;
+            Slot.AssetKey = null;
+        }
+    }
+}

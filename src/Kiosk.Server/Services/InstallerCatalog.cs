@@ -15,6 +15,9 @@ public sealed class InstallerPackage
     public string Sha256 { get; set; } = "";
     public bool HasEmbeddedSignature { get; set; }
     public bool AllowUnsigned { get; set; }
+    public bool AvailableInInitialSetup { get; set; }
+    public bool SelectedByDefault { get; set; }
+    public int InitialSetupOrder { get; set; }
     public DateTime UploadedAtUtc { get; set; }
     public DateTime? ArchivedAtUtc { get; set; }
 }
@@ -52,6 +55,29 @@ public sealed class InstallerCatalog
     public InstallerPackage? Find(string id)
     {
         lock (_gate) return _packages.FirstOrDefault(p => p.ArchivedAtUtc == null && p.Id.Equals(id, StringComparison.OrdinalIgnoreCase));
+    }
+
+    public IReadOnlyList<InstallerPackage> InitialSetupList()
+    {
+        lock (_gate)
+            return _packages
+                .Where(p => p.ArchivedAtUtc == null && p.AvailableInInitialSetup)
+                .OrderBy(p => p.InitialSetupOrder)
+                .ThenBy(p => p.DisplayName, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+    }
+
+    public void ConfigureInitialSetup(string id, bool available, bool selectedByDefault, int order)
+    {
+        lock (_gate)
+        {
+            var package = _packages.FirstOrDefault(p => p.Id == id && p.ArchivedAtUtc == null)
+                ?? throw new KeyNotFoundException("Aplicaci\u00f3n no encontrada.");
+            package.AvailableInInitialSetup = available;
+            package.SelectedByDefault = available && selectedByDefault;
+            package.InitialSetupOrder = Math.Clamp(order, 0, 10_000);
+            Save();
+        }
     }
 
     public async Task<InstallerPackage> AddAsync(string displayName, string originalName, Stream content,

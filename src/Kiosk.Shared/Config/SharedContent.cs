@@ -18,6 +18,8 @@ namespace KioskClinicaPC.Core.Config
             local.AttractSlides = server.AttractSlides;
             local.AttractSlidesNew = server.AttractSlidesNew;
             local.UiTexts = server.UiTexts;
+            // También se copia null: al terminar un evento debe retirarse el tema cacheado anterior.
+            local.VisualTheme = server.VisualTheme;
 
             // El esquema lo marca el servidor: es quien versiona el contenido compartido.
             local.SchemaVersion = server.SchemaVersion;

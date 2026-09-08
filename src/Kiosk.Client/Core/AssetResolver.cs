@@ -48,6 +48,20 @@ namespace KioskClinicaPC.Core
                              App.SpecImagesFolderPath, App.RemoteSpecImagesFolderPath, App.BundledSpecImagesFolderPath);
         }
 
+        /// <summary>Resuelve una clave exacta y segura de la biblioteca de adornos.</summary>
+        public static string? ResolveThemeAsset(string? key)
+        {
+            if (!Config.ThemeAssetKey.IsSafe(key)) return null;
+            foreach (string dir in new[] { App.RemoteThemeAssetsFolderPath, App.BundledThemeAssetsFolderPath })
+            {
+                string candidate = Path.GetFullPath(Path.Combine(dir, key!));
+                string root = Path.GetFullPath(dir) + Path.DirectorySeparatorChar;
+                if (candidate.StartsWith(root, System.StringComparison.OrdinalIgnoreCase) && File.Exists(candidate))
+                    return candidate;
+            }
+            return null;
+        }
+
         /// <summary>Recorre las carpetas en orden: la primera que dé match gana (override antes que empaquetado).</summary>
         private static string? BestMatch(System.Func<string, bool> matches, params string[] dirs)
         {

@@ -11,6 +11,7 @@ public sealed class EventStore
 {
     private readonly string _path;
     private readonly object _gate = new();
+    public event Action? Changed;
 
     public EventStore(string dataDir)
     {
@@ -30,6 +31,10 @@ public sealed class EventStore
 
     public KioskEvent? Get(string id) => All().FirstOrDefault(e => e.Id == id);
 
+    public bool ReferencesThemeAsset(string fileName) => All().Any(ev =>
+        ThemeSlots(ev.Theme).Any(slot => slot.Mode == ThemeSlotMode.Library &&
+            string.Equals(slot.AssetKey, fileName, StringComparison.OrdinalIgnoreCase)));
+
     /// <summary>Inserta o actualiza por Id.</summary>
     public void Save(KioskEvent ev)
     {
@@ -40,6 +45,7 @@ public sealed class EventStore
             if (i >= 0) list[i] = ev; else list.Add(ev);
             WriteAll(list);
         }
+        Changed?.Invoke();
     }
 
     public void Delete(string id)
@@ -50,6 +56,7 @@ public sealed class EventStore
             list.RemoveAll(e => e.Id == id);
             WriteAll(list);
         }
+        Changed?.Invoke();
     }
 
     private void WriteAll(List<KioskEvent> list)
@@ -61,5 +68,16 @@ public sealed class EventStore
             File.Move(tmp, _path, overwrite: true);
         }
         finally { try { if (File.Exists(tmp)) File.Delete(tmp); } catch { } }
+    }
+
+    private static IEnumerable<ThemeSlotOverride> ThemeSlots(EventThemeSelection? theme)
+    {
+        if (theme?.Scenes == null) yield break;
+        foreach (ThemeSceneOverride scene in new[]
+                 { theme.Scenes.Attract, theme.Scenes.Scan, theme.Scenes.Overview, theme.Scenes.Detail })
+        {
+            if (scene?.Primary != null) yield return scene.Primary;
+            if (scene?.Secondary != null) yield return scene.Secondary;
+        }
     }
 }

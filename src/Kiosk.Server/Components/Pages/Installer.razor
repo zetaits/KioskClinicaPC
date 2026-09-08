@@ -1,0 +1,113 @@
+@page "/instalador"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@implements IDisposable
+@using KioskClinicaPC.Core.Sync
+@inject InitialSetupBundleStore Bundles
+@inject InitialSetupSessionStore Sessions
+@inject InstallerCatalog Catalog
+
+<section class="card">
+    <div class="card-head">
+        <div>
+            <h2>Instalador de equipos</h2>
+            <p class="muted section-copy">Instala Kiosk, el pack de aplicaciones o ambos desde un único asistente.</p>
+        </div>
+    </div>
+
+    @if (_bundle is null)
+    {
+        <div class="alert error" role="alert">
+            <span class="dot offline"></span>
+            @(_bundleError ?? $"No hay un instalador válido en {Bundles.Root}.")
+        </div>
+        <p class="mono-note">Copia el .exe y su archivo .bundle.json generado por build-installer.ps1.</p>
+    }
+    else
+    {
+        <div class="kv">
+            <div class="r"><span class="k">Versión</span><span class="v">@_bundle.Manifest.Version</span></div>
+            <div class="r"><span class="k">Tamaño</span><span class="v">@Size(_bundle.Manifest.SizeBytes)</span></div>
+            <div class="r"><span class="k">Servidor incluido</span><span class="v">@_bundle.Manifest.ServerUrl</span></div>
+            <div class="r"><span class="k">SHA-256</span><span class="v">@_bundle.Manifest.Sha256[..12]…</span></div>
+        </div>
+        <div style="margin-top:18px">
+            <a class="primary button-link" href="/panel/setup/download">Descargar instalador</a>
+        </div>
+    }
+</section>
+
+<section class="card">
+    <div class="card-head">
+        <h2>Pack predeterminado</h2>
+        <span class="mono-note">@Catalog.InitialSetupList().Count disponibles</span>
+    </div>
+    @if (Catalog.InitialSetupList().Count == 0)
+    {
+        <div class="empty-state compact"><div><b>Pack vacío</b><p>Configura las aplicaciones desde la página Aplicaciones.</p></div></div>
+    }
+    else
+    {
+        <div class="catalog-list">
+            @foreach (var package in Catalog.InitialSetupList())
+            {
+                <div class="job-row">
+                    <div class="job-title"><b>@package.DisplayName</b><span>@Size(package.SizeBytes)</span></div>
+                    <span class="badge @(package.SelectedByDefault ? "ok" : "accent")">@(package.SelectedByDefault ? "Preseleccionada" : "Opcional")</span>
+                    <code>@package.Sha256[..12]…</code>
+                    <span class="mono-note">#@package.InitialSetupOrder</span>
+                </div>
+            }
+        </div>
+    }
+</section>
+
+<section class="card">
+    <div class="card-head"><h2>Instalaciones iniciales recientes</h2></div>
+    @if (Sessions.Recent().Count == 0)
+    {
+        <div class="empty-state compact"><div><b>Sin actividad</b><p>Las ejecuciones del Setup aparecerán aquí.</p></div></div>
+    }
+    else
+    {
+        <div class="job-list">
+            @foreach (var session in Sessions.Recent())
+            {
+                <div class="job-row">
+                    <div class="job-title"><b>@session.MachineName</b><span>Setup @session.SetupVersion · @session.Packages.Count aplicación(es)</span></div>
+                    <span class="badge @SessionCss(session)">@SessionLabel(session)</span>
+                    <div class="job-progress"><small>@string.Join(" · ", session.Packages.Select(p => $"{p.PackageName}: {PackageLabel(p.State)}"))</small></div>
+                    <time>@session.UpdatedAtUtc.ToLocalTime().ToString("dd/MM HH:mm")</time>
+                </div>
+            }
+        </div>
+    }
+</section>
+
+@code {
+    private ValidatedInitialSetupBundle? _bundle;
+    private string? _bundleError;
+
+    protected override void OnInitialized()
+    {
+        _bundle = Bundles.Latest(out _bundleError);
+        Sessions.Changed += Changed;
+    }
+
+    private void Changed() => InvokeAsync(StateHasChanged);
+    public void Dispose() => Sessions.Changed -= Changed;
+    private static string Size(long bytes) => bytes >= 1024 * 1024 ? $"{bytes / 1024d / 1024d:N1} MB" : $"{bytes / 1024d:N0} KB";
+    private static string SessionLabel(InitialSetupSession s) => s.IsTerminal
+        ? (s.Packages.Any(p => p.State == InstallationJobState.Failed) ? "Con errores" : "Completada") : "En curso";
+    private static string SessionCss(InitialSetupSession s) => !s.IsTerminal ? "accent" : s.Packages.Any(p => p.State == InstallationJobState.Failed) ? "warn" : "ok";
+    private static string PackageLabel(InstallationJobState state) => state switch
+    {
+        InstallationJobState.Succeeded => "instalada",
+        InstallationJobState.RebootRequired => "requiere reinicio",
+        InstallationJobState.Failed => "error",
+        InstallationJobState.Downloading => "descargando",
+        InstallationJobState.Verifying => "verificando",
+        InstallationJobState.Installing => "instalando",
+        _ => "pendiente"
+    };
+}

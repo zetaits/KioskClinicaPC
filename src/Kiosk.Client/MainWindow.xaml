@@ -8,7 +8,7 @@
         xmlns:edit="clr-namespace:KioskClinicaPC.Controls"
         mc:Ignorable="d"
         Title="KioskClinicaPC"
-        Foreground="{StaticResource Text0Brush}"
+        Foreground="{DynamicResource Text0Brush}"
         FontFamily="{StaticResource SpaceGrotesk}"
         WindowStyle="None"
         ResizeMode="NoResize"
@@ -46,7 +46,7 @@
             <Setter Property="FontFamily" Value="{StaticResource JetBrainsMono}"/>
             <Setter Property="FontSize" Value="18"/>
             <Setter Property="FontWeight" Value="Bold"/>
-            <Setter Property="Foreground" Value="{StaticResource Text3Brush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text3Brush}"/>
             <Setter Property="Padding" Value="14,7"/>
             <Setter Property="Template">
                 <Setter.Value>
@@ -61,10 +61,10 @@
                                     <Condition Binding="{Binding IsMouseOver, RelativeSource={RelativeSource Self}}" Value="True"/>
                                 </MultiDataTrigger.Conditions>
                                 <Setter TargetName="seg" Property="Background" Value="#1AFFFFFF"/>
-                                <Setter Property="Foreground" Value="{StaticResource Text1Brush}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource Text1Brush}"/>
                             </MultiDataTrigger>
                             <DataTrigger Binding="{Binding Tag, RelativeSource={RelativeSource Self}}" Value="True">
-                                <Setter TargetName="seg" Property="Background" Value="{StaticResource CyanBrush}"/>
+                                <Setter TargetName="seg" Property="Background" Value="{DynamicResource CyanBrush}"/>
                                 <Setter Property="Foreground" Value="#02121a"/>
                             </DataTrigger>
                         </ControlTemplate.Triggers>
@@ -76,9 +76,9 @@
 
     <!-- Fondo ambiente (no negro) para que las bandas de letterbox en paneles no 16:9 no sean
          vacíos negros, sino que se fundan con el fondo de la app. -->
-    <Grid x:Name="WindowRoot" Background="{StaticResource Bg0Brush}">
+    <Grid x:Name="WindowRoot" Background="{DynamicResource Bg0Brush}">
     <Viewbox Stretch="Uniform" StretchDirection="Both" UseLayoutRounding="True" SnapsToDevicePixels="True">
-        <Grid x:Name="RootGrid" Width="1920" Height="1080" ClipToBounds="True" Background="{StaticResource Bg0Brush}"
+        <Grid x:Name="RootGrid" Width="1920" Height="1080" ClipToBounds="True" Background="{DynamicResource Bg0Brush}"
               TextOptions.TextFormattingMode="Ideal" TextOptions.TextRenderingMode="ClearType"
               RenderOptions.BitmapScalingMode="HighQuality">
             
@@ -94,9 +94,9 @@
                 <Rectangle>
                     <Rectangle.Fill>
                         <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-                            <GradientStop Color="{StaticResource Bg0Color}" Offset="0"/>
-                            <GradientStop Color="{StaticResource Bg1Color}" Offset="0.55"/>
-                            <GradientStop Color="#07050f" Offset="1"/>
+                            <GradientStop Color="{DynamicResource Bg0Color}" Offset="0"/>
+                            <GradientStop Color="{DynamicResource Bg1Color}" Offset="0.55"/>
+                            <GradientStop Color="{DynamicResource Bg0Color}" Offset="1"/>
                         </LinearGradientBrush>
                     </Rectangle.Fill>
                 </Rectangle>
@@ -104,11 +104,11 @@
                 <Rectangle Opacity="0.24">
                     <Rectangle.Fill>
                         <RadialGradientBrush Center="0.82,0.12" GradientOrigin="0.82,0.12" RadiusX="0.70" RadiusY="0.55">
-                            <GradientStop Color="{StaticResource MagentaColor}" Offset="0"/>
+                            <GradientStop Color="{DynamicResource MagentaColor}" Offset="0"/>
                             <!-- Fade a alpha-0 del MISMO color (#00FFB069), no a Transparent (#00FFFFFF):
                                  WPF interpola sin premultiplicar → amber→transparent-blanco pasa por grises
                                  lechosos (halo blanco lechoso). Mismo hue con alpha 0 = desvanecido limpio. -->
-                            <GradientStop Color="#00FFB069" Offset="0.65"/>
+                            <GradientStop Color="{DynamicResource SecondaryTransparentColor}" Offset="0.65"/>
                         </RadialGradientBrush>
                     </Rectangle.Fill>
                 </Rectangle>
@@ -116,8 +116,8 @@
                 <Rectangle Opacity="0.30">
                     <Rectangle.Fill>
                         <RadialGradientBrush Center="0.12,0.92" GradientOrigin="0.12,0.92" RadiusX="0.65" RadiusY="0.50">
-                            <GradientStop Color="{StaticResource CyanColor}" Offset="0"/>
-                            <GradientStop Color="#00F37A4A" Offset="0.65"/>
+                            <GradientStop Color="{DynamicResource CyanColor}" Offset="0"/>
+                            <GradientStop Color="{DynamicResource PrimaryTransparentColor}" Offset="0.65"/>
                         </RadialGradientBrush>
                     </Rectangle.Fill>
                 </Rectangle>
@@ -125,8 +125,8 @@
                 <Rectangle Opacity="0.34">
                     <Rectangle.Fill>
                         <RadialGradientBrush Center="0.50,0.55" GradientOrigin="0.50,0.55" RadiusX="0.55" RadiusY="0.45">
-                            <GradientStop Color="#CC3D00" Offset="0"/>
-                            <GradientStop Color="#00CC3D00" Offset="0.70"/>
+                            <GradientStop Color="{DynamicResource PrimaryDeepColor}" Offset="0"/>
+                            <GradientStop Color="{DynamicResource PrimaryDeepTransparentColor}" Offset="0.70"/>
                         </RadialGradientBrush>
                     </Rectangle.Fill>
                 </Rectangle>
@@ -134,8 +134,8 @@
                 <Rectangle Opacity="0.60">
                     <Rectangle.Fill>
                         <RadialGradientBrush Center="0.95,0.78" GradientOrigin="0.95,0.78" RadiusX="0.45" RadiusY="0.40">
-                            <GradientStop Color="#331A66" Offset="0"/>
-                            <GradientStop Color="#00331A66" Offset="0.70"/>
+                            <GradientStop Color="{DynamicResource SecondaryDeepColor}" Offset="0"/>
+                            <GradientStop Color="{DynamicResource SecondaryDeepTransparentColor}" Offset="0.70"/>
                         </RadialGradientBrush>
                     </Rectangle.Fill>
                 </Rectangle>
@@ -252,8 +252,8 @@
                     </Ellipse.RenderTransform>
                     <Ellipse.Fill>
                         <RadialGradientBrush Center="0.5,0.5" GradientOrigin="0.5,0.5" RadiusX="0.5" RadiusY="0.5">
-                            <GradientStop Color="#80F37A4A" Offset="0"/>
-                            <GradientStop Color="#00F37A4A" Offset="0.72"/>
+                            <GradientStop Color="{DynamicResource PrimaryHalfColor}" Offset="0"/>
+                            <GradientStop Color="{DynamicResource PrimaryTransparentColor}" Offset="0.72"/>
                         </RadialGradientBrush>
                     </Ellipse.Fill>
                 </Ellipse>
@@ -267,7 +267,14 @@
                     <Grid.Background>
                         <SolidColorBrush Color="Transparent"/>
                     </Grid.Background>
-                    
+                    <Grid IsHitTestVisible="False" ClipToBounds="True">
+                        <Border Width="570" HorizontalAlignment="Left" VerticalAlignment="Stretch" ClipToBounds="True">
+                            <Image x:Name="AttractThemePrimary" Width="620" Height="500" HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="-70,0,0,-40" Stretch="Uniform"/>
+                        </Border>
+                        <Border Width="650" HorizontalAlignment="Right" VerticalAlignment="Stretch" ClipToBounds="True">
+                            <Image x:Name="AttractThemeSecondary" Width="620" Height="360" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,80,-60,0" Stretch="Uniform"/>
+                        </Border>
+                    </Grid>
                     <Rectangle Fill="Transparent" MouseLeftButtonDown="AttractScreen_Click" />
 
                     <!-- Wireframe orb behind text (monochrome orange, sphere-like).
@@ -290,7 +297,7 @@
                                 <BitmapCache RenderAtScale="15"/>
                             </Canvas.CacheMode>
                             <Canvas.Effect>
-                                <DropShadowEffect Color="{StaticResource CyanColor}" BlurRadius="22"
+                                <DropShadowEffect Color="{DynamicResource CyanColor}" BlurRadius="22"
                                                   ShadowDepth="0" Opacity="0.5"/>
                             </Canvas.Effect>
                             <Canvas.RenderTransform>
@@ -302,40 +309,40 @@
 
                             <!-- Outer ring -->
                             <Ellipse Canvas.Left="2" Canvas.Top="2" Width="96" Height="96"
-                                     Stroke="{StaticResource CyanBrush}" StrokeThickness="0.28" Fill="Transparent"/>
+                                     Stroke="{DynamicResource CyanBrush}" StrokeThickness="0.28" Fill="Transparent"/>
 
                             <!-- Latitudes (top half) -->
-                            <Ellipse Canvas.Left="2" Canvas.Top="3.0"  Width="96" Height="91.2" Stroke="{StaticResource CyanBrush}" StrokeThickness="0.22" Fill="Transparent" Opacity="0.85"/>
-                            <Ellipse Canvas.Left="2" Canvas.Top="6.5"  Width="96" Height="84.6" Stroke="{StaticResource CyanBrush}" StrokeThickness="0.22" Fill="Transparent" Opacity="0.80"/>
-                            <Ellipse Canvas.Left="2" Canvas.Top="10.5" Width="96" Height="76.4" Stroke="{StaticResource CyanBrush}" StrokeThickness="0.22" Fill="Transparent" Opacity="0.75"/>
-                            <Ellipse Canvas.Left="2" Canvas.Top="15.0" Width="96" Height="67.0" Stroke="{StaticResource CyanBrush}" StrokeThickness="0.22" Fill="Transparent" Opacity="0.70"/>
-                            <Ellipse Canvas.Left="2" Canvas.Top="19.5" Width="96" Height="56.0" Stroke="{StaticResource CyanBrush}" StrokeThickness="0.22" Fill="Transparent" Opacity="0.65"/>
-                            <Ellipse Canvas.Left="2" Canvas.Top="24.5" Width="96" Height="44.0" Stroke="{StaticResource CyanBrush}" StrokeThickness="0.22" Fill="Transparent" Opacity="0.60"/>
-                            <Ellipse Canvas.Left="2" Canvas.Top="30.0" Width="96" Height="30.0" Stroke="{StaticResource CyanBrush}" StrokeThickness="0.22" Fill="Transparent" Opacity="0.55"/>
-                            <Ellipse Canvas.Left="2" Canvas.Top="36.0" Width="96" Height="16.0" Stroke="{StaticResource CyanBrush}" StrokeThickness="0.22" Fill="Transparent" Opacity="0.50"/>
+                            <Ellipse Canvas.Left="2" Canvas.Top="3.0"  Width="96" Height="91.2" Stroke="{DynamicResource CyanBrush}" StrokeThickness="0.22" Fill="Transparent" Opacity="0.85"/>
+                            <Ellipse Canvas.Left="2" Canvas.Top="6.5"  Width="96" Height="84.6" Stroke="{DynamicResource CyanBrush}" StrokeThickness="0.22" Fill="Transparent" Opacity="0.80"/>
+                            <Ellipse Canvas.Left="2" Canvas.Top="10.5" Width="96" Height="76.4" Stroke="{DynamicResource CyanBrush}" StrokeThickness="0.22" Fill="Transparent" Opacity="0.75"/>
+                            <Ellipse Canvas.Left="2" Canvas.Top="15.0" Width="96" Height="67.0" Stroke="{DynamicResource CyanBrush}" StrokeThickness="0.22" Fill="Transparent" Opacity="0.70"/>
+                            <Ellipse Canvas.Left="2" Canvas.Top="19.5" Width="96" Height="56.0" Stroke="{DynamicResource CyanBrush}" StrokeThickness="0.22" Fill="Transparent" Opacity="0.65"/>
+                            <Ellipse Canvas.Left="2" Canvas.Top="24.5" Width="96" Height="44.0" Stroke="{DynamicResource CyanBrush}" StrokeThickness="0.22" Fill="Transparent" Opacity="0.60"/>
+                            <Ellipse Canvas.Left="2" Canvas.Top="30.0" Width="96" Height="30.0" Stroke="{DynamicResource CyanBrush}" StrokeThickness="0.22" Fill="Transparent" Opacity="0.55"/>
+                            <Ellipse Canvas.Left="2" Canvas.Top="36.0" Width="96" Height="16.0" Stroke="{DynamicResource CyanBrush}" StrokeThickness="0.22" Fill="Transparent" Opacity="0.50"/>
 
                             <!-- Equator (refuerzo) -->
-                            <Ellipse Canvas.Left="2" Canvas.Top="49.5" Width="96" Height="1.0" Stroke="{StaticResource CyanBrush}" StrokeThickness="0.32" Fill="Transparent" Opacity="1.0"/>
+                            <Ellipse Canvas.Left="2" Canvas.Top="49.5" Width="96" Height="1.0" Stroke="{DynamicResource CyanBrush}" StrokeThickness="0.32" Fill="Transparent" Opacity="1.0"/>
 
                             <!-- Latitudes (bottom half, mirror) -->
-                            <Ellipse Canvas.Left="2" Canvas.Top="48.0" Width="96" Height="16.0" Stroke="{StaticResource CyanBrush}" StrokeThickness="0.22" Fill="Transparent" Opacity="0.50"/>
-                            <Ellipse Canvas.Left="2" Canvas.Top="40.0" Width="96" Height="30.0" Stroke="{StaticResource CyanBrush}" StrokeThickness="0.22" Fill="Transparent" Opacity="0.55"/>
-                            <Ellipse Canvas.Left="2" Canvas.Top="33.5" Width="96" Height="44.0" Stroke="{StaticResource CyanBrush}" StrokeThickness="0.22" Fill="Transparent" Opacity="0.60"/>
-                            <Ellipse Canvas.Left="2" Canvas.Top="27.0" Width="96" Height="56.0" Stroke="{StaticResource CyanBrush}" StrokeThickness="0.22" Fill="Transparent" Opacity="0.65"/>
-                            <Ellipse Canvas.Left="2" Canvas.Top="21.5" Width="96" Height="67.0" Stroke="{StaticResource CyanBrush}" StrokeThickness="0.22" Fill="Transparent" Opacity="0.70"/>
-                            <Ellipse Canvas.Left="2" Canvas.Top="16.5" Width="96" Height="76.4" Stroke="{StaticResource CyanBrush}" StrokeThickness="0.22" Fill="Transparent" Opacity="0.75"/>
-                            <Ellipse Canvas.Left="2" Canvas.Top="11.5" Width="96" Height="84.6" Stroke="{StaticResource CyanBrush}" StrokeThickness="0.22" Fill="Transparent" Opacity="0.80"/>
-                            <Ellipse Canvas.Left="2" Canvas.Top="7.0"  Width="96" Height="91.2" Stroke="{StaticResource CyanBrush}" StrokeThickness="0.22" Fill="Transparent" Opacity="0.85"/>
+                            <Ellipse Canvas.Left="2" Canvas.Top="48.0" Width="96" Height="16.0" Stroke="{DynamicResource CyanBrush}" StrokeThickness="0.22" Fill="Transparent" Opacity="0.50"/>
+                            <Ellipse Canvas.Left="2" Canvas.Top="40.0" Width="96" Height="30.0" Stroke="{DynamicResource CyanBrush}" StrokeThickness="0.22" Fill="Transparent" Opacity="0.55"/>
+                            <Ellipse Canvas.Left="2" Canvas.Top="33.5" Width="96" Height="44.0" Stroke="{DynamicResource CyanBrush}" StrokeThickness="0.22" Fill="Transparent" Opacity="0.60"/>
+                            <Ellipse Canvas.Left="2" Canvas.Top="27.0" Width="96" Height="56.0" Stroke="{DynamicResource CyanBrush}" StrokeThickness="0.22" Fill="Transparent" Opacity="0.65"/>
+                            <Ellipse Canvas.Left="2" Canvas.Top="21.5" Width="96" Height="67.0" Stroke="{DynamicResource CyanBrush}" StrokeThickness="0.22" Fill="Transparent" Opacity="0.70"/>
+                            <Ellipse Canvas.Left="2" Canvas.Top="16.5" Width="96" Height="76.4" Stroke="{DynamicResource CyanBrush}" StrokeThickness="0.22" Fill="Transparent" Opacity="0.75"/>
+                            <Ellipse Canvas.Left="2" Canvas.Top="11.5" Width="96" Height="84.6" Stroke="{DynamicResource CyanBrush}" StrokeThickness="0.22" Fill="Transparent" Opacity="0.80"/>
+                            <Ellipse Canvas.Left="2" Canvas.Top="7.0"  Width="96" Height="91.2" Stroke="{DynamicResource CyanBrush}" StrokeThickness="0.22" Fill="Transparent" Opacity="0.85"/>
 
                             <!-- Longitudes (vertical ellipses) -->
-                            <Ellipse Canvas.Left="49.5" Canvas.Top="2" Width="1.0"  Height="96" Stroke="{StaticResource CyanBrush}" StrokeThickness="0.32" Fill="Transparent" Opacity="0.95"/>
-                            <Ellipse Canvas.Left="46"   Canvas.Top="2" Width="8"    Height="96" Stroke="{StaticResource CyanBrush}" StrokeThickness="0.18" Fill="Transparent" Opacity="0.70"/>
-                            <Ellipse Canvas.Left="42"   Canvas.Top="2" Width="16"   Height="96" Stroke="{StaticResource CyanBrush}" StrokeThickness="0.18" Fill="Transparent" Opacity="0.65"/>
-                            <Ellipse Canvas.Left="37"   Canvas.Top="2" Width="26"   Height="96" Stroke="{StaticResource CyanBrush}" StrokeThickness="0.18" Fill="Transparent" Opacity="0.60"/>
-                            <Ellipse Canvas.Left="31"   Canvas.Top="2" Width="38"   Height="96" Stroke="{StaticResource CyanBrush}" StrokeThickness="0.18" Fill="Transparent" Opacity="0.55"/>
-                            <Ellipse Canvas.Left="24"   Canvas.Top="2" Width="52"   Height="96" Stroke="{StaticResource CyanBrush}" StrokeThickness="0.18" Fill="Transparent" Opacity="0.50"/>
-                            <Ellipse Canvas.Left="16"   Canvas.Top="2" Width="68"   Height="96" Stroke="{StaticResource CyanBrush}" StrokeThickness="0.18" Fill="Transparent" Opacity="0.45"/>
-                            <Ellipse Canvas.Left="8"    Canvas.Top="2" Width="84"   Height="96" Stroke="{StaticResource CyanBrush}" StrokeThickness="0.18" Fill="Transparent" Opacity="0.40"/>
+                            <Ellipse Canvas.Left="49.5" Canvas.Top="2" Width="1.0"  Height="96" Stroke="{DynamicResource CyanBrush}" StrokeThickness="0.32" Fill="Transparent" Opacity="0.95"/>
+                            <Ellipse Canvas.Left="46"   Canvas.Top="2" Width="8"    Height="96" Stroke="{DynamicResource CyanBrush}" StrokeThickness="0.18" Fill="Transparent" Opacity="0.70"/>
+                            <Ellipse Canvas.Left="42"   Canvas.Top="2" Width="16"   Height="96" Stroke="{DynamicResource CyanBrush}" StrokeThickness="0.18" Fill="Transparent" Opacity="0.65"/>
+                            <Ellipse Canvas.Left="37"   Canvas.Top="2" Width="26"   Height="96" Stroke="{DynamicResource CyanBrush}" StrokeThickness="0.18" Fill="Transparent" Opacity="0.60"/>
+                            <Ellipse Canvas.Left="31"   Canvas.Top="2" Width="38"   Height="96" Stroke="{DynamicResource CyanBrush}" StrokeThickness="0.18" Fill="Transparent" Opacity="0.55"/>
+                            <Ellipse Canvas.Left="24"   Canvas.Top="2" Width="52"   Height="96" Stroke="{DynamicResource CyanBrush}" StrokeThickness="0.18" Fill="Transparent" Opacity="0.50"/>
+                            <Ellipse Canvas.Left="16"   Canvas.Top="2" Width="68"   Height="96" Stroke="{DynamicResource CyanBrush}" StrokeThickness="0.18" Fill="Transparent" Opacity="0.45"/>
+                            <Ellipse Canvas.Left="8"    Canvas.Top="2" Width="84"   Height="96" Stroke="{DynamicResource CyanBrush}" StrokeThickness="0.18" Fill="Transparent" Opacity="0.40"/>
                         </Canvas>
                     </Viewbox>
 
@@ -357,43 +364,43 @@
                     <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="{Binding EditMode.IsActive}" MaxWidth="1760" MaxHeight="940">
                         <!-- Eyebrow with line decorations -->
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,28">
-                            <Rectangle Width="28" Height="1" Fill="{StaticResource CyanBrush}" VerticalAlignment="Center" Margin="0,0,14,0"/>
-                            <TextBlock Text="{Binding CurrentSlide.Eyebrow}" Style="{StaticResource MonoFont}" Foreground="{StaticResource CyanBrush}" FontSize="18"/>
-                            <Rectangle Width="28" Height="1" Fill="{StaticResource CyanBrush}" VerticalAlignment="Center" Margin="14,0,0,0"/>
+                            <Rectangle Width="28" Height="1" Fill="{DynamicResource CyanBrush}" VerticalAlignment="Center" Margin="0,0,14,0"/>
+                            <TextBlock Text="{Binding CurrentSlide.Eyebrow}" Style="{StaticResource MonoFont}" Foreground="{DynamicResource CyanBrush}" FontSize="18"/>
+                            <Rectangle Width="28" Height="1" Fill="{DynamicResource CyanBrush}" VerticalAlignment="Center" Margin="14,0,0,0"/>
                         </StackPanel>
 
                         <!-- 168px titles: auto-encogen a una caja fija para que el slide más largo no empuje el CTA al borde -->
                         <Viewbox StretchDirection="DownOnly" Stretch="Uniform" HorizontalAlignment="Center" MaxWidth="1280" MaxHeight="360" Margin="0,0,0,12">
-                          <TextBlock Text="{Binding CurrentSlide.Title1}" Style="{StaticResource DisplayFont}" FontSize="168" Foreground="{StaticResource Text0Brush}" TextAlignment="Center" LineHeight="160" LineStackingStrategy="BlockLineHeight" TextWrapping="Wrap" Width="1280"/>
+                          <TextBlock Text="{Binding CurrentSlide.Title1}" Style="{StaticResource DisplayFont}" FontSize="168" Foreground="{DynamicResource Text0Brush}" TextAlignment="Center" LineHeight="160" LineStackingStrategy="BlockLineHeight" TextWrapping="Wrap" Width="1280"/>
                         </Viewbox>
 
                         <!-- Title 2 — wraps to ~3 lines (matches mockup), clean orange neon (no chromatic glitch) -->
                         <Viewbox StretchDirection="DownOnly" Stretch="Uniform" HorizontalAlignment="Center" MaxWidth="1280" MaxHeight="360">
                         <Grid HorizontalAlignment="Center">
                             <!-- Neon core layer (tight blur, dense) -->
-                            <TextBlock Text="{Binding CurrentSlide.Title2}" edit:Editable.IsOn="False" Style="{StaticResource DisplayFont}" FontSize="168" Foreground="{StaticResource CyanBrush}" TextAlignment="Center" LineHeight="160" LineStackingStrategy="BlockLineHeight" TextWrapping="Wrap" Width="1280" Opacity="0.6">
+                            <TextBlock Text="{Binding CurrentSlide.Title2}" edit:Editable.IsOn="False" Style="{StaticResource DisplayFont}" FontSize="168" Foreground="{DynamicResource CyanBrush}" TextAlignment="Center" LineHeight="160" LineStackingStrategy="BlockLineHeight" TextWrapping="Wrap" Width="1280" Opacity="0.6">
                                 <TextBlock.Effect>
-                                    <DropShadowEffect Color="{StaticResource CyanColor}" BlurRadius="16" ShadowDepth="0" Opacity="1"/>
+                                    <DropShadowEffect Color="{DynamicResource CyanColor}" BlurRadius="16" ShadowDepth="0" Opacity="1"/>
                                 </TextBlock.Effect>
                             </TextBlock>
                             <!-- Base title (wide halo) — gradient vertical: melocotón → naranja → dorado (feedback v4) -->
                             <TextBlock Text="{Binding CurrentSlide.Title2}" Style="{StaticResource DisplayFont}" FontSize="168" TextAlignment="Center" LineHeight="160" LineStackingStrategy="BlockLineHeight" TextWrapping="Wrap" Width="1280">
                                 <TextBlock.Foreground>
                                     <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-                                        <GradientStop Color="#FF8C6E" Offset="0"/>
-                                        <GradientStop Color="#F37A4A" Offset="0.45"/>
-                                        <GradientStop Color="#FFC857" Offset="1"/>
+                                        <GradientStop Color="{DynamicResource MagentaColor}" Offset="0"/>
+                                        <GradientStop Color="{DynamicResource CyanColor}" Offset="0.45"/>
+                                        <GradientStop Color="{DynamicResource OkColor}" Offset="1"/>
                                     </LinearGradientBrush>
                                 </TextBlock.Foreground>
                                 <TextBlock.Effect>
-                                    <DropShadowEffect Color="{StaticResource CyanColor}" BlurRadius="48" ShadowDepth="0" Opacity="0.85"/>
+                                    <DropShadowEffect Color="{DynamicResource CyanColor}" BlurRadius="48" ShadowDepth="0" Opacity="0.85"/>
                                 </TextBlock.Effect>
                             </TextBlock>
                         </Grid>
                         </Viewbox>
 
                         <!-- Subtitle -->
-                        <TextBlock Text="{Binding CurrentSlide.Subtitle}" edit:Editable.Multiline="True" Foreground="{StaticResource Text1Brush}" FontSize="24" TextAlignment="Center" Margin="0,38,0,0" MaxWidth="1100" TextWrapping="Wrap"/>
+                        <TextBlock Text="{Binding CurrentSlide.Subtitle}" edit:Editable.Multiline="True" Foreground="{DynamicResource Text1Brush}" FontSize="24" TextAlignment="Center" Margin="0,38,0,0" MaxWidth="1100" TextWrapping="Wrap"/>
 
                         <!-- CTA Button (HUD bracket-corner style) -->
                         <Grid HorizontalAlignment="Center" Margin="0,48,0,0">
@@ -409,18 +416,18 @@
                             </Grid.ColumnDefinitions>
 
                             <Border x:Name="PulseButton" Grid.Row="1" Grid.Column="1"
-                                    Background="#10F37A4A" BorderBrush="{StaticResource CyanBrush}" BorderThickness="2"
+                                    Background="#10F37A4A" BorderBrush="{DynamicResource CyanBrush}" BorderThickness="2"
                                     Padding="36,18">
                                 <Border.Effect>
-                                    <DropShadowEffect Color="{StaticResource CyanColor}" BlurRadius="24" ShadowDepth="0" Opacity="0.48"/>
+                                    <DropShadowEffect Color="{DynamicResource CyanColor}" BlurRadius="24" ShadowDepth="0" Opacity="0.48"/>
                                 </Border.Effect>
                                 <StackPanel Orientation="Horizontal">
-                                    <Ellipse Width="12" Height="12" Fill="{StaticResource CyanBrush}" VerticalAlignment="Center" Margin="0,0,16,0">
+                                    <Ellipse Width="12" Height="12" Fill="{DynamicResource CyanBrush}" VerticalAlignment="Center" Margin="0,0,16,0">
                                         <Ellipse.Effect>
-                                            <DropShadowEffect Color="{StaticResource CyanColor}" BlurRadius="12" ShadowDepth="0" Opacity="0.9"/>
+                                            <DropShadowEffect Color="{DynamicResource CyanColor}" BlurRadius="12" ShadowDepth="0" Opacity="0.9"/>
                                         </Ellipse.Effect>
                                     </Ellipse>
-                                    <TextBlock Text="{Binding Texts[attract.cta]}" Style="{StaticResource DisplayFont}" Foreground="{StaticResource Text0Brush}" FontSize="22"/>
+                                    <TextBlock Text="{Binding Texts[attract.cta]}" Style="{StaticResource DisplayFont}" Foreground="{DynamicResource Text0Brush}" FontSize="22"/>
                                 </StackPanel>
                                 <Border.Triggers>
                                     <EventTrigger RoutedEvent="Loaded">
@@ -440,31 +447,31 @@
                             </Border>
 
                             <!-- 4 L-bracket corners -->
-                            <Path Grid.Row="0" Grid.Column="0" Stroke="{StaticResource CyanBrush}" StrokeThickness="2"
+                            <Path Grid.Row="0" Grid.Column="0" Stroke="{DynamicResource CyanBrush}" StrokeThickness="2"
                                   Data="M 0,14 L 0,0 L 14,0">
-                                <Path.Effect><DropShadowEffect Color="{StaticResource CyanColor}" BlurRadius="6" ShadowDepth="0" Opacity="0.9"/></Path.Effect>
+                                <Path.Effect><DropShadowEffect Color="{DynamicResource CyanColor}" BlurRadius="6" ShadowDepth="0" Opacity="0.9"/></Path.Effect>
                             </Path>
-                            <Path Grid.Row="0" Grid.Column="2" Stroke="{StaticResource CyanBrush}" StrokeThickness="2"
+                            <Path Grid.Row="0" Grid.Column="2" Stroke="{DynamicResource CyanBrush}" StrokeThickness="2"
                                   Data="M 0,0 L 14,0 L 14,14">
-                                <Path.Effect><DropShadowEffect Color="{StaticResource CyanColor}" BlurRadius="6" ShadowDepth="0" Opacity="0.9"/></Path.Effect>
+                                <Path.Effect><DropShadowEffect Color="{DynamicResource CyanColor}" BlurRadius="6" ShadowDepth="0" Opacity="0.9"/></Path.Effect>
                             </Path>
-                            <Path Grid.Row="2" Grid.Column="0" Stroke="{StaticResource CyanBrush}" StrokeThickness="2"
+                            <Path Grid.Row="2" Grid.Column="0" Stroke="{DynamicResource CyanBrush}" StrokeThickness="2"
                                   Data="M 0,0 L 0,14 L 14,14">
-                                <Path.Effect><DropShadowEffect Color="{StaticResource CyanColor}" BlurRadius="6" ShadowDepth="0" Opacity="0.9"/></Path.Effect>
+                                <Path.Effect><DropShadowEffect Color="{DynamicResource CyanColor}" BlurRadius="6" ShadowDepth="0" Opacity="0.9"/></Path.Effect>
                             </Path>
-                            <Path Grid.Row="2" Grid.Column="2" Stroke="{StaticResource CyanBrush}" StrokeThickness="2"
+                            <Path Grid.Row="2" Grid.Column="2" Stroke="{DynamicResource CyanBrush}" StrokeThickness="2"
                                   Data="M 0,14 L 14,14 L 14,0">
-                                <Path.Effect><DropShadowEffect Color="{StaticResource CyanColor}" BlurRadius="6" ShadowDepth="0" Opacity="0.9"/></Path.Effect>
+                                <Path.Effect><DropShadowEffect Color="{DynamicResource CyanColor}" BlurRadius="6" ShadowDepth="0" Opacity="0.9"/></Path.Effect>
                             </Path>
                         </Grid>
-                        <TextBlock Text="{Binding Texts[attract.hint]}" Style="{StaticResource MonoFont}" Foreground="{StaticResource Text2Brush}" FontSize="16" HorizontalAlignment="Center" Margin="0,22,0,0"/>
+                        <TextBlock Text="{Binding Texts[attract.hint]}" Style="{StaticResource MonoFont}" Foreground="{DynamicResource Text2Brush}" FontSize="16" HorizontalAlignment="Center" Margin="0,22,0,0"/>
                     </StackPanel>
 
                     <!-- Slide indicator dots -->
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,110" IsHitTestVisible="False">
-                        <Rectangle x:Name="SlideDot0" Width="32" Height="4" Fill="{StaticResource CyanBrush}" Margin="0,0,10,0">
+                        <Rectangle x:Name="SlideDot0" Width="32" Height="4" Fill="{DynamicResource CyanBrush}" Margin="0,0,10,0">
                             <Rectangle.Effect>
-                                <DropShadowEffect Color="{StaticResource CyanColor}" BlurRadius="10" ShadowDepth="0" Opacity="0.8"/>
+                                <DropShadowEffect Color="{DynamicResource CyanColor}" BlurRadius="10" ShadowDepth="0" Opacity="0.8"/>
                             </Rectangle.Effect>
                         </Rectangle>
                         <Rectangle x:Name="SlideDot1" Width="8" Height="4" Fill="#33FFFFFF" Margin="0,0,10,0"/>
@@ -474,15 +481,19 @@
 
                 <!-- ====== SCREEN 1: SCAN ====== -->
                 <Grid x:Name="Screen1_Scan" Visibility="Collapsed" Opacity="0">
+                    <Grid IsHitTestVisible="False" ClipToBounds="True">
+                        <Border Width="480" HorizontalAlignment="Left" VerticalAlignment="Stretch" ClipToBounds="True"><Image x:Name="ScanThemePrimary" Width="410" Height="470" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="-55,80,0,0" Stretch="Uniform"/></Border>
+                        <Border Width="500" HorizontalAlignment="Right" VerticalAlignment="Stretch" ClipToBounds="True"><Image x:Name="ScanThemeSecondary" Width="480" Height="340" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,-55,95" Stretch="Uniform"/></Border>
+                    </Grid>
                     <Grid>
                         <!-- Anillo de progreso del radar (0–100 %). Hermano del radar (no hijo) y en su
                              propio lienzo 820 holgado: si fuera hijo del radar (760), la grid menor lo
                              recortaría en los 4 cardinales (donde el aro, ~788, sobresale del 760). -->
                         <Grid Width="820" Height="820" HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False">
-                            <Path x:Name="ScanProgressRing" Stroke="{StaticResource CyanBrush}" StrokeThickness="4"
+                            <Path x:Name="ScanProgressRing" Stroke="{DynamicResource CyanBrush}" StrokeThickness="4"
                                   StrokeStartLineCap="Round" StrokeEndLineCap="Round" Opacity="0.9">
                                 <Path.Effect>
-                                    <DropShadowEffect Color="{StaticResource CyanColor}" BlurRadius="8" ShadowDepth="0" Opacity="0.9"/>
+                                    <DropShadowEffect Color="{DynamicResource CyanColor}" BlurRadius="8" ShadowDepth="0" Opacity="0.9"/>
                                 </Path.Effect>
                             </Path>
                         </Grid>
@@ -501,7 +512,7 @@
                             <!-- Sweep: cuña que pivota en el centro (380,380). Endpoint (691.76,190) =
                                  centro + 380·(sin60,-cos60), exactamente en el círculo exterior. Gira a
                                  1.7 s/vuelta (arrancado en code-behind durante el escaneo). -->
-                            <Path Fill="{StaticResource CyanBrush}" Opacity="0.42" Data="M 380 380 L 380 0 A 380 380 0 0 1 691.76 190 Z">
+                            <Path Fill="{DynamicResource CyanBrush}" Opacity="0.42" Data="M 380 380 L 380 0 A 380 380 0 0 1 691.76 190 Z">
                                 <Path.OpacityMask>
                                     <LinearGradientBrush StartPoint="0,0" EndPoint="1,0.5">
                                         <GradientStop Color="#CCFFFFFF" Offset="0"/>
@@ -514,9 +525,9 @@
                                 </Path.RenderTransform>
                             </Path>
                             <!-- Center dot with heavy glow -->
-                            <Ellipse Width="18" Height="18" Fill="{StaticResource CyanBrush}" HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <Ellipse Width="18" Height="18" Fill="{DynamicResource CyanBrush}" HorizontalAlignment="Center" VerticalAlignment="Center">
                                 <Ellipse.Effect>
-                                    <DropShadowEffect Color="{StaticResource CyanColor}" BlurRadius="60" ShadowDepth="0" Opacity="1"/>
+                                    <DropShadowEffect Color="{DynamicResource CyanColor}" BlurRadius="60" ShadowDepth="0" Opacity="1"/>
                                 </Ellipse.Effect>
                             </Ellipse>
 
@@ -540,7 +551,7 @@
                                             <!-- Anillo de ping (continuo). Escala 10→64px (×6.4) + fade.
                                                  El desfase por blip (Pd) lo aplica el handler Loaded. -->
                                             <Ellipse x:Name="PingRing" Canvas.Left="-5" Canvas.Top="-5" Width="10" Height="10"
-                                                     Stroke="{StaticResource MagentaBrush}" StrokeThickness="1.5" Opacity="0"
+                                                     Stroke="{DynamicResource MagentaBrush}" StrokeThickness="1.5" Opacity="0"
                                                      RenderTransformOrigin="0.5,0.5"
                                                      Loaded="ScanPingRing_Loaded" Tag="{Binding PingDelaySeconds}">
                                                 <Ellipse.RenderTransform><ScaleTransform/></Ellipse.RenderTransform>
@@ -549,18 +560,18 @@
                                             <Ellipse Canvas.Left="-5" Canvas.Top="-5" Width="10" Height="10">
                                                 <Ellipse.Style>
                                                     <Style TargetType="Ellipse">
-                                                        <Setter Property="Fill" Value="{StaticResource MagentaBrush}"/>
+                                                        <Setter Property="Fill" Value="{DynamicResource MagentaBrush}"/>
                                                         <Setter Property="Effect">
                                                             <Setter.Value>
-                                                                <DropShadowEffect Color="{StaticResource MagentaColor}" BlurRadius="12" ShadowDepth="0"/>
+                                                                <DropShadowEffect Color="{DynamicResource MagentaColor}" BlurRadius="12" ShadowDepth="0"/>
                                                             </Setter.Value>
                                                         </Setter>
                                                         <Style.Triggers>
                                                             <DataTrigger Binding="{Binding IsDetected}" Value="True">
-                                                                <Setter Property="Fill" Value="{StaticResource CyanBrush}"/>
+                                                                <Setter Property="Fill" Value="{DynamicResource CyanBrush}"/>
                                                                 <Setter Property="Effect">
                                                                     <Setter.Value>
-                                                                        <DropShadowEffect Color="{StaticResource CyanColor}" BlurRadius="18" ShadowDepth="0" Opacity="1"/>
+                                                                        <DropShadowEffect Color="{DynamicResource CyanColor}" BlurRadius="18" ShadowDepth="0" Opacity="1"/>
                                                                     </Setter.Value>
                                                                 </Setter>
                                                             </DataTrigger>
@@ -618,7 +629,7 @@
                                                         </Style.Triggers>
                                                     </Style>
                                                 </Border.Style>
-                                                <TextBlock Style="{StaticResource MonoFont}" FontSize="15" Foreground="{StaticResource Text0Brush}" TextWrapping="NoWrap">
+                                                <TextBlock Style="{StaticResource MonoFont}" FontSize="15" Foreground="{DynamicResource Text0Brush}" TextWrapping="NoWrap">
                                                     <Run Text="{Binding LabelUpper, Mode=OneWay}"/><Run Text=" · OK"/>
                                                 </TextBlock>
                                             </Border>
@@ -637,7 +648,7 @@
                                                         </Style.Triggers>
                                                     </Style>
                                                 </Border.Style>
-                                                <TextBlock Style="{StaticResource MonoFont}" FontSize="15" Foreground="{StaticResource Text0Brush}" TextWrapping="NoWrap">
+                                                <TextBlock Style="{StaticResource MonoFont}" FontSize="15" Foreground="{DynamicResource Text0Brush}" TextWrapping="NoWrap">
                                                     <Run Text="{Binding LabelUpper, Mode=OneWay}"/><Run Text=" · OK"/>
                                                 </TextBlock>
                                             </Border>
@@ -649,7 +660,7 @@
 
                         <!-- Log area at bottom left -->
                         <StackPanel VerticalAlignment="Bottom" HorizontalAlignment="Left" Margin="120,0,0,120">
-                            <TextBlock Text="{Binding Texts[scan.logTitle]}" Style="{StaticResource MonoFont}" FontSize="16" Foreground="{StaticResource CyanBrush}" Margin="0,0,0,16"/>
+                            <TextBlock Text="{Binding Texts[scan.logTitle]}" Style="{StaticResource MonoFont}" FontSize="16" Foreground="{DynamicResource CyanBrush}" Margin="0,0,0,16"/>
                             <ItemsControl x:Name="ScanLogControl" ItemsSource="{Binding ScanLogs}" Width="720">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
@@ -659,7 +670,7 @@
                                                 <ColumnDefinition Width="22"/>
                                                 <ColumnDefinition Width="*"/>
                                             </Grid.ColumnDefinitions>
-                                            <TextBlock Text="{Binding Time}" edit:Editable.IsOn="False" Style="{StaticResource MonoFont}" Foreground="{StaticResource Text3Brush}" FontSize="18" Grid.Column="0"/>
+                                            <TextBlock Text="{Binding Time}" edit:Editable.IsOn="False" Style="{StaticResource MonoFont}" Foreground="{DynamicResource Text3Brush}" FontSize="18" Grid.Column="0"/>
                                             <!-- Icono del componente (solo en líneas READ con id). -->
                                             <Path Grid.Column="1" Data="{Binding IconData}" Fill="{Binding AccentBrush}" Stretch="Uniform"
                                                   Width="16" Height="16" HorizontalAlignment="Center" VerticalAlignment="Center"
@@ -673,10 +684,10 @@
 
                         <!-- % counter at bottom right -->
                         <StackPanel VerticalAlignment="Bottom" HorizontalAlignment="Right" Margin="0,0,120,120">
-                            <TextBlock Text="{Binding Texts[scan.progress]}" Style="{StaticResource MonoFont}" FontSize="16" Foreground="{StaticResource CyanBrush}" Margin="0,0,0,12" HorizontalAlignment="Right"/>
+                            <TextBlock Text="{Binding Texts[scan.progress]}" Style="{StaticResource MonoFont}" FontSize="16" Foreground="{DynamicResource CyanBrush}" Margin="0,0,0,12" HorizontalAlignment="Right"/>
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                                <TextBlock x:Name="ScanProgressText" Text="000" edit:Editable.IsOn="False" Style="{StaticResource DisplayFont}" FontSize="220" Foreground="{StaticResource Text0Brush}" LineHeight="200"/>
-                                <TextBlock Text="%" Style="{StaticResource DisplayFont}" FontSize="220" Foreground="{StaticResource CyanBrush}" LineHeight="200"/>
+                                <TextBlock x:Name="ScanProgressText" Text="000" edit:Editable.IsOn="False" Style="{StaticResource DisplayFont}" FontSize="220" Foreground="{DynamicResource Text0Brush}" LineHeight="200"/>
+                                <TextBlock Text="%" Style="{StaticResource DisplayFont}" FontSize="220" Foreground="{DynamicResource CyanBrush}" LineHeight="200"/>
                             </StackPanel>
                         </StackPanel>
                     </Grid>
@@ -687,6 +698,10 @@
                     <Grid.RenderTransform>
                         <ScaleTransform x:Name="MainRevealScale" ScaleX="1" ScaleY="1"/>
                     </Grid.RenderTransform>
+                    <Grid IsHitTestVisible="False" ClipToBounds="True">
+                        <Border Width="420" HorizontalAlignment="Left" VerticalAlignment="Stretch" ClipToBounds="True"><Image x:Name="OverviewThemePrimary" Width="470" Height="420" HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="-90,0,0,120" Stretch="Uniform"/></Border>
+                        <Border Width="430" HorizontalAlignment="Right" VerticalAlignment="Stretch" ClipToBounds="True"><Image x:Name="OverviewThemeSecondary" Width="390" Height="390" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,70,-45,0" Stretch="Uniform"/></Border>
+                    </Grid>
 
                     <!-- IDENTITY BLOCK — left column at top:180. Ancho 440 = deja hueco al spotlight (x=600). -->
                     <StackPanel HorizontalAlignment="Left" VerticalAlignment="Top" Width="440" Margin="120,220,0,0">
@@ -700,27 +715,27 @@
                                HorizontalAlignment="Left" VerticalAlignment="Center"
                                Stretch="Uniform" StretchDirection="DownOnly" MaxHeight="120" MaxWidth="440">
                           <Image.Effect>
-                            <DropShadowEffect Color="{StaticResource CyanColor}" BlurRadius="22" ShadowDepth="0" Opacity="0.35"/>
+                            <DropShadowEffect Color="{DynamicResource CyanColor}" BlurRadius="22" ShadowDepth="0" Opacity="0.35"/>
                           </Image.Effect>
                         </Image>
                       </Grid>
                       <!-- Marca/Modelo detectados: auto-encogen si el nombre real es largo (no se cortan) -->
                       <Viewbox StretchDirection="DownOnly" Stretch="Uniform" HorizontalAlignment="Left" MaxWidth="440" Margin="0,0,0,10"
                                Visibility="{Binding HasBrandLogo, Converter={StaticResource InverseBoolToVis}}">
-                        <TextBlock Style="{StaticResource DisplayFont}" FontSize="58" LineHeight="58" Foreground="{StaticResource Text0Brush}" Text="{Binding DisplayConfig.ChassisName}"/>
+                        <TextBlock Style="{StaticResource DisplayFont}" FontSize="58" LineHeight="58" Foreground="{DynamicResource Text0Brush}" Text="{Binding DisplayConfig.ChassisName}"/>
                       </Viewbox>
                       <Viewbox StretchDirection="DownOnly" Stretch="Uniform" HorizontalAlignment="Left" MaxWidth="440">
-                        <TextBlock Style="{StaticResource DisplayFont}" FontSize="58" LineHeight="58" Foreground="{StaticResource CyanBrush}" Text="{Binding DisplayConfig.ModelName}">
+                        <TextBlock Style="{StaticResource DisplayFont}" FontSize="58" LineHeight="58" Foreground="{DynamicResource CyanBrush}" Text="{Binding DisplayConfig.ModelName}">
                           <TextBlock.Effect>
-                            <DropShadowEffect Color="{StaticResource CyanColor}" BlurRadius="24" ShadowDepth="0" Opacity="0.6"/>
+                            <DropShadowEffect Color="{DynamicResource CyanColor}" BlurRadius="24" ShadowDepth="0" Opacity="0.6"/>
                           </TextBlock.Effect>
                         </TextBlock>
                       </Viewbox>
 
                       <StackPanel Orientation="Horizontal" Margin="0,24,0,0">
-                        <TextBlock Foreground="{StaticResource Text1Brush}" FontSize="18" Text="{Binding DisplayConfig.Family}"/>
+                        <TextBlock Foreground="{DynamicResource Text1Brush}" FontSize="18" Text="{Binding DisplayConfig.Family}"/>
                         <!-- SKU: solo visible si el campo está relleno (tienda sin inventario → oculto). -->
-                        <TextBlock Foreground="{StaticResource Text2Brush}" FontSize="18"
+                        <TextBlock Foreground="{DynamicResource Text2Brush}" FontSize="18"
                                    Visibility="{Binding DisplayConfig.Sku, Converter={StaticResource NonEmptyToVis}}">
                           <Run Text=" · SKU "/><Run Text="{Binding DisplayConfig.Sku}"/>
                         </TextBlock>
@@ -728,15 +743,15 @@
                     
                       <StackPanel Orientation="Horizontal" Margin="0,32,0,0">
                         <!-- Píldora de garantía: borde + tinte ámbar, icono de escudo -->
-                        <Border Background="#1FFFA75C" BorderBrush="{StaticResource AmberBrush}" BorderThickness="1.5" CornerRadius="8" Padding="14,11">
+                        <Border Background="#1FFFA75C" BorderBrush="{DynamicResource AmberBrush}" BorderThickness="1.5" CornerRadius="8" Padding="14,11">
                           <StackPanel Orientation="Horizontal">
                             <Path Data="M 12,2 L 21,5 L 21,11 C 21,16.5 17,20.5 12,22 C 7,20.5 3,16.5 3,11 L 3,5 Z M 10.5,14.5 L 8,12 L 9.4,10.6 L 10.5,11.7 L 14.6,7.6 L 16,9 Z"
-                                  Fill="{StaticResource AmberBrush}" Stretch="Uniform" Width="20" Height="20" VerticalAlignment="Center" Margin="0,0,10,0">
+                                  Fill="{DynamicResource AmberBrush}" Stretch="Uniform" Width="20" Height="20" VerticalAlignment="Center" Margin="0,0,10,0">
                                 <Path.Effect>
-                                    <DropShadowEffect Color="{StaticResource AmberColor}" BlurRadius="12" ShadowDepth="0" Opacity="0.8"/>
+                                    <DropShadowEffect Color="{DynamicResource AmberColor}" BlurRadius="12" ShadowDepth="0" Opacity="0.8"/>
                                 </Path.Effect>
                             </Path>
-                            <TextBlock Text="{Binding WarrantyText}" edit:Editable.IsOn="False" Style="{StaticResource MonoFont}" FontSize="18" FontWeight="Medium" Foreground="{StaticResource AmberBrush}" VerticalAlignment="Center"/>
+                            <TextBlock Text="{Binding WarrantyText}" edit:Editable.IsOn="False" Style="{StaticResource MonoFont}" FontSize="18" FontWeight="Medium" Foreground="{DynamicResource AmberBrush}" VerticalAlignment="Center"/>
                           </StackPanel>
                         </Border>
                       </StackPanel>
@@ -745,9 +760,9 @@
                     <!-- Component spotlight (centre-top) — sigue al componente resaltado (ActiveSpec):
                          icono grande con glow + nombre + valor. Cambia al ritmo del ciclo de tiles. -->
                     <StackPanel HorizontalAlignment="Left" VerticalAlignment="Top" Width="780" Margin="600,150,0,0">
-                        <TextBlock Text="{Binding Texts[hud.productView]}" Style="{StaticResource MonoFont}" FontSize="18" Foreground="{StaticResource Text2Brush}" Margin="0,0,0,14"/>
+                        <TextBlock Text="{Binding Texts[hud.productView]}" Style="{StaticResource MonoFont}" FontSize="18" Foreground="{DynamicResource Text2Brush}" Margin="0,0,0,14"/>
                         <Grid Height="430">
-                            <Border x:Name="SpotlightFrame" Background="#46140B24" BorderBrush="{StaticResource Line1Brush}" BorderThickness="1"/>
+                            <Border x:Name="SpotlightFrame" Background="#46140B24" BorderBrush="{DynamicResource Line1Brush}" BorderThickness="1"/>
 
                             <!-- Tratamiento "Retícula + barrido" (spot-a del mockup): aro discontinuo que gira
                                  lento + haz horizontal que barre de arriba abajo, ambos con el acento del
@@ -769,12 +784,12 @@
                                             </BeginStoryboard>
                                         </EventTrigger>
                                     </Grid.Triggers>
-                                    <Ellipse Stroke="{Binding AccentBrush, FallbackValue={StaticResource CyanBrush}}" StrokeThickness="1" StrokeDashArray="2 4"/>
-                                    <Ellipse Margin="26" Stroke="{Binding AccentBrush, FallbackValue={StaticResource CyanBrush}}" StrokeThickness="1" Opacity="0.5"/>
-                                    <Ellipse Width="8" Height="8" Fill="{Binding AccentBrush, FallbackValue={StaticResource CyanBrush}}" HorizontalAlignment="Center" VerticalAlignment="Top"    Margin="0,-4,0,0"/>
-                                    <Ellipse Width="8" Height="8" Fill="{Binding AccentBrush, FallbackValue={StaticResource CyanBrush}}" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,-4"/>
-                                    <Ellipse Width="8" Height="8" Fill="{Binding AccentBrush, FallbackValue={StaticResource CyanBrush}}" HorizontalAlignment="Left"   VerticalAlignment="Center" Margin="-4,0,0,0"/>
-                                    <Ellipse Width="8" Height="8" Fill="{Binding AccentBrush, FallbackValue={StaticResource CyanBrush}}" HorizontalAlignment="Right"  VerticalAlignment="Center" Margin="0,0,-4,0"/>
+                                    <Ellipse Stroke="{Binding AccentBrush, FallbackValue={DynamicResource CyanBrush}}" StrokeThickness="1" StrokeDashArray="2 4"/>
+                                    <Ellipse Margin="26" Stroke="{Binding AccentBrush, FallbackValue={DynamicResource CyanBrush}}" StrokeThickness="1" Opacity="0.5"/>
+                                    <Ellipse Width="8" Height="8" Fill="{Binding AccentBrush, FallbackValue={DynamicResource CyanBrush}}" HorizontalAlignment="Center" VerticalAlignment="Top"    Margin="0,-4,0,0"/>
+                                    <Ellipse Width="8" Height="8" Fill="{Binding AccentBrush, FallbackValue={DynamicResource CyanBrush}}" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,-4"/>
+                                    <Ellipse Width="8" Height="8" Fill="{Binding AccentBrush, FallbackValue={DynamicResource CyanBrush}}" HorizontalAlignment="Left"   VerticalAlignment="Center" Margin="-4,0,0,0"/>
+                                    <Ellipse Width="8" Height="8" Fill="{Binding AccentBrush, FallbackValue={DynamicResource CyanBrush}}" HorizontalAlignment="Right"  VerticalAlignment="Center" Margin="0,0,-4,0"/>
                                 </Grid>
 
                                 <!-- Haz de barrido: banda horizontal (90px) que cae de arriba abajo (3.4s) con
@@ -799,12 +814,12 @@
                                         <Rectangle.Fill>
                                             <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
                                                 <GradientStop Color="#00000000" Offset="0"/>
-                                                <GradientStop Color="{Binding AccentColor, FallbackValue={StaticResource CyanColor}}" Offset="0.5"/>
+                                                <GradientStop Color="{Binding AccentColor, FallbackValue={DynamicResource CyanColor}}" Offset="0.5"/>
                                                 <GradientStop Color="#00000000" Offset="1"/>
                                             </LinearGradientBrush>
                                         </Rectangle.Fill>
                                     </Rectangle>
-                                    <Rectangle Height="1" VerticalAlignment="Top" Fill="{Binding AccentBrush, FallbackValue={StaticResource CyanBrush}}" Opacity="0.5"/>
+                                    <Rectangle Height="1" VerticalAlignment="Top" Fill="{Binding AccentBrush, FallbackValue={DynamicResource CyanBrush}}" Opacity="0.5"/>
                                 </Grid>
                             </Grid>
 
@@ -836,7 +851,7 @@
                                      NotifyOnTargetUpdated en el icono mantiene vivo el fade+slide del bloque entero. -->
                                 <Grid x:Name="SpotlightIcon" Grid.Row="0" Margin="0,0,0,22">
                                     <Path Data="{Binding IconData, FallbackValue='M 0,0', NotifyOnTargetUpdated=True}"
-                                          Fill="{Binding AccentBrush, FallbackValue={StaticResource CyanBrush}}"
+                                          Fill="{Binding AccentBrush, FallbackValue={DynamicResource CyanBrush}}"
                                           Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center"
                                           MaxHeight="230"
                                           Visibility="{Binding HasImage, Converter={StaticResource InverseBoolToVis}}">
@@ -881,20 +896,20 @@
                                     </Image>
                                 </Grid>
                                 <StackPanel Grid.Row="1" HorizontalAlignment="Center">
-                                    <TextBlock Text="{Binding Label}" edit:Editable.IsOn="False" Style="{StaticResource MonoFont}" FontSize="18" Foreground="{StaticResource Text2Brush}" HorizontalAlignment="Center"/>
-                                    <TextBlock Text="{Binding Value}" edit:Editable.IsOn="False" Style="{StaticResource DisplayFont}" FontSize="34" Foreground="{StaticResource Text0Brush}" HorizontalAlignment="Center" Margin="0,6,0,0" TextAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                                    <TextBlock Text="{Binding Label}" edit:Editable.IsOn="False" Style="{StaticResource MonoFont}" FontSize="18" Foreground="{DynamicResource Text2Brush}" HorizontalAlignment="Center"/>
+                                    <TextBlock Text="{Binding Value}" edit:Editable.IsOn="False" Style="{StaticResource DisplayFont}" FontSize="34" Foreground="{DynamicResource Text0Brush}" HorizontalAlignment="Center" Margin="0,6,0,0" TextAlignment="Center" TextTrimming="CharacterEllipsis"/>
                                 </StackPanel>
                             </Grid>
                             <!-- corner brackets (top-left + bottom-right), 26×26 L marks -->
-                            <Path Stroke="{StaticResource CyanBrush}" StrokeThickness="2" Width="26" Height="26" HorizontalAlignment="Left" VerticalAlignment="Top" Stretch="None" Data="M 0,26 L 0,0 L 26,0"/>
-                            <Path Stroke="{StaticResource CyanBrush}" StrokeThickness="2" Width="26" Height="26" HorizontalAlignment="Right" VerticalAlignment="Bottom" Stretch="None" Data="M 0,26 L 26,26 L 26,0"/>
+                            <Path Stroke="{DynamicResource CyanBrush}" StrokeThickness="2" Width="26" Height="26" HorizontalAlignment="Left" VerticalAlignment="Top" Stretch="None" Data="M 0,26 L 0,0 L 26,0"/>
+                            <Path Stroke="{DynamicResource CyanBrush}" StrokeThickness="2" Width="26" Height="26" HorizontalAlignment="Right" VerticalAlignment="Bottom" Stretch="None" Data="M 0,26 L 26,26 L 26,0"/>
                         </Grid>
                     </StackPanel>
 
                     <!-- Component tile grid (bottom) — ordered, tappable, auto-cycling highlight.
                          Bajado para dar más alto al spotlight y cerrar el hueco inferior. -->
                     <StackPanel HorizontalAlignment="Left" VerticalAlignment="Top" Width="1260" Margin="120,622,0,0">
-                        <TextBlock Text="{Binding Texts[hud.components]}" Style="{StaticResource MonoFont}" FontSize="18" Foreground="{StaticResource Text2Brush}" Margin="0,0,0,16"/>
+                        <TextBlock Text="{Binding Texts[hud.components]}" Style="{StaticResource MonoFont}" FontSize="18" Foreground="{DynamicResource Text2Brush}" Margin="0,0,0,16"/>
                         <ItemsControl x:Name="SpecTiles" ItemsSource="{Binding Specs}">
                             <ItemsControl.ItemsPanel>
                                 <ItemsPanelTemplate>
@@ -904,7 +919,7 @@
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
                                     <Button Click="SpecNode_Click" Height="160" Margin="0,0,14,14"
-                                            Background="#AE140B24" BorderBrush="{StaticResource Line1Brush}" BorderThickness="1"
+                                            Background="#AE140B24" BorderBrush="{DynamicResource Line1Brush}" BorderThickness="1"
                                             Foreground="White" Cursor="Hand">
                                         <Button.Template>
                                             <ControlTemplate TargetType="Button">
@@ -913,14 +928,14 @@
                                                         <ScaleTransform ScaleX="1" ScaleY="1"/>
                                                     </Border.RenderTransform>
                                                     <Border.Effect>
-                                                        <DropShadowEffect Color="{StaticResource CyanColor}" BlurRadius="28" ShadowDepth="0" Opacity="0"/>
+                                                        <DropShadowEffect Color="{DynamicResource CyanColor}" BlurRadius="28" ShadowDepth="0" Opacity="0"/>
                                                     </Border.Effect>
                                                     <Border.Clip>
                                                         <PathGeometry Figures="M 0,0 L 238,0 L 238,148 L 226,160 L 0,160 Z"/>
                                                     </Border.Clip>
                                                     <Grid>
                                                         <!-- tinte de selección: sutil, concentrado en la parte baja (degradado) -->
-                                                        <Rectangle x:Name="HighlightBg" Fill="{StaticResource CyanBrush}" Opacity="0">
+                                                        <Rectangle x:Name="HighlightBg" Fill="{DynamicResource CyanBrush}" Opacity="0">
                                                             <Rectangle.OpacityMask>
                                                                 <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
                                                                     <GradientStop Color="#00FFFFFF" Offset="0"/>
@@ -937,26 +952,26 @@
                                                             </Grid.RowDefinitions>
                                                             <!-- top: icon + index -->
                                                             <Grid Grid.Row="0">
-                                                                <Path x:Name="IconPath" Data="{Binding IconData, FallbackValue='M 0,0'}" Fill="{StaticResource Text1Brush}" Width="24" Height="24" Stretch="Uniform" HorizontalAlignment="Left"/>
-                                                                <TextBlock Text="{Binding IndexText}" edit:Editable.IsOn="False" Style="{StaticResource MonoFont}" Foreground="{StaticResource Text3Brush}" FontSize="14" HorizontalAlignment="Right" VerticalAlignment="Top"/>
+                                                                <Path x:Name="IconPath" Data="{Binding IconData, FallbackValue='M 0,0'}" Fill="{DynamicResource Text1Brush}" Width="24" Height="24" Stretch="Uniform" HorizontalAlignment="Left"/>
+                                                                <TextBlock Text="{Binding IndexText}" edit:Editable.IsOn="False" Style="{StaticResource MonoFont}" Foreground="{DynamicResource Text3Brush}" FontSize="14" HorizontalAlignment="Right" VerticalAlignment="Top"/>
                                                             </Grid>
                                                             <!-- middle: label + value -->
                                                             <StackPanel Grid.Row="1" VerticalAlignment="Bottom">
-                                                                <TextBlock x:Name="LblTxt" Text="{Binding Label}" Style="{StaticResource MonoFont}" Foreground="{StaticResource Text2Brush}" FontSize="16"/>
-                                                                <TextBlock x:Name="ValTxt" Text="{Binding Value}" Style="{StaticResource DisplayFont}" Foreground="{StaticResource Text0Brush}" FontSize="20" Margin="0,5,0,0" TextWrapping="Wrap" TextTrimming="CharacterEllipsis"/>
+                                                                <TextBlock x:Name="LblTxt" Text="{Binding Label}" Style="{StaticResource MonoFont}" Foreground="{DynamicResource Text2Brush}" FontSize="16"/>
+                                                                <TextBlock x:Name="ValTxt" Text="{Binding Value}" Style="{StaticResource DisplayFont}" Foreground="{DynamicResource Text0Brush}" FontSize="20" Margin="0,5,0,0" TextWrapping="Wrap" TextTrimming="CharacterEllipsis"/>
                                                             </StackPanel>
                                                             <!-- footer: ver detalle -->
-                                                            <TextBlock x:Name="CtaTxt" Grid.Row="2" Text="{Binding Texts[hud.tileCta], RelativeSource={RelativeSource AncestorType=Window}}" edit:Editable.IsOn="False" Style="{StaticResource MonoFont}" FontSize="14" Foreground="{StaticResource Text3Brush}" Margin="0,10,0,0"/>
+                                                            <TextBlock x:Name="CtaTxt" Grid.Row="2" Text="{Binding Texts[hud.tileCta], RelativeSource={RelativeSource AncestorType=Window}}" edit:Editable.IsOn="False" Style="{StaticResource MonoFont}" FontSize="14" Foreground="{DynamicResource Text3Brush}" Margin="0,10,0,0"/>
                                                         </Grid>
                                                         <!-- borde de acento (overlay, aparece en fade al seleccionar) -->
-                                                        <Border x:Name="AccentEdge" BorderBrush="{StaticResource CyanBrush}" BorderThickness="1.5" Opacity="0"/>
+                                                        <Border x:Name="AccentEdge" BorderBrush="{DynamicResource CyanBrush}" BorderThickness="1.5" Opacity="0"/>
                                                         <!-- subrayado de progreso: crece durante el tiempo que el tile está activo -->
-                                                        <Rectangle x:Name="Progress" Height="3" VerticalAlignment="Bottom" HorizontalAlignment="Stretch" Fill="{StaticResource CyanBrush}" Opacity="0.9" RenderTransformOrigin="0,0.5">
+                                                        <Rectangle x:Name="Progress" Height="3" VerticalAlignment="Bottom" HorizontalAlignment="Stretch" Fill="{DynamicResource CyanBrush}" Opacity="0.9" RenderTransformOrigin="0,0.5">
                                                             <Rectangle.RenderTransform>
                                                                 <ScaleTransform ScaleX="0" ScaleY="1"/>
                                                             </Rectangle.RenderTransform>
                                                             <Rectangle.Effect>
-                                                                <DropShadowEffect Color="{StaticResource CyanColor}" BlurRadius="10" ShadowDepth="0" Opacity="0.8"/>
+                                                                <DropShadowEffect Color="{DynamicResource CyanColor}" BlurRadius="10" ShadowDepth="0" Opacity="0.8"/>
                                                             </Rectangle.Effect>
                                                         </Rectangle>
                                                     </Grid>
@@ -964,9 +979,9 @@
                                                 <ControlTemplate.Triggers>
                                                     <DataTrigger Binding="{Binding IsHighlighted}" Value="True">
                                                         <!-- color de icono/textos (inmediato) -->
-                                                        <Setter TargetName="IconPath" Property="Fill" Value="{StaticResource CyanBrush}" />
-                                                        <Setter TargetName="LblTxt" Property="Foreground" Value="{StaticResource CyanBrush}" />
-                                                        <Setter TargetName="CtaTxt" Property="Foreground" Value="{StaticResource CyanBrush}" />
+                                                        <Setter TargetName="IconPath" Property="Fill" Value="{DynamicResource CyanBrush}" />
+                                                        <Setter TargetName="LblTxt" Property="Foreground" Value="{DynamicResource CyanBrush}" />
+                                                        <Setter TargetName="CtaTxt" Property="Foreground" Value="{DynamicResource CyanBrush}" />
                                                         <DataTrigger.EnterActions>
                                                             <BeginStoryboard>
                                                                 <Storyboard>
@@ -1010,24 +1025,24 @@
 
                     <!-- Right Price Strip -->
                     <StackPanel HorizontalAlignment="Right" VerticalAlignment="Top" Width="380" Margin="0,180,120,0">
-                        <Border Background="#120A0A1A" BorderBrush="{StaticResource Line1Brush}" BorderThickness="1" Padding="26,28">
+                        <Border Background="#120A0A1A" BorderBrush="{DynamicResource Line1Brush}" BorderThickness="1" Padding="26,28">
                             <StackPanel>
-                                <TextBlock Text="{Binding Texts[price.label]}" Style="{StaticResource MonoFont}" FontSize="16" Foreground="{StaticResource MagentaBrush}"/>
+                                <TextBlock Text="{Binding Texts[price.label]}" Style="{StaticResource MonoFont}" FontSize="16" Foreground="{DynamicResource MagentaBrush}"/>
                                 <StackPanel Orientation="Horizontal" Margin="0,12,0,0" VerticalAlignment="Bottom">
-                                    <TextBlock Text="{Binding FormattedPrice}" edit:Editable.IsOn="False" Style="{StaticResource DisplayFont}" FontSize="88" Foreground="{StaticResource Text0Brush}" LineHeight="88"/>
+                                    <TextBlock Text="{Binding FormattedPrice}" edit:Editable.IsOn="False" Style="{StaticResource DisplayFont}" FontSize="88" Foreground="{DynamicResource Text0Brush}" LineHeight="88"/>
                                 </StackPanel>
                                 <StackPanel Orientation="Horizontal" Margin="0,4,0,0" Visibility="{Binding HasDiscount, Converter={StaticResource BoolToVis}}">
-                                    <TextBlock Text="{Binding FormattedOriginalPrice}" edit:Editable.IsOn="False" Foreground="{StaticResource Text2Brush}" FontSize="18" TextDecorations="Strikethrough" Margin="0,0,12,0"/>
-                                    <TextBlock Text="{Binding FormattedDiscount}" edit:Editable.IsOn="False" Style="{StaticResource MonoFont}" Foreground="{StaticResource MagentaBrush}" FontSize="18" FontWeight="Bold"/>
+                                    <TextBlock Text="{Binding FormattedOriginalPrice}" edit:Editable.IsOn="False" Foreground="{DynamicResource Text2Brush}" FontSize="18" TextDecorations="Strikethrough" Margin="0,0,12,0"/>
+                                    <TextBlock Text="{Binding FormattedDiscount}" edit:Editable.IsOn="False" Style="{StaticResource MonoFont}" Foreground="{DynamicResource MagentaBrush}" FontSize="18" FontWeight="Bold"/>
                                 </StackPanel>
                                 
-                                <Border Margin="0,22,0,0" Padding="16,16" Background="#0AFFFFFF" BorderBrush="{StaticResource Line2Brush}" BorderThickness="1" CornerRadius="10">
+                                <Border Margin="0,22,0,0" Padding="16,16" Background="#0AFFFFFF" BorderBrush="{DynamicResource Line2Brush}" BorderThickness="1" CornerRadius="10">
                                     <StackPanel>
                                         <!-- Etiqueta + switch de plazo en la misma fila (compacto) -->
                                         <Grid>
-                                            <TextBlock Text="{Binding Texts[price.installments]}" Style="{StaticResource MonoFont}" FontSize="16" Foreground="{StaticResource Text2Brush}" VerticalAlignment="Center" HorizontalAlignment="Left" Margin="0,0,16,0"/>
+                                            <TextBlock Text="{Binding Texts[price.installments]}" Style="{StaticResource MonoFont}" FontSize="16" Foreground="{DynamicResource Text2Brush}" VerticalAlignment="Center" HorizontalAlignment="Left" Margin="0,0,16,0"/>
                                             <!-- Switch: ambos plazos visibles; el seleccionado se enciende, el otro queda apagado -->
-                                            <Border HorizontalAlignment="Right" CornerRadius="8" Background="#0AFFFFFF" BorderBrush="{StaticResource CyanBrush}" BorderThickness="1.5" ClipToBounds="True">
+                                            <Border HorizontalAlignment="Right" CornerRadius="8" Background="#0AFFFFFF" BorderBrush="{DynamicResource CyanBrush}" BorderThickness="1.5" ClipToBounds="True">
                                                 <Grid>
                                                     <Grid.ColumnDefinitions>
                                                         <ColumnDefinition Width="Auto"/>
@@ -1035,20 +1050,20 @@
                                                         <ColumnDefinition Width="Auto"/>
                                                     </Grid.ColumnDefinitions>
                                                     <Button Grid.Column="0" Style="{StaticResource InstallmentSegment}" FontSize="15" Padding="10,7" Tag="{Binding IsSixMonths}" Click="Installments6_Click" Content="6 MESES" edit:Editable.IsOn="False"/>
-                                                    <Rectangle Grid.Column="1" Fill="{StaticResource CyanBrush}" Opacity="0.5"/>
+                                                    <Rectangle Grid.Column="1" Fill="{DynamicResource CyanBrush}" Opacity="0.5"/>
                                                     <Button Grid.Column="2" Style="{StaticResource InstallmentSegment}" FontSize="15" Padding="10,7" Tag="{Binding IsTwelveMonths}" Click="Installments12_Click" Content="12 MESES" edit:Editable.IsOn="False"/>
                                                 </Grid>
                                             </Border>
                                         </Grid>
                                         <!-- Cuota mensual: héroe del bloque, acento -->
                                         <StackPanel Orientation="Horizontal" Margin="0,12,0,0" VerticalAlignment="Bottom">
-                                            <TextBlock Text="{Binding InstallmentsPrefix}" edit:Editable.IsOn="False" Style="{StaticResource DisplayFont}" FontSize="30" Foreground="{StaticResource CyanBrush}"/>
-                                            <TextBlock Text="{Binding FormattedMonthly}" edit:Editable.IsOn="False" Style="{StaticResource DisplayFont}" FontSize="30" Foreground="{StaticResource CyanBrush}"/>
+                                            <TextBlock Text="{Binding InstallmentsPrefix}" edit:Editable.IsOn="False" Style="{StaticResource DisplayFont}" FontSize="30" Foreground="{DynamicResource CyanBrush}"/>
+                                            <TextBlock Text="{Binding FormattedMonthly}" edit:Editable.IsOn="False" Style="{StaticResource DisplayFont}" FontSize="30" Foreground="{DynamicResource CyanBrush}"/>
                                         </StackPanel>
                                         <!-- "Sin intereses" como píldora verde -->
                                         <Border HorizontalAlignment="Left" Margin="0,10,0,0" Padding="10,5" CornerRadius="6"
-                                                Background="#1FF0D26B" BorderBrush="{StaticResource OkBrush}" BorderThickness="1">
-                                            <TextBlock Text="{Binding Texts[price.noInterest]}" Style="{StaticResource MonoFont}" FontSize="15" FontWeight="Medium" Foreground="{StaticResource OkBrush}"/>
+                                                Background="#1FF0D26B" BorderBrush="{DynamicResource OkBrush}" BorderThickness="1">
+                                            <TextBlock Text="{Binding Texts[price.noInterest]}" Style="{StaticResource MonoFont}" FontSize="15" FontWeight="Medium" Foreground="{DynamicResource OkBrush}"/>
                                         </Border>
                                     </StackPanel>
                                 </Border>
@@ -1060,15 +1075,15 @@
                                         <ColumnDefinition Width="Auto"/>
                                         <ColumnDefinition Width="*"/>
                                     </Grid.ColumnDefinitions>
-                                    <Rectangle Grid.Column="0" Height="1" VerticalAlignment="Center" Fill="{StaticResource Line2Brush}"/>
-                                    <TextBlock Grid.Column="1" Text="LLÉVATELO EN EL MÓVIL" Style="{StaticResource MonoFont}" FontSize="14" Foreground="{StaticResource CyanBrush}" Margin="14,0" VerticalAlignment="Center"/>
-                                    <Rectangle Grid.Column="2" Height="1" VerticalAlignment="Center" Fill="{StaticResource Line2Brush}"/>
+                                    <Rectangle Grid.Column="0" Height="1" VerticalAlignment="Center" Fill="{DynamicResource Line2Brush}"/>
+                                    <TextBlock Grid.Column="1" Text="LLÉVATELO EN EL MÓVIL" Style="{StaticResource MonoFont}" FontSize="14" Foreground="{DynamicResource CyanBrush}" Margin="14,0" VerticalAlignment="Center"/>
+                                    <Rectangle Grid.Column="2" Height="1" VerticalAlignment="Center" Fill="{DynamicResource Line2Brush}"/>
                                 </Grid>
 
                                 <!-- QR enmarcado: la acción de cierre de la tarjeta -->
                                 <Border Margin="0,16,0,0" Padding="20" CornerRadius="12" BorderThickness="1">
                                     <Border.BorderBrush>
-                                        <SolidColorBrush Color="{StaticResource CyanColor}" Opacity="0.35"/>
+                                        <SolidColorBrush Color="{DynamicResource CyanColor}" Opacity="0.35"/>
                                     </Border.BorderBrush>
                                     <!-- Degradado radial: glow naranja desde arriba-centro que se desvanece -->
                                     <Border.Background>
@@ -1082,12 +1097,12 @@
                                              reescalar un QR denso emborrona los módulos y arruina el escaneo. -->
                                         <Border x:Name="QrBorder" Width="260" Height="260" Background="White" Padding="14" HorizontalAlignment="Center" UseLayoutRounding="True">
                                             <Border.Effect>
-                                                <DropShadowEffect Color="{StaticResource CyanColor}" BlurRadius="30" ShadowDepth="0" Opacity="0.35"/>
+                                                <DropShadowEffect Color="{DynamicResource CyanColor}" BlurRadius="30" ShadowDepth="0" Opacity="0.35"/>
                                             </Border.Effect>
                                             <Image x:Name="QrImage" Stretch="None" SnapsToDevicePixels="True" RenderOptions.BitmapScalingMode="NearestNeighbor"/>
                                         </Border>
-                                        <TextBlock Text="{Binding Texts[price.scanTitle]}" Style="{StaticResource MonoFont}" FontSize="17" FontWeight="Bold" Foreground="{StaticResource CyanBrush}" Margin="0,15,0,0" TextAlignment="Center"/>
-                                        <TextBlock Text="{Binding Texts[price.scanText]}" edit:Editable.Multiline="True" Foreground="{StaticResource Text1Brush}" FontSize="18" TextWrapping="Wrap" LineHeight="24" TextAlignment="Center" Margin="0,6,0,0"/>
+                                        <TextBlock Text="{Binding Texts[price.scanTitle]}" Style="{StaticResource MonoFont}" FontSize="17" FontWeight="Bold" Foreground="{DynamicResource CyanBrush}" Margin="0,15,0,0" TextAlignment="Center"/>
+                                        <TextBlock Text="{Binding Texts[price.scanText]}" edit:Editable.Multiline="True" Foreground="{DynamicResource Text1Brush}" FontSize="18" TextWrapping="Wrap" LineHeight="24" TextAlignment="Center" Margin="0,6,0,0"/>
                                     </StackPanel>
                                 </Border>
                             </StackPanel>
@@ -1105,7 +1120,10 @@
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="560"/>
                     </Grid.ColumnDefinitions>
-
+                    <Grid IsHitTestVisible="False" ClipToBounds="True">
+                        <Border Width="500" HorizontalAlignment="Left" VerticalAlignment="Stretch" ClipToBounds="True"><Image x:Name="DetailThemePrimary" Width="500" Height="320" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="-70,90,0,0" Stretch="Uniform"/></Border>
+                        <Border Width="470" HorizontalAlignment="Right" VerticalAlignment="Stretch" ClipToBounds="True"><Image x:Name="DetailThemeSecondary" Width="520" Height="440" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,-95,105" Stretch="Uniform"/></Border>
+                    </Grid>
                     <!-- LEFT: contenido arriba (fila *) + navegación SIEMPRE anclada abajo (fila Auto) -->
                     <!-- Top margin deja sitio bajo el logo (agrandado) para que la fila breadcrumb no choque. -->
                     <Grid Grid.Column="0" Margin="120,185,40,176">
@@ -1120,32 +1138,32 @@
                       <StackPanel>
                         <!-- header rail: accent bar + icon + "01 / 10 · Procesador" -->
                         <StackPanel Orientation="Horizontal" Margin="0,0,0,26">
-                          <Rectangle Width="46" Height="3" Fill="{Binding AccentBrush, FallbackValue={StaticResource CyanBrush}}" VerticalAlignment="Center" Margin="0,0,18,0">
+                          <Rectangle Width="46" Height="3" Fill="{Binding AccentBrush, FallbackValue={DynamicResource CyanBrush}}" VerticalAlignment="Center" Margin="0,0,18,0">
                             <Rectangle.Effect>
-                              <DropShadowEffect Color="{Binding AccentColor, FallbackValue={StaticResource CyanColor}}" BlurRadius="14" ShadowDepth="0" Opacity="0.9"/>
+                              <DropShadowEffect Color="{Binding AccentColor, FallbackValue={DynamicResource CyanColor}}" BlurRadius="14" ShadowDepth="0" Opacity="0.9"/>
                             </Rectangle.Effect>
                           </Rectangle>
-                          <Path Data="{Binding IconData, FallbackValue='M 0,0'}" Fill="{Binding AccentBrush, FallbackValue={StaticResource CyanBrush}}" Height="34" Width="34" Stretch="Uniform" VerticalAlignment="Center"/>
-                          <TextBlock Text="{Binding IndexLabelFull}" edit:Editable.IsOn="False" Style="{StaticResource MonoFont}" FontSize="18" Foreground="{Binding AccentBrush, FallbackValue={StaticResource CyanBrush}}" VerticalAlignment="Center" Margin="14,0,0,0"/>
+                          <Path Data="{Binding IconData, FallbackValue='M 0,0'}" Fill="{Binding AccentBrush, FallbackValue={DynamicResource CyanBrush}}" Height="34" Width="34" Stretch="Uniform" VerticalAlignment="Center"/>
+                          <TextBlock Text="{Binding IndexLabelFull}" edit:Editable.IsOn="False" Style="{StaticResource MonoFont}" FontSize="18" Foreground="{Binding AccentBrush, FallbackValue={DynamicResource CyanBrush}}" VerticalAlignment="Center" Margin="14,0,0,0"/>
                         </StackPanel>
 
                         <!-- family eyebrow -->
-                        <TextBlock Text="{Binding Family}" Style="{StaticResource MonoFont}" FontSize="18" Foreground="{StaticResource Text2Brush}" Margin="0,0,0,8"/>
+                        <TextBlock Text="{Binding Family}" Style="{StaticResource MonoFont}" FontSize="18" Foreground="{DynamicResource Text2Brush}" Margin="0,0,0,8"/>
 
                         <!-- hero: modelo concreto (DetailTitle). Auto-encoge si es largo (nunca se corta ni empuja la navegación). -->
                         <Viewbox StretchDirection="DownOnly" Stretch="Uniform" HorizontalAlignment="Left" MaxWidth="980" MaxHeight="240" Margin="0,0,0,12">
-                          <TextBlock Text="{Binding DetailTitle}" edit:Editable.IsOn="False" Style="{StaticResource DisplayFont}" FontSize="116" LineHeight="110" Foreground="{Binding AccentBrush, FallbackValue={StaticResource CyanBrush}}" TextWrapping="Wrap" Width="980">
+                          <TextBlock Text="{Binding DetailTitle}" edit:Editable.IsOn="False" Style="{StaticResource DisplayFont}" FontSize="116" LineHeight="110" Foreground="{Binding AccentBrush, FallbackValue={DynamicResource CyanBrush}}" TextWrapping="Wrap" Width="980">
                             <TextBlock.Effect>
-                              <DropShadowEffect Color="{Binding AccentColor, FallbackValue={StaticResource CyanColor}}" BlurRadius="42" ShadowDepth="0" Opacity="0.55"/>
+                              <DropShadowEffect Color="{Binding AccentColor, FallbackValue={DynamicResource CyanColor}}" BlurRadius="42" ShadowDepth="0" Opacity="0.55"/>
                             </TextBlock.Effect>
                           </TextBlock>
                         </Viewbox>
 
                         <!-- nombre amigable (chip secundario): pequeño, oculto si no aporta nada al cliente -->
-                        <TextBlock Text="{Binding DetailSubtitle}" edit:Editable.IsOn="False" Style="{StaticResource MonoFont}" FontSize="20" Foreground="{StaticResource Text2Brush}" TextWrapping="NoWrap" Margin="0,0,0,28" Visibility="{Binding HasDetailSubtitle, Converter={StaticResource BoolToVis}}"/>
+                        <TextBlock Text="{Binding DetailSubtitle}" edit:Editable.IsOn="False" Style="{StaticResource MonoFont}" FontSize="20" Foreground="{DynamicResource Text2Brush}" TextWrapping="NoWrap" Margin="0,0,0,28" Visibility="{Binding HasDetailSubtitle, Converter={StaticResource BoolToVis}}"/>
 
                         <!-- StatStrip: Detail parsed into framed cells. Oculto si no hay detalle real. -->
-                        <Border BorderBrush="{StaticResource Line1Brush}" BorderThickness="1" Background="#05FFFFFF" HorizontalAlignment="Left"
+                        <Border BorderBrush="{DynamicResource Line1Brush}" BorderThickness="1" Background="#05FFFFFF" HorizontalAlignment="Left"
                                 Visibility="{Binding HasDetail, Converter={StaticResource BoolToVis}}">
                           <ItemsControl ItemsSource="{Binding DetailTokens}">
                             <ItemsControl.ItemsPanel>
@@ -1153,11 +1171,11 @@
                             </ItemsControl.ItemsPanel>
                             <ItemsControl.ItemTemplate>
                               <DataTemplate>
-                                <Border BorderBrush="{StaticResource Line1Brush}" BorderThickness="1,0,0,0" Padding="22,14" MinWidth="118">
+                                <Border BorderBrush="{DynamicResource Line1Brush}" BorderThickness="1,0,0,0" Padding="22,14" MinWidth="118">
                                   <StackPanel>
                                     <Rectangle Width="22" Height="2" Margin="0,0,0,8" HorizontalAlignment="Left"
-                                               Fill="{Binding DataContext.AccentBrush, RelativeSource={RelativeSource AncestorType=ItemsControl}, FallbackValue={StaticResource CyanBrush}}"/>
-                                    <TextBlock Text="{Binding}" edit:Editable.IsOn="False" Style="{StaticResource DisplayFont}" FontSize="19" Foreground="{StaticResource Text0Brush}" TextWrapping="NoWrap"/>
+                                               Fill="{Binding DataContext.AccentBrush, RelativeSource={RelativeSource AncestorType=ItemsControl}, FallbackValue={DynamicResource CyanBrush}}"/>
+                                    <TextBlock Text="{Binding}" edit:Editable.IsOn="False" Style="{StaticResource DisplayFont}" FontSize="19" Foreground="{DynamicResource Text0Brush}" TextWrapping="NoWrap"/>
                                   </StackPanel>
                                 </Border>
                               </DataTemplate>
@@ -1166,41 +1184,41 @@
                         </Border>
 
                         <!-- Metrics module: radial gauge + tier + honest scale (benchmarked specs) -->
-                        <Border Margin="0,28,0,0" Padding="28,26" Background="#120A0A1A" BorderBrush="{StaticResource Line1Brush}" BorderThickness="1"
+                        <Border Margin="0,28,0,0" Padding="28,26" Background="#120A0A1A" BorderBrush="{DynamicResource Line1Brush}" BorderThickness="1"
                                 HorizontalAlignment="Left" Visibility="{Binding HasBench, Converter={StaticResource BoolToVis}}">
                           <StackPanel Orientation="Horizontal">
                             <edit:RadialGauge Value="{Binding BenchScore}" AccentColor="{Binding AccentColor}" GaugeSize="196" VerticalAlignment="Center" Margin="0,0,38,0"/>
                             <StackPanel Width="640" VerticalAlignment="Center">
-                              <TextBlock Text="// RENDIMIENTO MEDIDO" Style="{StaticResource MonoFont}" FontSize="18" Foreground="{Binding AccentBrush, FallbackValue={StaticResource CyanBrush}}" Margin="0,0,0,14"/>
-                              <TextBlock Text="{Binding Tier}" edit:Editable.IsOn="False" Style="{StaticResource DisplayFont}" FontSize="34" Foreground="{StaticResource Text0Brush}" Margin="0,0,0,8"/>
-                              <TextBlock Text="{Binding BenchPercentLabel}" edit:Editable.IsOn="False" Style="{StaticResource MonoFont}" FontSize="16" Foreground="{StaticResource Text2Brush}" Margin="0,0,0,20"/>
+                              <TextBlock Text="// RENDIMIENTO MEDIDO" Style="{StaticResource MonoFont}" FontSize="18" Foreground="{Binding AccentBrush, FallbackValue={DynamicResource CyanBrush}}" Margin="0,0,0,14"/>
+                              <TextBlock Text="{Binding Tier}" edit:Editable.IsOn="False" Style="{StaticResource DisplayFont}" FontSize="34" Foreground="{DynamicResource Text0Brush}" Margin="0,0,0,8"/>
+                              <TextBlock Text="{Binding BenchPercentLabel}" edit:Editable.IsOn="False" Style="{StaticResource MonoFont}" FontSize="16" Foreground="{DynamicResource Text2Brush}" Margin="0,0,0,20"/>
                               <!-- honest position scale (0–640px = 0–100) -->
                               <Grid Height="10" Width="640" Background="#10FFFFFF" HorizontalAlignment="Left">
-                                <Rectangle HorizontalAlignment="Left" Width="{Binding BenchBarWidth}" Fill="{Binding AccentBrush, FallbackValue={StaticResource CyanBrush}}">
+                                <Rectangle HorizontalAlignment="Left" Width="{Binding BenchBarWidth}" Fill="{Binding AccentBrush, FallbackValue={DynamicResource CyanBrush}}">
                                   <Rectangle.Effect>
-                                    <DropShadowEffect Color="{Binding AccentColor, FallbackValue={StaticResource CyanColor}}" BlurRadius="16" ShadowDepth="0" Opacity="0.8"/>
+                                    <DropShadowEffect Color="{Binding AccentColor, FallbackValue={DynamicResource CyanColor}}" BlurRadius="16" ShadowDepth="0" Opacity="0.8"/>
                                   </Rectangle.Effect>
                                 </Rectangle>
-                                <Rectangle Width="2" Height="20" Fill="{StaticResource Text0Brush}" HorizontalAlignment="Left" VerticalAlignment="Center"
+                                <Rectangle Width="2" Height="20" Fill="{DynamicResource Text0Brush}" HorizontalAlignment="Left" VerticalAlignment="Center"
                                            Margin="{Binding BenchMarkerLeft, Converter={StaticResource LeftMarginConverter}}"/>
                               </Grid>
                               <Grid Width="640" HorizontalAlignment="Left" Margin="0,10,0,0">
-                                <TextBlock Text="BÁSICO" Style="{StaticResource MonoFont}" FontSize="16" Foreground="{StaticResource Text3Brush}" HorizontalAlignment="Left"/>
-                                <TextBlock Text="TOPE DE GAMA" Style="{StaticResource MonoFont}" FontSize="16" Foreground="{StaticResource Text3Brush}" HorizontalAlignment="Right"/>
+                                <TextBlock Text="BÁSICO" Style="{StaticResource MonoFont}" FontSize="16" Foreground="{DynamicResource Text3Brush}" HorizontalAlignment="Left"/>
+                                <TextBlock Text="TOPE DE GAMA" Style="{StaticResource MonoFont}" FontSize="16" Foreground="{DynamicResource Text3Brush}" HorizontalAlignment="Right"/>
                               </Grid>
                             </StackPanel>
                           </StackPanel>
                         </Border>
 
                         <!-- Non-benchmarked specs: verified component panel -->
-                        <Border Margin="0,28,0,0" Padding="26,22" Background="#120A0A1A" BorderBrush="{StaticResource Line1Brush}" BorderThickness="1"
+                        <Border Margin="0,28,0,0" Padding="26,22" Background="#120A0A1A" BorderBrush="{DynamicResource Line1Brush}" BorderThickness="1"
                                 HorizontalAlignment="Left" Visibility="{Binding HasBench, Converter={StaticResource InverseBoolToVis}}">
                           <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                            <Path Data="{Binding IconData, FallbackValue='M 0,0'}" Fill="{Binding AccentBrush, FallbackValue={StaticResource CyanBrush}}" Height="28" Width="28" Stretch="Uniform" VerticalAlignment="Center"/>
-                            <TextBlock Text="Componente verificado · operativo" Style="{StaticResource MonoFont}" FontSize="18" Foreground="{StaticResource Text1Brush}" VerticalAlignment="Center" Margin="18,0,32,0"/>
-                            <Ellipse Width="9" Height="9" Fill="{StaticResource OkBrush}" VerticalAlignment="Center">
+                            <Path Data="{Binding IconData, FallbackValue='M 0,0'}" Fill="{Binding AccentBrush, FallbackValue={DynamicResource CyanBrush}}" Height="28" Width="28" Stretch="Uniform" VerticalAlignment="Center"/>
+                            <TextBlock Text="Componente verificado · operativo" Style="{StaticResource MonoFont}" FontSize="18" Foreground="{DynamicResource Text1Brush}" VerticalAlignment="Center" Margin="18,0,32,0"/>
+                            <Ellipse Width="9" Height="9" Fill="{DynamicResource OkBrush}" VerticalAlignment="Center">
                               <Ellipse.Effect>
-                                <DropShadowEffect Color="{StaticResource OkColor}" BlurRadius="10" ShadowDepth="0" Opacity="0.9"/>
+                                <DropShadowEffect Color="{DynamicResource OkColor}" BlurRadius="10" ShadowDepth="0" Opacity="0.9"/>
                               </Ellipse.Effect>
                             </Ellipse>
                           </StackPanel>
@@ -1222,14 +1240,14 @@
                              si no, el icono vectorial enmarcado. Corchetes de esquina + etiqueta. Faltaba:
                              la columna derecha saltaba directa al bloque "QUÉ SIGNIFICA". El glow radial
                              funde a alpha-0 NEGRO (no a Transparent=blanco) para evitar halo lechoso. -->
-                        <Border Height="264" BorderBrush="{StaticResource Line1Brush}" BorderThickness="1"
+                        <Border Height="264" BorderBrush="{DynamicResource Line1Brush}" BorderThickness="1"
                                 Background="#800A0716" ClipToBounds="True" Margin="0,0,0,26">
                           <Grid>
                             <!-- radial(70% 90% at 50% 30%, accent 14%) -->
                             <Rectangle Opacity="0.14">
                               <Rectangle.Fill>
                                 <RadialGradientBrush Center="0.5,0.3" GradientOrigin="0.5,0.3" RadiusX="0.7" RadiusY="0.9">
-                                  <GradientStop Color="{Binding AccentColor, FallbackValue={StaticResource CyanColor}}" Offset="0"/>
+                                  <GradientStop Color="{Binding AccentColor, FallbackValue={DynamicResource CyanColor}}" Offset="0"/>
                                   <GradientStop Color="#00000000" Offset="0.7"/>
                                 </RadialGradientBrush>
                               </Rectangle.Fill>
@@ -1239,17 +1257,17 @@
                             <Border Width="160" Height="160" HorizontalAlignment="Center" VerticalAlignment="Center"
                                     BorderThickness="1" Visibility="{Binding HasImage, Converter={StaticResource InverseBoolToVis}}">
                               <Border.BorderBrush>
-                                <SolidColorBrush Color="{Binding AccentColor, FallbackValue={StaticResource CyanColor}}" Opacity="0.38"/>
+                                <SolidColorBrush Color="{Binding AccentColor, FallbackValue={DynamicResource CyanColor}}" Opacity="0.38"/>
                               </Border.BorderBrush>
                               <Border.Background>
                                 <RadialGradientBrush>
-                                  <GradientStop Color="{Binding AccentColor, FallbackValue={StaticResource CyanColor}}" Offset="0"/>
+                                  <GradientStop Color="{Binding AccentColor, FallbackValue={DynamicResource CyanColor}}" Offset="0"/>
                                   <GradientStop Color="#00000000" Offset="0.72"/>
                                 </RadialGradientBrush>
                               </Border.Background>
-                              <Path Data="{Binding IconData, FallbackValue='M 0,0'}" Fill="{Binding AccentBrush, FallbackValue={StaticResource CyanBrush}}"
+                              <Path Data="{Binding IconData, FallbackValue='M 0,0'}" Fill="{Binding AccentBrush, FallbackValue={DynamicResource CyanBrush}}"
                                     Width="84" Height="84" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center">
-                                <Path.Effect><DropShadowEffect Color="{Binding AccentColor, FallbackValue={StaticResource CyanColor}}" BlurRadius="16" ShadowDepth="0" Opacity="0.9"/></Path.Effect>
+                                <Path.Effect><DropShadowEffect Color="{Binding AccentColor, FallbackValue={DynamicResource CyanColor}}" BlurRadius="16" ShadowDepth="0" Opacity="0.9"/></Path.Effect>
                               </Path>
                             </Border>
 
@@ -1262,30 +1280,30 @@
                             </Image>
 
                             <!-- corchetes de esquina (24×24 acento, inset 10) -->
-                            <Path Data="M 0,24 L 0,0 L 24,0" Stroke="{Binding AccentBrush, FallbackValue={StaticResource CyanBrush}}" StrokeThickness="2" HorizontalAlignment="Left"  VerticalAlignment="Top"    Margin="10"/>
-                            <Path Data="M 0,0 L 24,0 L 24,24" Stroke="{Binding AccentBrush, FallbackValue={StaticResource CyanBrush}}" StrokeThickness="2" HorizontalAlignment="Right" VerticalAlignment="Top"    Margin="10"/>
-                            <Path Data="M 0,0 L 0,24 L 24,24" Stroke="{Binding AccentBrush, FallbackValue={StaticResource CyanBrush}}" StrokeThickness="2" HorizontalAlignment="Left"  VerticalAlignment="Bottom" Margin="10"/>
-                            <Path Data="M 0,24 L 24,24 L 24,0" Stroke="{Binding AccentBrush, FallbackValue={StaticResource CyanBrush}}" StrokeThickness="2" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="10"/>
+                            <Path Data="M 0,24 L 0,0 L 24,0" Stroke="{Binding AccentBrush, FallbackValue={DynamicResource CyanBrush}}" StrokeThickness="2" HorizontalAlignment="Left"  VerticalAlignment="Top"    Margin="10"/>
+                            <Path Data="M 0,0 L 24,0 L 24,24" Stroke="{Binding AccentBrush, FallbackValue={DynamicResource CyanBrush}}" StrokeThickness="2" HorizontalAlignment="Right" VerticalAlignment="Top"    Margin="10"/>
+                            <Path Data="M 0,0 L 0,24 L 24,24" Stroke="{Binding AccentBrush, FallbackValue={DynamicResource CyanBrush}}" StrokeThickness="2" HorizontalAlignment="Left"  VerticalAlignment="Bottom" Margin="10"/>
+                            <Path Data="M 0,24 L 24,24 L 24,0" Stroke="{Binding AccentBrush, FallbackValue={DynamicResource CyanBrush}}" StrokeThickness="2" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="10"/>
 
                             <!-- etiqueta: COMPONENTE REAL (foto) / ESQUEMA · {family} (icono) -->
                             <Border HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="16,0,0,14"
-                                    Background="#990A0716" BorderBrush="{Binding AccentBrush, FallbackValue={StaticResource CyanBrush}}" BorderThickness="2,0,0,0" Padding="9,5">
+                                    Background="#990A0716" BorderBrush="{Binding AccentBrush, FallbackValue={DynamicResource CyanBrush}}" BorderThickness="2,0,0,0" Padding="9,5">
                               <Grid>
-                                <TextBlock Style="{StaticResource MonoFont}" FontSize="16" Foreground="{StaticResource Text2Brush}" Text="COMPONENTE REAL"
+                                <TextBlock Style="{StaticResource MonoFont}" FontSize="16" Foreground="{DynamicResource Text2Brush}" Text="COMPONENTE REAL"
                                            edit:Editable.IsOn="False" Visibility="{Binding HasImage, Converter={StaticResource BoolToVis}}"/>
-                                <TextBlock Style="{StaticResource MonoFont}" FontSize="16" Foreground="{StaticResource Text2Brush}"
+                                <TextBlock Style="{StaticResource MonoFont}" FontSize="16" Foreground="{DynamicResource Text2Brush}"
                                            edit:Editable.IsOn="False" Visibility="{Binding HasImage, Converter={StaticResource InverseBoolToVis}}"><Run Text="ESQUEMA · "/><Run Text="{Binding Family}"/></TextBlock>
                               </Grid>
                             </Border>
                           </Grid>
                         </Border>
 
-                        <Border Background="#120A0A1A" BorderBrush="{StaticResource Line1Brush}" BorderThickness="1" Padding="36" CornerRadius="0">
+                        <Border Background="#120A0A1A" BorderBrush="{DynamicResource Line1Brush}" BorderThickness="1" Padding="36" CornerRadius="0">
                           <StackPanel>
-                            <TextBlock Text="// QUÉ SIGNIFICA" Style="{StaticResource MonoFont}" FontSize="18" Foreground="{Binding AccentBrush, FallbackValue={StaticResource CyanBrush}}" Margin="0,0,0,18"/>
-                            <TextBlock Text="{Binding Summary}" edit:Editable.Multiline="True" FontSize="22" LineHeight="33" Foreground="{StaticResource Text0Brush}" TextWrapping="Wrap"/>
+                            <TextBlock Text="// QUÉ SIGNIFICA" Style="{StaticResource MonoFont}" FontSize="18" Foreground="{Binding AccentBrush, FallbackValue={DynamicResource CyanBrush}}" Margin="0,0,0,18"/>
+                            <TextBlock Text="{Binding Summary}" edit:Editable.Multiline="True" FontSize="22" LineHeight="33" Foreground="{DynamicResource Text0Brush}" TextWrapping="Wrap"/>
                     
-                            <TextBlock Text="// PARA QUÉ TE SIRVE" Style="{StaticResource MonoFont}" FontSize="18" Foreground="{Binding AccentBrush, FallbackValue={StaticResource CyanBrush}}" Margin="0,38,0,18"/>
+                            <TextBlock Text="// PARA QUÉ TE SIRVE" Style="{StaticResource MonoFont}" FontSize="18" Foreground="{Binding AccentBrush, FallbackValue={DynamicResource CyanBrush}}" Margin="0,38,0,18"/>
                             
                             <ItemsControl ItemsSource="{Binding Pros}">
                               <ItemsControl.ItemTemplate>
@@ -1294,7 +1312,7 @@
                                     <Border Width="28" Height="28" BorderBrush="{Binding DataContext.AccentBrush, RelativeSource={RelativeSource AncestorType=ItemsControl}}" BorderThickness="1" Background="#1AFFFFFF" Margin="0,0,16,0">
                                       <TextBlock Text="{Binding Index}" edit:Editable.IsOn="False" Style="{StaticResource MonoFont}" FontSize="16" Foreground="{Binding DataContext.AccentBrush, RelativeSource={RelativeSource AncestorType=ItemsControl}}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                     </Border>
-                                    <TextBlock Text="{Binding Text}" edit:Editable.Multiline="True" Foreground="{StaticResource Text1Brush}" FontSize="20" VerticalAlignment="Center" TextWrapping="Wrap" MaxWidth="380"/>
+                                    <TextBlock Text="{Binding Text}" edit:Editable.Multiline="True" Foreground="{DynamicResource Text1Brush}" FontSize="20" VerticalAlignment="Center" TextWrapping="Wrap" MaxWidth="380"/>
                                   </StackPanel>
                                 </DataTemplate>
                               </ItemsControl.ItemTemplate>
@@ -1315,21 +1333,21 @@
                                     <Button Click="SpecNode_Click" Margin="4" Cursor="Hand">
                                         <Button.Template>
                                             <ControlTemplate TargetType="Button">
-                                                <Border x:Name="NavBorder" Padding="6,10" Background="#05FFFFFF" BorderBrush="{StaticResource Line1Brush}" BorderThickness="1">
+                                                <Border x:Name="NavBorder" Padding="6,10" Background="#05FFFFFF" BorderBrush="{DynamicResource Line1Brush}" BorderThickness="1">
                                                     <StackPanel HorizontalAlignment="Center">
-                                                        <Path x:Name="NavIcon" Data="{Binding IconData, FallbackValue='M 0,0'}" Fill="{StaticResource Text2Brush}" Height="18" Width="18" Stretch="Uniform" HorizontalAlignment="Center" Margin="0,0,0,4"/>
-                                                        <TextBlock x:Name="NavLbl" Text="{Binding LabelShort}" edit:Editable.IsOn="False" Style="{StaticResource MonoFont}" FontSize="15" Foreground="{StaticResource Text2Brush}" HorizontalAlignment="Center"/>
+                                                        <Path x:Name="NavIcon" Data="{Binding IconData, FallbackValue='M 0,0'}" Fill="{DynamicResource Text2Brush}" Height="18" Width="18" Stretch="Uniform" HorizontalAlignment="Center" Margin="0,0,0,4"/>
+                                                        <TextBlock x:Name="NavLbl" Text="{Binding LabelShort}" edit:Editable.IsOn="False" Style="{StaticResource MonoFont}" FontSize="15" Foreground="{DynamicResource Text2Brush}" HorizontalAlignment="Center"/>
                                                     </StackPanel>
                                                 </Border>
                                                 <ControlTemplate.Triggers>
                                                     <DataTrigger Binding="{Binding IsCurrentDetail}" Value="True">
-                                                        <Setter TargetName="NavBorder" Property="BorderBrush" Value="{Binding AccentBrush, FallbackValue={StaticResource CyanBrush}}"/>
+                                                        <Setter TargetName="NavBorder" Property="BorderBrush" Value="{Binding AccentBrush, FallbackValue={DynamicResource CyanBrush}}"/>
                                                         <Setter TargetName="NavBorder" Property="Background" Value="#14FFFFFF"/>
-                                                        <Setter TargetName="NavIcon" Property="Fill" Value="{Binding AccentBrush, FallbackValue={StaticResource CyanBrush}}"/>
-                                                        <Setter TargetName="NavLbl" Property="Foreground" Value="{StaticResource Text0Brush}"/>
+                                                        <Setter TargetName="NavIcon" Property="Fill" Value="{Binding AccentBrush, FallbackValue={DynamicResource CyanBrush}}"/>
+                                                        <Setter TargetName="NavLbl" Property="Foreground" Value="{DynamicResource Text0Brush}"/>
                                                     </DataTrigger>
                                                     <Trigger Property="IsMouseOver" Value="True">
-                                                        <Setter TargetName="NavBorder" Property="BorderBrush" Value="{StaticResource Text1Brush}"/>
+                                                        <Setter TargetName="NavBorder" Property="BorderBrush" Value="{DynamicResource Text1Brush}"/>
                                                     </Trigger>
                                                 </ControlTemplate.Triggers>
                                             </ControlTemplate>
@@ -1375,7 +1393,7 @@
                         </TransformGroup>
                     </Image.RenderTransform>
                     <Image.Effect>
-                        <DropShadowEffect x:Name="EntranceLogoGlow" Color="{StaticResource CyanColor}" BlurRadius="40" ShadowDepth="0" Opacity="0.85"/>
+                        <DropShadowEffect x:Name="EntranceLogoGlow" Color="{DynamicResource CyanColor}" BlurRadius="40" ShadowDepth="0" Opacity="0.85"/>
                     </Image.Effect>
                 </Image>
             </Grid>
@@ -1384,17 +1402,17 @@
             <Grid x:Name="ForegroundChrome" IsHitTestVisible="{Binding EditMode.IsActive}" Panel.ZIndex="40">
                 <!-- Corner brackets: 44×44 L-shapes at 24px from each corner -->
                 <Canvas IsHitTestVisible="False">
-                    <Path Canvas.Left="24" Canvas.Top="24" Stroke="{StaticResource CyanBrush}" StrokeThickness="2" Data="M 0,44 L 0,0 L 44,0">
-                        <Path.Effect><DropShadowEffect Color="{StaticResource CyanColor}" BlurRadius="6" ShadowDepth="0" Opacity="0.9"/></Path.Effect>
+                    <Path Canvas.Left="24" Canvas.Top="24" Stroke="{DynamicResource CyanBrush}" StrokeThickness="2" Data="M 0,44 L 0,0 L 44,0">
+                        <Path.Effect><DropShadowEffect Color="{DynamicResource CyanColor}" BlurRadius="6" ShadowDepth="0" Opacity="0.9"/></Path.Effect>
                     </Path>
-                    <Path Canvas.Left="1852" Canvas.Top="24" Stroke="{StaticResource CyanBrush}" StrokeThickness="2" Data="M 44,44 L 44,0 L 0,0">
-                        <Path.Effect><DropShadowEffect Color="{StaticResource CyanColor}" BlurRadius="6" ShadowDepth="0" Opacity="0.9"/></Path.Effect>
+                    <Path Canvas.Left="1852" Canvas.Top="24" Stroke="{DynamicResource CyanBrush}" StrokeThickness="2" Data="M 44,44 L 44,0 L 0,0">
+                        <Path.Effect><DropShadowEffect Color="{DynamicResource CyanColor}" BlurRadius="6" ShadowDepth="0" Opacity="0.9"/></Path.Effect>
                     </Path>
-                    <Path Canvas.Left="24" Canvas.Top="1012" Stroke="{StaticResource CyanBrush}" StrokeThickness="2" Data="M 0,0 L 0,44 L 44,44">
-                        <Path.Effect><DropShadowEffect Color="{StaticResource CyanColor}" BlurRadius="6" ShadowDepth="0" Opacity="0.9"/></Path.Effect>
+                    <Path Canvas.Left="24" Canvas.Top="1012" Stroke="{DynamicResource CyanBrush}" StrokeThickness="2" Data="M 0,0 L 0,44 L 44,44">
+                        <Path.Effect><DropShadowEffect Color="{DynamicResource CyanColor}" BlurRadius="6" ShadowDepth="0" Opacity="0.9"/></Path.Effect>
                     </Path>
-                    <Path Canvas.Left="1852" Canvas.Top="1012" Stroke="{StaticResource CyanBrush}" StrokeThickness="2" Data="M 44,0 L 44,44 L 0,44">
-                        <Path.Effect><DropShadowEffect Color="{StaticResource CyanColor}" BlurRadius="6" ShadowDepth="0" Opacity="0.9"/></Path.Effect>
+                    <Path Canvas.Left="1852" Canvas.Top="1012" Stroke="{DynamicResource CyanBrush}" StrokeThickness="2" Data="M 44,0 L 44,44 L 0,44">
+                        <Path.Effect><DropShadowEffect Color="{DynamicResource CyanColor}" BlurRadius="6" ShadowDepth="0" Opacity="0.9"/></Path.Effect>
                     </Path>
                 </Canvas>
 
@@ -1409,17 +1427,17 @@
                                 </TransformGroup>
                             </Image.RenderTransform>
                             <Image.Effect>
-                                <DropShadowEffect x:Name="HeaderLogoGlow" Color="{StaticResource CyanColor}" BlurRadius="20" ShadowDepth="0" Opacity="0.75"/>
+                                <DropShadowEffect x:Name="HeaderLogoGlow" Color="{DynamicResource CyanColor}" BlurRadius="20" ShadowDepth="0" Opacity="0.75"/>
                             </Image.Effect>
                         </Image>
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Right">
-                        <TextBlock Style="{StaticResource MonoFont}" Foreground="{StaticResource Text2Brush}" FontSize="14" VerticalAlignment="Center" Margin="0,0,32,0"
+                        <TextBlock Style="{StaticResource MonoFont}" Foreground="{DynamicResource Text2Brush}" FontSize="14" VerticalAlignment="Center" Margin="0,0,32,0"
                                    Visibility="{Binding DisplayConfig.Sku, Converter={StaticResource NonEmptyToVis}}">
-                            <Run Text="SKU "/><Run Text="{Binding DisplayConfig.Sku}" Foreground="{StaticResource Text0Brush}" FontWeight="Bold"/>
+                            <Run Text="SKU "/><Run Text="{Binding DisplayConfig.Sku}" Foreground="{DynamicResource Text0Brush}" FontWeight="Bold"/>
                         </TextBlock>
-                        <TextBlock Text="{Binding CurrentScreenName}" edit:Editable.IsOn="False" Style="{StaticResource MonoFont}" Foreground="{StaticResource Text2Brush}" FontSize="14" VerticalAlignment="Center" Margin="0,0,32,0"/>
-                        <TextBlock Text="{Binding CurrentTimeString}" edit:Editable.IsOn="False" Style="{StaticResource MonoFont}" Foreground="{StaticResource Text2Brush}" FontSize="14" VerticalAlignment="Center"/>
+                        <TextBlock Text="{Binding CurrentScreenName}" edit:Editable.IsOn="False" Style="{StaticResource MonoFont}" Foreground="{DynamicResource Text2Brush}" FontSize="14" VerticalAlignment="Center" Margin="0,0,32,0"/>
+                        <TextBlock Text="{Binding CurrentTimeString}" edit:Editable.IsOn="False" Style="{StaticResource MonoFont}" Foreground="{DynamicResource Text2Brush}" FontSize="14" VerticalAlignment="Center"/>
                     </StackPanel>
                 </Grid>
 
@@ -1431,11 +1449,11 @@
                     <!-- BOTTOM CHROME ROW: padding-x 64. Oculta en Detalle (la barra de precio manda el pie). -->
                     <Grid Margin="64,0,64,36" Height="24"
                           Visibility="{Binding ShowPriceBar, Converter={StaticResource InverseBoolToVis}}">
-                        <TextBlock Style="{StaticResource MonoFont}" Foreground="{StaticResource Text2Brush}"
+                        <TextBlock Style="{StaticResource MonoFont}" Foreground="{DynamicResource Text2Brush}"
                                    FontSize="14" VerticalAlignment="Center" HorizontalAlignment="Left">
-                            <Run Text="CLINICAPC · "/><Run Text="{Binding DisplayConfig.ShopAddress}" Foreground="{StaticResource Text0Brush}"/>
+                            <Run Text="CLINICAPC · "/><Run Text="{Binding DisplayConfig.ShopAddress}" Foreground="{DynamicResource Text0Brush}"/>
                         </TextBlock>
-                        <TextBlock Style="{StaticResource MonoFont}" Foreground="{StaticResource Text2Brush}"
+                        <TextBlock Style="{StaticResource MonoFont}" Foreground="{DynamicResource Text2Brush}"
                                    FontSize="14" VerticalAlignment="Center" HorizontalAlignment="Right"
                                    Text="{Binding DisplayConfig.ShopServices}"/>
                     </Grid>
@@ -1473,13 +1491,13 @@
                         </Border.Style>
                         <Grid>
                             <!-- Borde superior fino -->
-                            <Rectangle Height="1" VerticalAlignment="Top" Fill="{StaticResource Line2Brush}"/>
+                            <Rectangle Height="1" VerticalAlignment="Top" Fill="{DynamicResource Line2Brush}"/>
                             <!-- Acento superior: degradado horizontal transparente→naranja→transparente -->
                             <Rectangle Height="1" VerticalAlignment="Top" Opacity="0.5">
                                 <Rectangle.Fill>
                                     <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
                                         <GradientStop Color="#00F37A4A" Offset="0"/>
-                                        <GradientStop Color="{StaticResource CyanColor}" Offset="0.5"/>
+                                        <GradientStop Color="{DynamicResource CyanColor}" Offset="0.5"/>
                                         <GradientStop Color="#00F37A4A" Offset="1"/>
                                     </LinearGradientBrush>
                                 </Rectangle.Fill>
@@ -1496,31 +1514,31 @@
                                     <!-- 1) Precio héroe + tachado/descuento -->
                                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                         <TextBlock Text="{Binding FormattedPrice}" edit:Editable.IsOn="False"
-                                                   Style="{StaticResource DisplayFont}" FontSize="66" Foreground="{StaticResource Text0Brush}" VerticalAlignment="Center"/>
+                                                   Style="{StaticResource DisplayFont}" FontSize="66" Foreground="{DynamicResource Text0Brush}" VerticalAlignment="Center"/>
                                         <StackPanel Margin="16,0,0,0" VerticalAlignment="Center"
                                                     Visibility="{Binding HasDiscount, Converter={StaticResource BoolToVis}}">
                                             <TextBlock Text="{Binding FormattedOriginalPrice}" edit:Editable.IsOn="False"
-                                                       FontFamily="{StaticResource SpaceGrotesk}" FontSize="18" Foreground="{StaticResource Text2Brush}"
+                                                       FontFamily="{StaticResource SpaceGrotesk}" FontSize="18" Foreground="{DynamicResource Text2Brush}"
                                                        TextDecorations="Strikethrough"/>
                                             <TextBlock Text="{Binding FormattedDiscount}" edit:Editable.IsOn="False"
-                                                       Style="{StaticResource MonoFont}" FontSize="17" Foreground="{StaticResource MagentaBrush}" Margin="0,2,0,0"/>
+                                                       Style="{StaticResource MonoFont}" FontSize="17" Foreground="{DynamicResource MagentaBrush}" Margin="0,2,0,0"/>
                                         </StackPanel>
                                     </StackPanel>
 
                                     <!-- 2) Separador -->
-                                    <Rectangle Width="1" Height="60" Fill="{StaticResource Line2Brush}" Margin="46,0" VerticalAlignment="Center"/>
+                                    <Rectangle Width="1" Height="60" Fill="{DynamicResource Line2Brush}" Margin="46,0" VerticalAlignment="Center"/>
 
                                     <!-- 3) Financiación -->
                                     <StackPanel VerticalAlignment="Center">
                                         <StackPanel Orientation="Horizontal">
                                             <TextBlock Text="{Binding InstallmentsPrefix}" edit:Editable.IsOn="False"
-                                                       Style="{StaticResource DisplayFont}" FontSize="30" Foreground="{StaticResource CyanBrush}"/>
+                                                       Style="{StaticResource DisplayFont}" FontSize="30" Foreground="{DynamicResource CyanBrush}"/>
                                             <TextBlock Text="{Binding FormattedMonthly}" edit:Editable.IsOn="False"
-                                                       Style="{StaticResource DisplayFont}" FontSize="30" Foreground="{StaticResource CyanBrush}"/>
+                                                       Style="{StaticResource DisplayFont}" FontSize="30" Foreground="{DynamicResource CyanBrush}"/>
                                         </StackPanel>
                                         <Border HorizontalAlignment="Left" Margin="0,8,0,0" Padding="10,5" CornerRadius="6"
-                                                Background="#1FF0D26B" BorderBrush="{StaticResource OkBrush}" BorderThickness="1">
-                                            <TextBlock Text="{Binding Texts[price.noInterest]}" Style="{StaticResource MonoFont}" FontSize="15" Foreground="{StaticResource OkBrush}"/>
+                                                Background="#1FF0D26B" BorderBrush="{DynamicResource OkBrush}" BorderThickness="1">
+                                            <TextBlock Text="{Binding Texts[price.noInterest]}" Style="{StaticResource MonoFont}" FontSize="15" Foreground="{DynamicResource OkBrush}"/>
                                         </Border>
                                     </StackPanel>
                                 </StackPanel>
@@ -1531,7 +1549,7 @@
                                         <Image x:Name="PriceBarQrImage" Stretch="Uniform" RenderOptions.BitmapScalingMode="NearestNeighbor"/>
                                     </Border>
                                     <TextBlock Text="{Binding Texts[price.scanText]}" edit:Editable.Multiline="True"
-                                               Style="{StaticResource MonoFont}" FontSize="15" Foreground="{StaticResource Text2Brush}"
+                                               Style="{StaticResource MonoFont}" FontSize="15" Foreground="{DynamicResource Text2Brush}"
                                                TextWrapping="Wrap" MaxWidth="200" Margin="18,0,0,0" VerticalAlignment="Center"/>
                                 </StackPanel>
                             </Grid>
@@ -1560,19 +1578,19 @@
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                 <Ellipse Width="10" Height="10" Fill="#FFF37A4A" VerticalAlignment="Center" Margin="0,0,10,0"/>
                 <TextBlock Text="MODO EDICIÓN" FontFamily="{StaticResource JetBrainsMono}" FontWeight="Bold" Foreground="White" FontSize="14" VerticalAlignment="Center"/>
-                <TextBlock Text="· toca cualquier texto para editarlo" FontFamily="{StaticResource JetBrainsMono}" Foreground="{StaticResource Text2Brush}" FontSize="12" VerticalAlignment="Center" Margin="8,0,0,0"/>
-                <Rectangle Width="1" Height="22" Fill="{StaticResource Line2Brush}" Margin="18,0,18,0"/>
-                <TextBlock Text="pantalla" FontFamily="{StaticResource JetBrainsMono}" Foreground="{StaticResource Text2Brush}" FontSize="12" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                <TextBlock Text="· toca cualquier texto para editarlo" FontFamily="{StaticResource JetBrainsMono}" Foreground="{DynamicResource Text2Brush}" FontSize="12" VerticalAlignment="Center" Margin="8,0,0,0"/>
+                <Rectangle Width="1" Height="22" Fill="{DynamicResource Line2Brush}" Margin="18,0,18,0"/>
+                <TextBlock Text="pantalla" FontFamily="{StaticResource JetBrainsMono}" Foreground="{DynamicResource Text2Brush}" FontSize="12" VerticalAlignment="Center" Margin="0,0,8,0"/>
                 <Button Content="Espera" Click="EditGoAttract_Click" Style="{StaticResource SecondaryButton}" Padding="10,6" Margin="0,0,6,0"/>
                 <Button Content="Escaneo" Click="EditGoScan_Click" Style="{StaticResource SecondaryButton}" Padding="10,6" Margin="0,0,6,0"/>
                 <Button Content="Resumen" Click="EditGoMain_Click" Style="{StaticResource SecondaryButton}" Padding="10,6" Margin="0,0,6,0"/>
                 <Button Content="Detalle" Click="EditGoDetail_Click" Style="{StaticResource SecondaryButton}" Padding="10,6"/>
                 <StackPanel Orientation="Horizontal" Margin="18,0,0,0" Visibility="{Binding IsAttractScreen, Converter={StaticResource BoolToVis}}">
                     <Button Content="◀" Click="EditPrevSlide_Click" Style="{StaticResource SecondaryButton}" Padding="10,6" Margin="0,0,6,0"/>
-                    <TextBlock Text="slide" FontFamily="{StaticResource JetBrainsMono}" Foreground="{StaticResource Text2Brush}" FontSize="12" VerticalAlignment="Center"/>
+                    <TextBlock Text="slide" FontFamily="{StaticResource JetBrainsMono}" Foreground="{DynamicResource Text2Brush}" FontSize="12" VerticalAlignment="Center"/>
                     <Button Content="▶" Click="EditNextSlide_Click" Style="{StaticResource SecondaryButton}" Padding="10,6" Margin="6,0,0,0"/>
                 </StackPanel>
-                <Rectangle Width="1" Height="22" Fill="{StaticResource Line2Brush}" Margin="18,0,18,0"/>
+                <Rectangle Width="1" Height="22" Fill="{DynamicResource Line2Brush}" Margin="18,0,18,0"/>
                 <Button Content="Guardar" Click="EditSave_Click" Style="{StaticResource PrimaryButton}" Padding="18,8" Margin="0,0,8,0"/>
                 <Button Content="Descartar" Click="EditDiscard_Click" Style="{StaticResource SecondaryButton}" Margin="0,0,8,0"/>
                 <Button Content="Salir" Click="EditExit_Click" Style="{StaticResource SecondaryButton}"/>

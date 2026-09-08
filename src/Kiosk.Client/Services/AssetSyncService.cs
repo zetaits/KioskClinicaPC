@@ -24,7 +24,7 @@ namespace KioskClinicaPC.Services
     public sealed class AssetSyncService : IAssetSyncService, IDisposable
     {
         private static readonly HashSet<string> Categories =
-            new(StringComparer.Ordinal) { "Brands", "SpecImages" };
+            new(StringComparer.Ordinal) { "Brands", "SpecImages", "ThemeAssets" };
 
         private readonly HttpClient? _http;
         private readonly string? _baseUrl;

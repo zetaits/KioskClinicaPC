@@ -1,0 +1,56 @@
+@using KioskClinicaPC.Core.Config
+
+<div class="theme-preview" style="@Style">
+    <div class="theme-preview-grid"></div>
+    @if (_theme.DecorationsEnabled && !string.IsNullOrWhiteSpace(Scene.PrimaryAssetKey))
+    {
+        <img class="theme-decoration primary" src="@AssetUrl(Scene.PrimaryAssetKey)" alt="" />
+    }
+    @if (_theme.DecorationsEnabled && !string.IsNullOrWhiteSpace(Scene.SecondaryAssetKey))
+    {
+        <img class="theme-decoration secondary" src="@AssetUrl(Scene.SecondaryAssetKey)" alt="" />
+    }
+    <div class="preview-chrome"><span>CLÍNICA PC</span><small>@ScreenLabel</small></div>
+    <div class="preview-content @Screen.ToLowerInvariant()">
+        @if (Screen == "Attract")
+        {
+            var slide = Event.AttractSlides.FirstOrDefault() ?? new AttractSlide { Eyebrow = "CLÍNICA PC", Title1 = "ESTE EQUIPO", Title2 = "TE ESTÁ OBSERVANDO", Subtitle = "Toca para descubrir todos sus detalles" };
+            <small>@slide.Eyebrow</small><h3>@slide.Title1<br /><em>@slide.Title2</em></h3><p>@slide.Subtitle</p><button>TOCA PARA DESCUBRIR ESTE EQUIPO</button>
+        }
+        else if (Screen == "Scan")
+        {
+            <div class="preview-radar"><b>68</b><span>PROGRESO</span></div><div class="preview-log">// CPU DETECTADA<br />// MEMORIA VERIFICADA<br />// ALMACENAMIENTO LISTO</div>
+        }
+        else if (Screen == "Overview")
+        {
+            <small>EQUIPO DETECTADO</small><h3>PORTÁTIL <em>CLÍNICA PC</em></h3><div class="preview-tiles"><i>CPU</i><i>RAM</i><i>SSD</i><i>PANTALLA</i></div>
+        }
+        else
+        {
+            <small>DETALLE DEL COMPONENTE</small><h3>PROCESADOR <em>INTEL CORE</em></h3><p>Rendimiento explicado de forma clara y sin tecnicismos.</p><div class="preview-meter"></div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public KioskEvent Event { get; set; } = new();
+    [Parameter, EditorRequired] public string Screen { get; set; } = "Attract";
+
+    private ResolvedVisualTheme _theme => ThemePresetCatalog.Resolve(Event.Theme);
+    private ResolvedThemeScene Scene => Screen switch
+    {
+        "Scan" => _theme.Scenes.Scan,
+        "Overview" => _theme.Scenes.Overview,
+        "Detail" => _theme.Scenes.Detail,
+        _ => _theme.Scenes.Attract
+    };
+    private string ScreenLabel => Screen switch
+    {
+        "Scan" => "ESCANEO",
+        "Overview" => "RESUMEN",
+        "Detail" => "DETALLE",
+        _ => "ESPERA"
+    };
+    private string Style => $"--pv-bg0:{_theme.Palette.Background0};--pv-bg1:{_theme.Palette.Background1};--pv-bg2:{_theme.Palette.Background2};--pv-primary:{_theme.Palette.Primary};--pv-secondary:{_theme.Palette.Secondary};--pv-text:{_theme.Palette.Text0};--pv-intensity:{(_theme.Intensity / 100d).ToString(System.Globalization.CultureInfo.InvariantCulture)}";
+    private static string AssetUrl(string key) => $"/panel/assets/ThemeAssets/{Uri.EscapeDataString(key)}";
+}

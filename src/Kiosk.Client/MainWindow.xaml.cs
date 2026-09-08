@@ -23,6 +23,7 @@ using KioskClinicaPC.Windows;
 using KioskClinicaPC.ViewModels;
 using KioskClinicaPC.Services;
 using KioskClinicaPC.Models;
+using KioskClinicaPC.Core.Theming;
 using Serilog;
 
 namespace KioskClinicaPC
@@ -113,9 +114,9 @@ namespace KioskClinicaPC
             ApplyTimerIntervals();
 
             GraphicsQuality.Initialize(_settings.GraphicsMode);
-            ParticleField.Spawn(ParticleCanvas, GraphicsQuality.ParticleCount);
             StartAmbientMotion();
             await _viewModel.LoadHardwareAndConfigAsync();
+            ApplyVisualTheme();
             RefreshQr();
             EnterAttractMode();
             _ready = true; // DisplayConfig/Specs ya construidos: la interacción puede disparar el escaneo
@@ -449,6 +450,7 @@ namespace KioskClinicaPC
             {
                 await _assetSync.SyncAsync();
                 await _viewModel.ReloadContentAsync();
+                ApplyVisualTheme();
                 RefreshQr();
             }
             catch (Exception ex)
@@ -465,8 +467,40 @@ namespace KioskClinicaPC
             await Dispatcher.InvokeAsync(() =>
             {
                 _viewModel.RefreshAssets();
+                ApplyVisualTheme();
                 RefreshQr();
             });
+        }
+
+        /// <summary>Aplica paleta, ambiente y escenas ya resueltas por el servidor.</summary>
+        private void ApplyVisualTheme()
+        {
+            var theme = _viewModel.VisualTheme;
+            ThemeRuntime.ApplyResources(this, theme);
+            ParticleField.Spawn(ParticleCanvas, GraphicsQuality.ParticleCount,
+                ThemeRuntime.Primary, ThemeRuntime.Secondary, theme.AmbientEffect, theme.Intensity);
+
+            ApplyScene(theme.Scenes.Attract, AttractThemePrimary, AttractThemeSecondary, theme);
+            ApplyScene(theme.Scenes.Scan, ScanThemePrimary, ScanThemeSecondary, theme);
+            ApplyScene(theme.Scenes.Overview, OverviewThemePrimary, OverviewThemeSecondary, theme);
+            ApplyScene(theme.Scenes.Detail, DetailThemePrimary, DetailThemeSecondary, theme);
+        }
+
+        private static void ApplyScene(ResolvedThemeScene scene, Image primary, Image secondary,
+            ResolvedVisualTheme theme)
+        {
+            double opacity = theme.DecorationsEnabled ? .15 + .55 * theme.Intensity / 100d : 0;
+            ApplyDecoration(primary, scene.PrimaryAssetKey, opacity);
+            ApplyDecoration(secondary, scene.SecondaryAssetKey, opacity * .9);
+        }
+
+        private static void ApplyDecoration(Image target, string? assetKey, double opacity)
+        {
+            ImageSource? source = ThemeRuntime.LoadDecoration(assetKey);
+            target.Source = source;
+            target.Visibility = source == null || opacity <= 0 ? Visibility.Collapsed : Visibility.Visible;
+            target.BeginAnimation(OpacityProperty, new DoubleAnimation(0, opacity,
+                TimeSpan.FromMilliseconds(320)) { EasingFunction = new SineEase { EasingMode = EasingMode.EaseOut } });
         }
 
         private void EnterAttractMode()
@@ -743,7 +777,10 @@ namespace KioskClinicaPC
                 ApplyTimerIntervals();
 
                 if (result == true)
+                {
                     await _viewModel.LoadHardwareAndConfigAsync();
+                    ApplyVisualTheme();
+                }
 
                 RefreshQr(); // PdfBaseUrl o specs pueden haber cambiado
                 launchEdit = settingsWindow.LaunchEditMode;

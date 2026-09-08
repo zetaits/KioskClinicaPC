@@ -4,6 +4,7 @@ using System.Threading;
 using System.Windows;
 using Microsoft.Extensions.DependencyInjection;
 using KioskClinicaPC.Core;
+using KioskClinicaPC.Core.Platform;
 using KioskClinicaPC.Services;
 using KioskClinicaPC.ViewModels;
 using KioskClinicaPC.Windows;
@@ -39,6 +40,7 @@ namespace KioskClinicaPC
         // Imágenes EMPAQUETADAS junto al .exe (Assets\Brands, Assets\SpecImages). El instalable las trae.
         public static readonly string BundledBrandsFolderPath = Path.Combine(AppContext.BaseDirectory, "Assets", "Brands");
         public static readonly string BundledSpecImagesFolderPath = Path.Combine(AppContext.BaseDirectory, "Assets", "SpecImages");
+        public static readonly string BundledThemeAssetsFolderPath = Path.Combine(AppContext.BaseDirectory, "Assets", "ThemeAssets");
 
         // Override opcional en %LOCALAPPDATA% (cambiar imágenes sin recompilar). Tiene prioridad si existe.
         public static readonly string BrandsFolderPath = Path.Combine(AppDataFolderPath, "Brands");
@@ -46,16 +48,26 @@ namespace KioskClinicaPC
         public static readonly string RemoteAssetsFolderPath = Path.Combine(AppDataFolderPath, "RemoteAssets");
         public static readonly string RemoteBrandsFolderPath = Path.Combine(RemoteAssetsFolderPath, "Brands");
         public static readonly string RemoteSpecImagesFolderPath = Path.Combine(RemoteAssetsFolderPath, "SpecImages");
+        public static readonly string RemoteThemeAssetsFolderPath = Path.Combine(RemoteAssetsFolderPath, "ThemeAssets");
 
         protected override void OnStartup(StartupEventArgs e)
         {
             base.OnStartup(e);
+            // El instalador lo ejecuta como usuario interactivo antes de un reinicio pendiente.
+            // Solo registra HKCU\Run: no abre ventanas ni activa la protección del kiosko.
+            if (e.Args.Any(a => a.Equals("--register-autostart-only", StringComparison.OrdinalIgnoreCase)))
+            {
+                AutostartRegistration.Register();
+                Shutdown();
+                return;
+            }
             Directory.CreateDirectory(AppDataFolderPath);
             Directory.CreateDirectory(Path.Combine(AppDataFolderPath, "logs"));
             Directory.CreateDirectory(BrandsFolderPath);
             Directory.CreateDirectory(SpecImagesFolderPath);
             Directory.CreateDirectory(RemoteBrandsFolderPath);
             Directory.CreateDirectory(RemoteSpecImagesFolderPath);
+            Directory.CreateDirectory(RemoteThemeAssetsFolderPath);
 
             Log.Logger = new LoggerConfiguration()
                 .WriteTo.File(LogFilePath, rollingInterval: RollingInterval.Day)
@@ -92,15 +104,27 @@ namespace KioskClinicaPC
             KioskManager.Protect();
             _protected = true;
 
-            // Asegura que exista KioskSettings.json con contraseña sembrada e identidad de flota.
+            // Carga el perfil y aplica el aprovisionamiento del instalador antes de pedir la contraseña.
+            // Ya no existe una clave compartida: perfiles nuevos y anteriores a la política actual deben
+            // elegir una propia. Si el encargado cancela, OnExit libera la protección del escritorio.
             var settings = KioskSettings.Load(SettingsFilePath);
             bool seeded = settings.ApplyProvisioningIfNew(SettingsFilePath, ProvisioningFilePath);
-            seeded |= settings.EnsurePasswordSeeded();
+            if (settings.RequiresPasswordSetup())
+            {
+                var passwordSetup = new PasswordSetupWindow(settings);
+                if (passwordSetup.ShowDialog() != true)
+                {
+                    Log.Warning("Configuración de contraseña cancelada; el kiosko no se iniciará.");
+                    Shutdown();
+                    return;
+                }
+                seeded = true;
+            }
             seeded |= settings.EnsureDeviceIdentitySeeded();
             if (seeded)
             {
                 settings.Save(SettingsFilePath);
-                Log.Information("KioskSettings sembrado (aprovisionamiento / contraseña / identidad de flota).");
+                Log.Information("KioskSettings actualizado (aprovisionamiento / política de contraseña / identidad de flota).");
             }
 
             if (!File.Exists(ConfigFilePath))

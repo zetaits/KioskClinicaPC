@@ -28,7 +28,7 @@ taskkill /im KioskClinicaPC.exe /f >nul 2>&1
 
 rem Instala en silencio. El Setup es admin; la tarea corre como SYSTEM (sin UAC).
 rem /VERYSILENT salta el [Run] postinstall (skipifsilent) -> no se relanza en sesion 0.
-"%SETUP%" /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /NOCANCEL
+"%SETUP%" /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /NOCANCEL /COMPONENTS="kiosk"
 
 del /f /q "%SETUP%" 2>nul
 

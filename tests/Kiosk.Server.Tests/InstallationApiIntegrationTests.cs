@@ -11,6 +11,7 @@ namespace Kiosk.Server.Tests;
 
 public sealed class InstallationApiIntegrationTests : IAsyncLifetime
 {
+    private const string SetupKey = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
     private readonly string _root = Path.Combine(Path.GetTempPath(), "kiosk-api-install-tests", Guid.NewGuid().ToString("N"));
     private WebApplicationFactory<Program> _factory = null!;
 
@@ -22,11 +23,47 @@ public sealed class InstallationApiIntegrationTests : IAsyncLifetime
             b.UseSetting("Kiosk:DataDir", _root);
             b.UseSetting("Kiosk:AssetsDir", Path.Combine(_root, "assets"));
             b.UseSetting("Kiosk:InstallersDir", Path.Combine(_root, "installers"));
+            b.UseSetting("Kiosk:SetupDir", Path.Combine(_root, "setups"));
             b.UseSetting("Kiosk:ApiKey", "secret");
+            b.UseSetting("Kiosk:InitialSetupKey", SetupKey);
             b.UseSetting("Kiosk:PanelInitialPassword", "test-panel-password");
         });
         _ = _factory.Server;
         return Task.CompletedTask;
+    }
+
+    [Fact]
+    public async Task Initial_setup_catalog_and_download_use_scoped_session_token()
+    {
+        var catalog = _factory.Services.GetRequiredService<InstallerCatalog>();
+        byte[] msi = { 0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1 };
+        var package = await catalog.AddAsync("Chrome", "chrome.msi", new MemoryStream(msi), true);
+        catalog.ConfigureInitialSetup(package.Id, true, true, 1);
+
+        var noKey = _factory.CreateClient();
+        Assert.Equal(HttpStatusCode.Unauthorized, (await noKey.GetAsync("/api/setup/catalog")).StatusCode);
+
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Add("X-Setup-Key", SetupKey);
+        var listed = await client.GetFromJsonAsync<InitialSetupCatalog>("/api/setup/catalog");
+        Assert.True(listed!.Packages.Single().SelectedByDefault);
+        var createResponse = await client.PostAsJsonAsync("/api/setup/sessions", new InitialSetupSessionRequest
+        {
+            MachineName = "PC NUEVO", SetupVersion = "1.2.3", PackageIds = [package.Id]
+        });
+        createResponse.EnsureSuccessStatusCode();
+        var session = await createResponse.Content.ReadFromJsonAsync<InitialSetupSessionResponse>();
+        Assert.NotNull(session);
+
+        Assert.Equal(HttpStatusCode.NotFound,
+            (await client.GetAsync($"/api/setup/sessions/{session!.SessionId}/packages/{package.Id}/download")).StatusCode);
+        client.DefaultRequestHeaders.Add("X-Setup-Token", session.Token);
+        Assert.Equal(msi, await client.GetByteArrayAsync($"/api/setup/sessions/{session.SessionId}/packages/{package.Id}/download"));
+
+        var update = await client.PostAsJsonAsync($"/api/setup/sessions/{session.SessionId}/packages/{package.Id}/status",
+            new InitialSetupStatusUpdate { State = InstallationJobState.Succeeded, ProgressPercent = 100, ExitCode = 0 });
+        Assert.Equal(HttpStatusCode.NoContent, update.StatusCode);
+        Assert.True(_factory.Services.GetRequiredService<InitialSetupSessionStore>().Recent().Single().IsTerminal);
     }
 
     [Fact]

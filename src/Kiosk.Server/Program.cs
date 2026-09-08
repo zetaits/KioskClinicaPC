@@ -11,6 +11,10 @@ using KioskClinicaPC.Core.Sync;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.HttpOverrides;
+using System.Security.Cryptography;
+using System.Text;
+using Microsoft.AspNetCore.RateLimiting;
+using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -26,6 +30,7 @@ static string OrDefault(string? value, string fallback) => string.IsNullOrWhiteS
 string dataDir   = OrDefault(builder.Configuration["Kiosk:DataDir"],   Path.Combine(builder.Environment.ContentRootPath, "data"));
 string assetsDir = OrDefault(builder.Configuration["Kiosk:AssetsDir"], Path.Combine(builder.Environment.ContentRootPath, "assets"));
 string installersDir = OrDefault(builder.Configuration["Kiosk:InstallersDir"], Path.Combine(builder.Environment.ContentRootPath, "installers"));
+string setupDir = OrDefault(builder.Configuration["Kiosk:SetupDir"], Path.Combine(builder.Environment.ContentRootPath, "setups"));
 string sourceSeedAssetsDir = Path.GetFullPath(Path.Combine(
     builder.Environment.ContentRootPath, "..", "Kiosk.Client", "Assets"));
 string publishedSeedAssetsDir = Path.Combine(builder.Environment.ContentRootPath, "seed-assets");
@@ -35,11 +40,15 @@ long maxInstallerRequestBytes = checked(maxInstallerBytes + 1024L * 1024); // ma
 builder.Services.Configure<FormOptions>(o => o.MultipartBodyLengthLimit = maxInstallerRequestBytes);
 builder.WebHost.ConfigureKestrel(o => o.Limits.MaxRequestBodySize = maxInstallerRequestBytes);
 string? apiKey   = builder.Configuration["Kiosk:ApiKey"];   // vacío = servidor abierto (solo pruebas)
+string? initialSetupKey = builder.Configuration["Kiosk:InitialSetupKey"];
 string? panelInitialPassword = builder.Configuration["Kiosk:PanelInitialPassword"];
 int slideDurationMs = builder.Configuration.GetValue<int?>("Kiosk:SlideDurationMs") ?? 5200; // = default del cliente
 
 if (!builder.Environment.IsDevelopment() && string.IsNullOrWhiteSpace(apiKey))
     throw new InvalidOperationException("Kiosk:ApiKey es obligatoria fuera de Development.");
+if (!string.IsNullOrWhiteSpace(initialSetupKey) &&
+    (initialSetupKey.Length != 64 || !initialSetupKey.All(Uri.IsHexDigit)))
+    throw new InvalidOperationException("Kiosk:InitialSetupKey debe tener 64 caracteres hexadecimales.");
 
 // Zona horaria de la tienda para evaluar la vigencia de los eventos (no la del VPS). Id de Windows
 // (p.ej. "Romance Standard Time" para España); vacío = zona local del servidor.
@@ -83,6 +92,8 @@ builder.Services.AddSingleton(new AssetLibrary(assetsDir, seedAssetsDir));
 builder.Services.AddSingleton(new FleetRegistry(dataDir, storeTz));
 builder.Services.AddSingleton(new InstallerCatalog(dataDir, installersDir, maxInstallerBytes));
 builder.Services.AddSingleton(new InstallationJobStore(dataDir));
+builder.Services.AddSingleton(new InitialSetupSessionStore(dataDir));
+builder.Services.AddSingleton(new InitialSetupBundleStore(setupDir));
 builder.Services.AddSingleton(new MaintenanceJobStore(dataDir));
 builder.Services.AddSingleton(new PanelAccessLog(dataDir));
 
@@ -90,6 +101,7 @@ builder.Services.AddSingleton(new PanelAccessLog(dataDir));
 builder.Services.AddSingleton(new AttractClock(slideDurationMs));
 builder.Services.AddSignalR();
 builder.Services.AddHostedService<AttractBroadcaster>();
+builder.Services.AddHostedService<EventTransitionBroadcaster>();
 
 // Panel de administración (Fase 3): Blazor Server + login por cookie (un solo encargado, sin roles).
 builder.Services.AddSingleton(new PanelAuthStore(dataDir, panelInitialPassword));
@@ -97,6 +109,14 @@ builder.Services.AddSingleton<LoginThrottle>();
 builder.Services.AddRazorComponents().AddInteractiveServerComponents();
 builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddAuthorization();
+builder.Services.AddRateLimiter(options => options.AddPolicy("initial-setup", context =>
+    RateLimitPartition.GetFixedWindowLimiter(
+        context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 30, Window = TimeSpan.FromMinutes(1), QueueLimit = 0,
+            AutoReplenishment = true
+        })));
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(options =>
     {
@@ -119,17 +139,39 @@ if (tzWarning != null) app.Logger.LogWarning("{TzWarning}", tzWarning);
 app.Logger.LogInformation("Zona horaria de la tienda: {TimeZone}.", storeTz.Id);
 if (string.IsNullOrEmpty(apiKey))
     app.Logger.LogWarning("Kiosk:ApiKey vacía: /api/* se sirve SIN autenticación. Fija una clave antes de exponer el servidor a internet.");
+if (string.IsNullOrEmpty(initialSetupKey))
+    app.Logger.LogWarning("Kiosk:InitialSetupKey vacía: el pack del instalador inicial queda deshabilitado.");
 
 app.UseForwardedHeaders();
 app.UseStaticFiles();
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseRateLimiter();
 app.UseAntiforgery();
 
-// Guardia de API key: cubre todo /api/*. Fuera de /api (p.ej. /health, panel, hub) queda abierto.
+static bool SecretEquals(string? expected, string? actual)
+{
+    if (string.IsNullOrEmpty(expected) || string.IsNullOrEmpty(actual)) return false;
+    byte[] left = SHA256.HashData(Encoding.UTF8.GetBytes(expected));
+    byte[] right = SHA256.HashData(Encoding.UTF8.GetBytes(actual));
+    return CryptographicOperations.FixedTimeEquals(left, right);
+}
+
+// El bootstrap inicial usa una clave limitada propia; el resto de /api conserva la clave de los kioscos.
 app.Use(async (ctx, next) =>
 {
-    if (ctx.Request.Path.StartsWithSegments("/api") && !string.IsNullOrEmpty(apiKey))
+    if (ctx.Request.Path.StartsWithSegments("/api/setup"))
+    {
+        if (!SecretEquals(initialSetupKey, ctx.Request.Headers["X-Setup-Key"].FirstOrDefault()))
+        {
+            ctx.Response.StatusCode = string.IsNullOrEmpty(initialSetupKey)
+                ? StatusCodes.Status503ServiceUnavailable
+                : StatusCodes.Status401Unauthorized;
+            await ctx.Response.WriteAsync("Instalación inicial no autorizada.");
+            return;
+        }
+    }
+    else if (ctx.Request.Path.StartsWithSegments("/api") && !string.IsNullOrEmpty(apiKey))
     {
         if (ctx.Request.Headers["X-Api-Key"] != apiKey)
         {
@@ -245,6 +287,62 @@ app.MapPost("/api/installations/{jobId}/status", async (string jobId, HttpContex
     return jobs.Update(jobId, token, update) ? Results.NoContent() : Results.BadRequest();
 });
 
+static string? SetupToken(HttpContext ctx) => ctx.Request.Headers["X-Setup-Token"].FirstOrDefault();
+
+app.MapGet("/api/setup/catalog", (InstallerCatalog catalog) =>
+    Results.Ok(new InitialSetupCatalog
+    {
+        Packages = catalog.InitialSetupList().Select(p => new InitialSetupPackage
+        {
+            Id = p.Id, DisplayName = p.DisplayName, Kind = p.Kind, SizeBytes = p.SizeBytes,
+            Sha256 = p.Sha256, SelectedByDefault = p.SelectedByDefault, Order = p.InitialSetupOrder
+        }).ToList()
+    })).RequireRateLimiting("initial-setup");
+
+app.MapPost("/api/setup/sessions", async (HttpContext ctx, InstallerCatalog catalog,
+    InitialSetupSessionStore sessions) =>
+{
+    var request = await ctx.Request.ReadFromJsonAsync<InitialSetupSessionRequest>();
+    if (request == null || request.PackageIds.Count == 0) return Results.BadRequest("Selecciona al menos una aplicación.");
+    var ids = request.PackageIds.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+    var available = catalog.InitialSetupList().ToDictionary(p => p.Id, StringComparer.OrdinalIgnoreCase);
+    if (ids.Count != request.PackageIds.Count || ids.Any(id => !available.ContainsKey(id)))
+        return Results.Conflict("La selección ha cambiado; vuelve a cargar el catálogo.");
+    var selected = ids.Select(id => available[id]).ToList();
+    var created = sessions.Create(request.MachineName, request.SetupVersion, selected);
+    return Results.Ok(new InitialSetupSessionResponse
+    {
+        SessionId = created.Session.Id,
+        Token = created.Token,
+        Packages = selected.Select(p => new InstallationManifest
+        {
+            JobId = created.Session.Id, DeviceId = created.Session.MachineName, PackageId = p.Id,
+            DisplayName = p.DisplayName, FileName = p.OriginalFileName, Kind = p.Kind,
+            SizeBytes = p.SizeBytes, Sha256 = p.Sha256, AllowUnsigned = p.AllowUnsigned
+        }).ToList()
+    });
+}).RequireRateLimiting("initial-setup");
+
+app.MapGet("/api/setup/sessions/{sessionId}/packages/{packageId}/download",
+    (string sessionId, string packageId, HttpContext ctx, InitialSetupSessionStore sessions, InstallerCatalog catalog) =>
+{
+    string? token = SetupToken(ctx);
+    var sessionPackage = token == null ? null : sessions.AuthorizePackage(sessionId, packageId, token);
+    var package = sessionPackage == null ? null : catalog.Find(packageId);
+    if (sessionPackage == null || package == null || package.Sha256 != sessionPackage.PackageSha256) return Results.NotFound();
+    return Results.File(catalog.ResolveFile(package), "application/octet-stream", enableRangeProcessing: true);
+});
+
+app.MapPost("/api/setup/sessions/{sessionId}/packages/{packageId}/status",
+    async (string sessionId, string packageId, HttpContext ctx, InitialSetupSessionStore sessions) =>
+{
+    string? token = SetupToken(ctx);
+    if (token == null) return Results.Unauthorized();
+    var update = await ctx.Request.ReadFromJsonAsync<InitialSetupStatusUpdate>();
+    if (update == null) return Results.BadRequest();
+    return sessions.Update(sessionId, packageId, token, update) ? Results.NoContent() : Results.BadRequest();
+});
+
 // El runner independiente sigue pudiendo confirmar el resultado cuando Kiosk y su servicio ya no existen.
 app.MapPost("/api/maintenance/{jobId}/status", async (string jobId, HttpContext ctx,
     MaintenanceJobStore jobs, FleetRegistry fleet) =>
@@ -324,6 +422,15 @@ app.MapGet("/panel/assets/{category}/{file}", (string category, string file, Ass
     if (!lib.TryGetFile(category, file, out string full)) return Results.NotFound();
     if (!contentTypes.TryGetContentType(full, out string? mime)) mime = "application/octet-stream";
     return Results.File(full, mime);
+}).RequireAuthorization();
+
+app.MapGet("/panel/setup/download", (InitialSetupBundleStore bundles) =>
+{
+    var bundle = bundles.Latest(out _);
+    return bundle == null
+        ? Results.NotFound()
+        : Results.File(bundle.FullPath, "application/vnd.microsoft.portable-executable",
+            bundle.Manifest.FileName, enableRangeProcessing: true);
 }).RequireAuthorization();
 
 // Subida desde formulario SSR para no transportar binarios grandes por el circuito de Blazor.

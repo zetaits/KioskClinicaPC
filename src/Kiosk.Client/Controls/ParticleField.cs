@@ -4,6 +4,7 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Shapes;
+using KioskClinicaPC.Core.Config;
 
 namespace KioskClinicaPC.Controls
 {
@@ -18,13 +19,28 @@ namespace KioskClinicaPC.Controls
     /// </summary>
     public static class ParticleField
     {
-        public static void Spawn(Canvas target, int count)
+        public static void Spawn(Canvas target, int count, Color? primary = null, Color? secondary = null,
+            ThemeAmbientEffect effect = ThemeAmbientEffect.Default, int intensity = 70)
         {
-            if (target == null || count <= 0) return;
+            if (target == null) return;
+            target.Children.Clear();
+            if (count <= 0 || intensity <= 0) return;
 
             var app = Application.Current;
-            var cyanColor = (Color)app.FindResource("CyanColor");
-            var magentaColor = (Color)app.FindResource("MagentaColor");
+            var cyanColor = primary ?? (Color)app.FindResource("CyanColor");
+            var magentaColor = secondary ?? (Color)app.FindResource("MagentaColor");
+            count = Math.Max(1, count * Math.Clamp(intensity, 0, 100) / 100);
+
+            if (effect == ThemeAmbientEffect.Spotlights)
+            {
+                AddSpotlights(target, cyanColor, magentaColor, intensity);
+                return;
+            }
+            if (effect == ThemeAmbientEffect.Notebook)
+            {
+                AddNotebookMarks(target, cyanColor, magentaColor, intensity);
+                return;
+            }
 
             // Dos pinceles de glow congelados (compartidos por todas las partículas del mismo color).
             var cyanGlow = BuildGlowBrush(cyanColor);
@@ -38,15 +54,19 @@ namespace KioskClinicaPC.Controls
                 // (Antes size=core+30 hacía todas ~31px → "bolas de fuego". Ahora escala con el punto.)
                 double core = 1 + random.NextDouble() * 2.5;
                 double size = core * 6;
-                var dot = new Ellipse
+                Shape dot = effect == ThemeAmbientEffect.Confetti
+                    ? new Rectangle { Width = core * 2.2, Height = core * 5.5, RadiusX = 1, RadiusY = 1 }
+                    : new Ellipse { Width = size, Height = size };
+                if (effect == ThemeAmbientEffect.Snow)
                 {
-                    Width = size,
-                    Height = size,
-                    Fill = random.NextDouble() > 0.5 ? cyanGlow : magentaGlow,
-                    Opacity = 0
-                };
+                    dot.Width = dot.Height = 2 + random.NextDouble() * 6;
+                    dot.Fill = new SolidColorBrush(Color.FromArgb(0xDD, 0xFF, 0xFF, 0xFF));
+                }
+                else dot.Fill = random.NextDouble() > 0.5 ? cyanGlow : magentaGlow;
+                dot.Opacity = 0;
                 Canvas.SetLeft(dot, random.NextDouble() * 1920);
-                Canvas.SetTop(dot, 1080 + 20);
+                bool descending = effect is ThemeAmbientEffect.Snow or ThemeAmbientEffect.Confetti;
+                Canvas.SetTop(dot, descending ? -20 : 1100);
                 target.Children.Add(dot);
 
                 double duration = 14 + random.NextDouble() * 18;
@@ -54,8 +74,8 @@ namespace KioskClinicaPC.Controls
 
                 var up = new DoubleAnimation
                 {
-                    From = 1100,
-                    To = -20,
+                    From = descending ? -20 : 1100,
+                    To = descending ? 1100 : -20,
                     Duration = TimeSpan.FromSeconds(duration),
                     RepeatBehavior = RepeatBehavior.Forever,
                     BeginTime = TimeSpan.FromSeconds(delay)
@@ -73,6 +93,36 @@ namespace KioskClinicaPC.Controls
 
                 dot.BeginAnimation(Canvas.TopProperty, up);
                 dot.BeginAnimation(UIElement.OpacityProperty, fade);
+            }
+        }
+
+        private static void AddSpotlights(Canvas target, Color primary, Color secondary, int intensity)
+        {
+            foreach (var item in new[] { (primary, 180d, -180d, -18d), (secondary, 1450d, -120d, 20d) })
+            {
+                var beam = new Rectangle
+                {
+                    Width = 210, Height = 1450, Opacity = .08 * intensity / 100d,
+                    Fill = new LinearGradientBrush(
+                        Color.FromArgb(0, item.Item1.R, item.Item1.G, item.Item1.B),
+                        Color.FromArgb(0xCC, item.Item1.R, item.Item1.G, item.Item1.B), 90),
+                    RenderTransform = new RotateTransform(item.Item4)
+                };
+                Canvas.SetLeft(beam, item.Item2); Canvas.SetTop(beam, item.Item3); target.Children.Add(beam);
+            }
+        }
+
+        private static void AddNotebookMarks(Canvas target, Color primary, Color secondary, int intensity)
+        {
+            for (int i = 0; i < 8; i++)
+            {
+                var line = new Line
+                {
+                    X1 = 0, X2 = 190 + i * 18, Y1 = 0, Y2 = i % 2 == 0 ? 0 : 35,
+                    Stroke = new SolidColorBrush(i % 2 == 0 ? primary : secondary), StrokeThickness = 2,
+                    Opacity = .12 * intensity / 100d
+                };
+                Canvas.SetLeft(line, i % 2 == 0 ? 70 : 1600); Canvas.SetTop(line, 160 + i * 105); target.Children.Add(line);
             }
         }
 

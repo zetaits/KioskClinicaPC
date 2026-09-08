@@ -8,8 +8,8 @@ namespace KioskClinicaPC.Tests
         [Fact]
         public void Hash_LuegoVerify_ConLaMismaClave_EsTrue()
         {
-            string stored = PasswordService.Hash("clinicapc2025");
-            Assert.True(PasswordService.Verify("clinicapc2025", stored));
+            string stored = PasswordService.Hash("clave-de-prueba-segura");
+            Assert.True(PasswordService.Verify("clave-de-prueba-segura", stored));
         }
 
         [Fact]

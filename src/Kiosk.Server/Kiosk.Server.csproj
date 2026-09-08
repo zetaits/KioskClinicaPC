@@ -3,7 +3,7 @@
   <!-- Servidor de contenido del kiosko: sirve la config y los assets a los clientes (Fase 1),
        y más adelante hospedará el hub SignalR (Fase 2) y el panel Blazor de administración (Fase 3). -->
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>Kiosk.Server</RootNamespace>
@@ -15,8 +15,8 @@
   <!-- Estado generado en ejecución. Nunca debe filtrarse al bundle (puede contener hashes, actividad y
        contenido real de una tienda). Producción lo guarda fuera de /opt, bajo /var/lib/kiosk-server. -->
   <ItemGroup>
-    <Content Remove="data\**;assets\**;installers\**" />
-    <None Remove="data\**;assets\**;installers\**" />
+    <Content Remove="data\**;assets\**;installers\**;setups\**" />
+    <None Remove="data\**;assets\**;installers\**;setups\**" />
   </ItemGroup>
 
   <ItemGroup>
@@ -39,6 +39,7 @@
     <Content Include="..\Kiosk.Client\Fonts\*.ttf" Link="wwwroot\ficha\fonts\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="..\Kiosk.Client\Assets\Brands\**\*" Link="seed-assets\Brands\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="..\Kiosk.Client\Assets\SpecImages\**\*" Link="seed-assets\SpecImages\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="..\Kiosk.Client\Assets\ThemeAssets\**\*" Link="seed-assets\ThemeAssets\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

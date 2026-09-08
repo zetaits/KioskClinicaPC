@@ -8,9 +8,13 @@ namespace KioskClinicaPC.Core.Config
     /// <summary>Ajustes de comportamiento del kiosko (separados del contenido en KioskConfig.json).</summary>
     public class KioskSettings
     {
-        public const string DefaultPassword = "clinicapc2025";
+        public const int CurrentPasswordPolicyVersion = 1;
+        public const int MinimumPasswordLength = 12;
 
         public string? PasswordHash { get; set; }
+        /// <summary>Versión de la política de contraseña aceptada por el encargado. Los perfiles
+        /// anteriores a la política actual deben renovar su clave una sola vez.</summary>
+        public int PasswordPolicyVersion { get; set; }
         public int InactivitySeconds { get; set; } = 90;
         public int AutoScanSeconds { get; set; } = 18;
         public double SlideIntervalSeconds { get; set; } = 5.2;
@@ -109,15 +113,40 @@ namespace KioskClinicaPC.Core.Config
             }
         }
 
-        /// <summary>Garantiza que exista un hash de contraseña; siembra el por defecto si falta.</summary>
-        public bool EnsurePasswordSeeded()
+        /// <summary>Indica si el primer arranque o una actualización debe pedir una contraseña segura.</summary>
+        public bool RequiresPasswordSetup()
+            => string.IsNullOrWhiteSpace(PasswordHash) || PasswordPolicyVersion < CurrentPasswordPolicyVersion;
+
+        /// <summary>
+        /// Establece o renueva la contraseña. Si ya existe un hash exige la clave actual, de modo que una
+        /// actualización no permita a otra persona apropiarse de los ajustes del kiosko.
+        /// </summary>
+        public bool TrySetPassword(string? currentPassword, string? newPassword, string? confirmation,
+            out string error)
         {
-            if (string.IsNullOrEmpty(PasswordHash))
+            if (!string.IsNullOrWhiteSpace(PasswordHash) &&
+                !PasswordService.Verify(currentPassword ?? string.Empty, PasswordHash))
             {
-                PasswordHash = PasswordService.Hash(DefaultPassword);
-                return true;
+                error = "La contraseña actual no es correcta.";
+                return false;
             }
-            return false;
+
+            if (string.IsNullOrWhiteSpace(newPassword) || newPassword.Length < MinimumPasswordLength)
+            {
+                error = $"La nueva contraseña debe tener al menos {MinimumPasswordLength} caracteres.";
+                return false;
+            }
+
+            if (!string.Equals(newPassword, confirmation, StringComparison.Ordinal))
+            {
+                error = "La nueva contraseña y su confirmación no coinciden.";
+                return false;
+            }
+
+            PasswordHash = PasswordService.Hash(newPassword);
+            PasswordPolicyVersion = CurrentPasswordPolicyVersion;
+            error = string.Empty;
+            return true;
         }
 
         /// <summary>Garantiza Id y nombre de flota: genera un GUID estable la primera vez y usa el hostname

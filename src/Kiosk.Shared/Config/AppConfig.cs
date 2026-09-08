@@ -6,7 +6,7 @@ namespace KioskClinicaPC.Core.Config
     {
         /// <summary>Versión del esquema de configuración actual. Súbela al cambiar la forma del
         /// JSON (renombrar/mover/cambiar tipos) y añade el paso correspondiente en ConfigMigrator.</summary>
-        public const int CurrentSchemaVersion = 1;
+        public const int CurrentSchemaVersion = 2;
 
         /// <summary>Versión del esquema con que se guardó este archivo. Los archivos previos al
         /// versionado no la traen → se deserializa como 0 y ConfigMigrator la actualiza.</summary>
@@ -119,6 +119,9 @@ namespace KioskClinicaPC.Core.Config
         public List<AttractSlide> AttractSlidesNew { get; set; } = new List<AttractSlide>();
 
         public Dictionary<string, string> UiTexts { get; set; } = new Dictionary<string, string>();
+
+        /// <summary>Tema efectivo resuelto por el servidor. Null usa la identidad visual normal.</summary>
+        public ResolvedVisualTheme? VisualTheme { get; set; }
     }
 
     public class SpecMarketingData

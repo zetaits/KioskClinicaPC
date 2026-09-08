@@ -33,6 +33,9 @@ namespace KioskClinicaPC.Core.Config
         /// <summary>Textos de UI a sobreponer (merge por clave) sobre los base mientras el evento activo.</summary>
         public Dictionary<string, string> UiTextOverrides { get; set; } = new();
 
+        /// <summary>Piel visual temporal. Null conserva el tema normal del kiosco.</summary>
+        public EventThemeSelection? Theme { get; set; }
+
         /// <summary>¿Está vigente en el instante <paramref name="nowLocal"/> (hora local de tienda)?</summary>
         public bool IsActiveAt(DateTime nowLocal) => Enabled && Start <= nowLocal && nowLocal < End;
     }

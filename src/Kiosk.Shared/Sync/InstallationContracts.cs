@@ -52,6 +52,45 @@ namespace KioskClinicaPC.Core.Sync
         public string? Message { get; set; }
     }
 
+    /// <summary>Aplicacion que el instalador inicial puede ofrecer al preparar un equipo.</summary>
+    public sealed class InitialSetupPackage
+    {
+        public string Id { get; set; } = "";
+        public string DisplayName { get; set; } = "";
+        public InstallerPackageKind Kind { get; set; }
+        public long SizeBytes { get; set; }
+        public string Sha256 { get; set; } = "";
+        public bool SelectedByDefault { get; set; }
+        public int Order { get; set; }
+    }
+
+    public sealed class InitialSetupCatalog
+    {
+        public List<InitialSetupPackage> Packages { get; set; } = new();
+    }
+
+    public sealed class InitialSetupSessionRequest
+    {
+        public string MachineName { get; set; } = "";
+        public string SetupVersion { get; set; } = "";
+        public List<string> PackageIds { get; set; } = new();
+    }
+
+    public sealed class InitialSetupSessionResponse
+    {
+        public string SessionId { get; set; } = "";
+        public string Token { get; set; } = "";
+        public List<InstallationManifest> Packages { get; set; } = new();
+    }
+
+    public sealed class InitialSetupStatusUpdate
+    {
+        public InstallationJobState State { get; set; }
+        public int? ProgressPercent { get; set; }
+        public int? ExitCode { get; set; }
+        public string? Message { get; set; }
+    }
+
     public sealed class MaintenanceStatusUpdate
     {
         public string DeviceId { get; set; } = "";

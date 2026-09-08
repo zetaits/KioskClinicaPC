@@ -55,6 +55,20 @@ public sealed class AssetLibraryTests : IDisposable
         Assert.Equal(initial, library.Version());
     }
 
+    [Fact]
+    public async Task Theme_assets_are_a_supported_synced_category()
+    {
+        var library = new AssetLibrary(Path.Combine(_root, "store"));
+        await using var input = CreateImage(6, 4, SKEncodedImageFormat.Png);
+
+        var saved = await library.SaveAsync(
+            "ThemeAssets", "Navidad hero", "decoracion.png", input, overwrite: false);
+
+        Assert.Equal("navidadhero.png", saved.FileName);
+        Assert.Contains(library.Manifest().Files,
+            item => item.Category == "ThemeAssets" && item.FileName == saved.FileName);
+    }
+
     public void Dispose()
     {
         try { Directory.Delete(_root, true); } catch { }
