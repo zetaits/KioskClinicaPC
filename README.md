@@ -133,6 +133,12 @@ restart or shut down the machine. Shop-wide restart and shutdown controls are av
 
 ![Fleet](docs/screenshots/panel-06-fleet.jpeg)
 
+### Managed kiosk updates
+GitHub Actions builds the Windows installer and signs an immutable release manifest. The VPS keeps the
+approved target version, stages the update across the fleet during a configurable maintenance window and
+shows download, installation and post-reboot confirmation per machine. GitHub Releases remains the fallback
+artifact source, and an older signed release can be selected for an explicit rollback.
+
 ### Security
 Change the panel password, check the server's current state and review recent successful, failed or
 throttled login attempts.
@@ -171,7 +177,8 @@ dotnet run   --project src/Kiosk.Server         # just the server (dev)
 ```
 
 Client output: `src\Kiosk.Client\bin\Debug\net10.0-windows\KioskClinicaPC.exe` (the WPF project is `net10.0-windows`).
-Server setup and deployment: **[docs/SERVIDOR.md](docs/SERVIDOR.md)**.
+Server setup: **[docs/SERVIDOR.md](docs/SERVIDOR.md)**. VPS updates:
+**[docs/ACTUALIZAR-PANEL-VPS.txt](docs/ACTUALIZAR-PANEL-VPS.txt)**.
 
 > ⚠️ Running it enters kiosk mode: it hides the taskbar and blocks Task Manager.
 > To exit cleanly use Settings → "Exit kiosk" or `Ctrl+Shift+K`. Killing the process leaves the desktop locked.

@@ -23,6 +23,13 @@ namespace KioskClinicaPC.Services
                 DeviceId = deviceId, JobId = jobId, Token = token
             });
 
+        public static Task<InstallerAgentResponse> StageKioskUpdateAsync(string? serverUrl, string? apiKey,
+            string deviceId, KioskUpdateAssignment assignment) => SendAsync(new InstallerAgentRequest
+            {
+                Operation = "stage-kiosk-update", ServerUrl = serverUrl, ApiKey = apiKey,
+                DeviceId = deviceId, UpdateAssignment = assignment
+            });
+
         public static Task<InstallerAgentResponse> UninstallKioskAsync(string userDataDirectory,
             string? serverUrl = null, string? apiKey = null, string? deviceId = null,
             string? jobId = null, string? token = null) =>

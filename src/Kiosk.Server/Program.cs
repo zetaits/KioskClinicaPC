@@ -31,6 +31,7 @@ string dataDir   = OrDefault(builder.Configuration["Kiosk:DataDir"],   Path.Comb
 string assetsDir = OrDefault(builder.Configuration["Kiosk:AssetsDir"], Path.Combine(builder.Environment.ContentRootPath, "assets"));
 string installersDir = OrDefault(builder.Configuration["Kiosk:InstallersDir"], Path.Combine(builder.Environment.ContentRootPath, "installers"));
 string setupDir = OrDefault(builder.Configuration["Kiosk:SetupDir"], Path.Combine(builder.Environment.ContentRootPath, "setups"));
+string updatesDir = OrDefault(builder.Configuration["Kiosk:UpdatesDir"], Path.Combine(builder.Environment.ContentRootPath, "updates"));
 string sourceSeedAssetsDir = Path.GetFullPath(Path.Combine(
     builder.Environment.ContentRootPath, "..", "Kiosk.Client", "Assets"));
 string publishedSeedAssetsDir = Path.Combine(builder.Environment.ContentRootPath, "seed-assets");
@@ -42,6 +43,15 @@ builder.WebHost.ConfigureKestrel(o => o.Limits.MaxRequestBodySize = maxInstaller
 string? apiKey   = builder.Configuration["Kiosk:ApiKey"];   // vacío = servidor abierto (solo pruebas)
 string? initialSetupKey = builder.Configuration["Kiosk:InitialSetupKey"];
 string? panelInitialPassword = builder.Configuration["Kiosk:PanelInitialPassword"];
+string? releasePublishKey = builder.Configuration["Kiosk:ReleasePublishKey"];
+string updateTokenKey = OrDefault(builder.Configuration["Kiosk:UpdateTokenKey"], apiKey ?? "development-update-token-key");
+var updateSigningKeys = builder.Configuration.GetSection("Kiosk:UpdateSigningKeys").GetChildren()
+    .Where(x => !string.IsNullOrWhiteSpace(x.Value))
+    .ToDictionary(x => x.Key, x => x.Value!, StringComparer.OrdinalIgnoreCase);
+string? updateSigningKeysDirectory = builder.Configuration["Kiosk:UpdateSigningKeysDirectory"];
+if (!string.IsNullOrWhiteSpace(updateSigningKeysDirectory) && Directory.Exists(updateSigningKeysDirectory))
+    foreach (string file in Directory.GetFiles(updateSigningKeysDirectory, "*.pem"))
+        updateSigningKeys[Path.GetFileNameWithoutExtension(file)] = File.ReadAllText(file);
 int slideDurationMs = builder.Configuration.GetValue<int?>("Kiosk:SlideDurationMs") ?? 5200; // = default del cliente
 
 if (!builder.Environment.IsDevelopment() && string.IsNullOrWhiteSpace(apiKey))
@@ -95,6 +105,8 @@ builder.Services.AddSingleton(new InstallationJobStore(dataDir));
 builder.Services.AddSingleton(new InitialSetupSessionStore(dataDir));
 builder.Services.AddSingleton(new InitialSetupBundleStore(setupDir));
 builder.Services.AddSingleton(new MaintenanceJobStore(dataDir));
+builder.Services.AddSingleton(new KioskUpdateStore(dataDir, updatesDir, maxInstallerBytes, storeTz,
+    updateTokenKey, updateSigningKeys));
 builder.Services.AddSingleton(new PanelAccessLog(dataDir));
 
 // Sincronización del bucle de atracción (Fase 2): reloj maestro + hub SignalR + latido periódico.
@@ -141,6 +153,8 @@ if (string.IsNullOrEmpty(apiKey))
     app.Logger.LogWarning("Kiosk:ApiKey vacía: /api/* se sirve SIN autenticación. Fija una clave antes de exponer el servidor a internet.");
 if (string.IsNullOrEmpty(initialSetupKey))
     app.Logger.LogWarning("Kiosk:InitialSetupKey vacía: el pack del instalador inicial queda deshabilitado.");
+if (string.IsNullOrWhiteSpace(releasePublishKey) || updateSigningKeys.Count == 0)
+    app.Logger.LogWarning("Las releases administradas están deshabilitadas: configura ReleasePublishKey y UpdateSigningKeys.");
 
 app.UseForwardedHeaders();
 app.UseStaticFiles();
@@ -160,7 +174,11 @@ static bool SecretEquals(string? expected, string? actual)
 // El bootstrap inicial usa una clave limitada propia; el resto de /api conserva la clave de los kioscos.
 app.Use(async (ctx, next) =>
 {
-    if (ctx.Request.Path.StartsWithSegments("/api/setup"))
+    if (ctx.Request.Path.StartsWithSegments("/api/releases"))
+    {
+        // La importación de CI usa una credencial independiente y no expone la API key de la flota.
+    }
+    else if (ctx.Request.Path.StartsWithSegments("/api/setup"))
     {
         if (!SecretEquals(initialSetupKey, ctx.Request.Headers["X-Setup-Key"].FirstOrDefault()))
         {
@@ -247,6 +265,65 @@ app.MapGet("/api/config/version", (ContentResolver content, AssetLibrary assets)
     Results.Ok(new { version = content.Version() + "-" + assets.Version() }));
 
 app.MapGet("/api/assets/manifest", (AssetLibrary assets) => Results.Ok(assets.Manifest()));
+
+static string? UpdateToken(HttpContext ctx) => ctx.Request.Headers["X-Update-Token"].FirstOrDefault();
+
+app.MapPost("/api/releases", async (HttpContext ctx, KioskUpdateStore updates) =>
+{
+    if (!SecretEquals(releasePublishKey, ctx.Request.Headers["X-Release-Publish-Key"].FirstOrDefault()))
+        return string.IsNullOrWhiteSpace(releasePublishKey) ? Results.StatusCode(503) : Results.Unauthorized();
+    try
+    {
+        var form = await ctx.Request.ReadFormAsync(ctx.RequestAborted);
+        var manifestFile = form.Files.GetFile("manifest") ?? throw new InvalidDataException("Falta el manifiesto.");
+        var setup = form.Files.GetFile("setup") ?? throw new InvalidDataException("Falta el instalador.");
+        string signature = form["signature"].ToString();
+        if (manifestFile.Length is <= 0 or > 128 * 1024) throw new InvalidDataException("Tamaño de manifiesto no válido.");
+        byte[] manifestBytes;
+        await using (var input = manifestFile.OpenReadStream())
+        using (var memory = new MemoryStream()) { await input.CopyToAsync(memory, ctx.RequestAborted); manifestBytes = memory.ToArray(); }
+        await using var setupStream = setup.OpenReadStream();
+        var release = await updates.ImportAsync(manifestBytes, signature, setup.FileName, setupStream, ctx.RequestAborted);
+        return Results.Ok(new { release.Version, release.Sha256, release.State });
+    }
+    catch (Exception ex) when (ex is InvalidDataException or IOException or CryptographicException or System.Text.Json.JsonException)
+    { return Results.BadRequest(new { error = ex.Message }); }
+});
+
+app.MapGet("/api/updates/assignment", (string deviceId, string currentVersion, string? deviceName,
+    KioskUpdateStore updates) =>
+{
+    var assignment = updates.GetAssignment(deviceId, deviceName ?? deviceId, currentVersion);
+    return assignment == null ? Results.NoContent() : Results.Ok(assignment);
+});
+
+app.MapGet("/api/updates/{jobId}/manifest", (string jobId, HttpContext ctx, KioskUpdateStore updates) =>
+{
+    var authorized = updates.Authorize(jobId, UpdateToken(ctx));
+    if (authorized == null) return Results.NotFound();
+    ctx.Response.Headers["X-Update-Signature"] = authorized.Value.Release.SignatureBase64;
+    ctx.Response.Headers["X-Update-Key-Id"] = authorized.Value.Release.KeyId;
+    return Results.File(updates.ManifestBytes(authorized.Value.Release), "application/json");
+});
+
+app.MapGet("/api/updates/{jobId}/download", (string jobId, HttpContext ctx, KioskUpdateStore updates) =>
+{
+    var authorized = updates.Authorize(jobId, UpdateToken(ctx));
+    return authorized == null ? Results.NotFound() : Results.File(updates.ResolveFile(authorized.Value.Release),
+        "application/vnd.microsoft.portable-executable", enableRangeProcessing: true);
+});
+
+app.MapGet("/api/updates/{jobId}/authorize", (string jobId, HttpContext ctx, KioskUpdateStore updates) =>
+{
+    var assignment = updates.AuthorizedAssignment(jobId, UpdateToken(ctx));
+    return assignment == null ? Results.NotFound() : Results.Ok(assignment);
+});
+
+app.MapPost("/api/updates/{jobId}/status", async (string jobId, HttpContext ctx, KioskUpdateStore updates) =>
+{
+    var update = await ctx.Request.ReadFromJsonAsync<KioskUpdateStatusUpdate>(ctx.RequestAborted);
+    return update != null && updates.Update(jobId, UpdateToken(ctx), update) ? Results.NoContent() : Results.BadRequest();
+});
 
 static string? InstallToken(HttpContext ctx) => ctx.Request.Headers["X-Install-Token"].FirstOrDefault();
 static string? MaintenanceToken(HttpContext ctx) => ctx.Request.Headers["X-Maintenance-Token"].FirstOrDefault();

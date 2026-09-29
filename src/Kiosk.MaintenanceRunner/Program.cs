@@ -162,15 +162,26 @@ internal static class Program
     private static async Task<bool> ScheduledTaskExists()
     {
         string executable = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "schtasks.exe");
-        var psi = new ProcessStartInfo(executable) { UseShellExecute = false, CreateNoWindow = true };
-        psi.ArgumentList.Add("/Query");
-        psi.ArgumentList.Add("/TN");
-        psi.ArgumentList.Add("KioskClinicaPC Updater");
-        using Process process = Process.Start(psi) ?? throw new InvalidOperationException("No se pudo consultar la tarea programada.");
-        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-        try { await process.WaitForExitAsync(timeout.Token); }
-        catch (OperationCanceledException) { try { process.Kill(true); } catch { } throw new TimeoutException("No se pudo verificar la tarea programada."); }
-        return process.ExitCode == 0;
+        foreach (string taskName in new[]
+                 {
+                     "KioskClinicaPC Updater", "KioskClinicaPC Update Check", "KioskClinicaPC Update Startup"
+                 })
+        {
+            var psi = new ProcessStartInfo(executable) { UseShellExecute = false, CreateNoWindow = true };
+            psi.ArgumentList.Add("/Query");
+            psi.ArgumentList.Add("/TN");
+            psi.ArgumentList.Add(taskName);
+            using Process process = Process.Start(psi) ?? throw new InvalidOperationException("No se pudo consultar la tarea programada.");
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            try { await process.WaitForExitAsync(timeout.Token); }
+            catch (OperationCanceledException)
+            {
+                try { process.Kill(true); } catch { }
+                throw new TimeoutException("No se pudo verificar la tarea programada.");
+            }
+            if (process.ExitCode == 0) return true;
+        }
+        return false;
     }
 
     private static async Task Report(KioskUninstallRunnerRequest request, MaintenanceJobState state, int? exitCode, string message)

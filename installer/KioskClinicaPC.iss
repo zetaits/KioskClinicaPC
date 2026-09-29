@@ -28,6 +28,7 @@
 #define AgentPublishDir "..\publish-agent"
 #define MaintenancePublishDir "..\publish-maintenance"
 #define SetupHelperPublishDir "..\publish-setup-helper"
+#define UpdateRunnerPublishDir "..\publish-update-runner"
 
 [Setup]
 AppId={{A7E3C9F1-2B4D-4E6A-9C8B-1F0D5E2A6B33}
@@ -97,6 +98,7 @@ Name: "{commonappdata}\KioskClinicaPC\updates"; Permissions: users-modify; Compo
 Source: "{#PublishDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Components: kiosk
 Source: "{#AgentPublishDir}\*"; DestDir: "{app}\Agent"; Flags: ignoreversion recursesubdirs createallsubdirs; Components: kiosk
 Source: "{#MaintenancePublishDir}\KioskMaintenanceRunner.exe"; DestDir: "{app}\Agent\Maintenance"; Flags: ignoreversion; Components: kiosk
+Source: "{#UpdateRunnerPublishDir}\KioskUpdateRunner.exe"; DestDir: "{app}\Agent\Update"; Flags: ignoreversion; Components: kiosk
 ; Aplicador de updates. Vive en ProgramData (NO en {app}) y con onlyifdoesntexist: asi un upgrade
 ; en silencio NO lo sobrescribe mientras la tarea lo esta ejecutando (evita bloqueo de archivo).
 Source: "updater.cmd"; DestDir: "{commonappdata}\KioskClinicaPC"; Flags: onlyifdoesntexist uninsremovereadonly; Components: kiosk
@@ -115,10 +117,12 @@ Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: de
 Root: HKLM; Subkey: "SOFTWARE\ClinicaPC\Kiosk"; ValueType: string; ValueName: "InstallerServerUrl"; ValueData: ""; Flags: createvalueifdoesntexist uninsdeletevalue; Components: kiosk
 
 [Run]
-; Registra la tarea SYSTEM que aplica los updates de madrugada (sin UAC). Se (re)crea en cada
-; instalacion. Corre diariamente a las 04:00; si el PC esta apagado a esa hora, queda el boton
-; manual "Buscar actualizaciones" + reinicio en Settings.
-Filename: "{sys}\schtasks.exe"; Parameters: "/Create /F /TN ""KioskClinicaPC Updater"" /RU SYSTEM /RL HIGHEST /SC DAILY /ST 04:00 /TR ""{commonappdata}\KioskClinicaPC\updater.cmd"""; Flags: runhidden; StatusMsg: "Configurando actualizaciones automaticas..."; Components: kiosk
+; Retira la tarea heredada que consultaba GitHub directamente. La release puente puede borrar su propia
+; tarea porque updater.cmd ya lanzó el Setup como un proceso independiente.
+Filename: "{sys}\schtasks.exe"; Parameters: "/Delete /F /TN ""KioskClinicaPC Updater"""; Flags: runhidden; Components: kiosk
+; El runner firmado vuelve a validar el trabajo y su ventana con la VPS antes de ejecutar nada.
+Filename: "{sys}\schtasks.exe"; Parameters: "/Create /F /TN ""KioskClinicaPC Update Check"" /RU SYSTEM /RL HIGHEST /SC MINUTE /MO 5 /TR ""{app}\Agent\Update\KioskUpdateRunner.exe"""; Flags: runhidden; StatusMsg: "Configurando actualizaciones administradas..."; Components: kiosk
+Filename: "{sys}\schtasks.exe"; Parameters: "/Create /F /TN ""KioskClinicaPC Update Startup"" /RU SYSTEM /RL HIGHEST /SC ONSTART /DELAY 0001:00 /TR ""{app}\Agent\Update\KioskUpdateRunner.exe"""; Flags: runhidden; Components: kiosk
 ; Agente privilegiado de instalaciones remotas. La app WPF solo le entrega IDs autorizados por pipe.
 Filename: "{sys}\sc.exe"; Parameters: "create KioskClinicaPCInstallerAgent binPath= ""{app}\Agent\KioskInstallerAgent.exe"" start= auto DisplayName= ""KioskClinicaPC Installer Agent"""; Flags: runhidden; StatusMsg: "Configurando agente de instalaciones..."; Components: kiosk
 Filename: "{sys}\sc.exe"; Parameters: "config KioskClinicaPCInstallerAgent binPath= ""{app}\Agent\KioskInstallerAgent.exe"" start= auto"; Flags: runhidden; Components: kiosk
@@ -136,6 +140,8 @@ Filename: "{sys}\sc.exe"; Parameters: "stop KioskClinicaPCInstallerAgent"; Flags
 Filename: "{sys}\sc.exe"; Parameters: "delete KioskClinicaPCInstallerAgent"; Flags: runhidden; RunOnceId: "DelInstallerAgent"
 ; Quita la tarea de actualizacion al desinstalar.
 Filename: "{sys}\schtasks.exe"; Parameters: "/Delete /F /TN ""KioskClinicaPC Updater"""; Flags: runhidden; RunOnceId: "DelUpdaterTask"
+Filename: "{sys}\schtasks.exe"; Parameters: "/Delete /F /TN ""KioskClinicaPC Update Check"""; Flags: runhidden; RunOnceId: "DelManagedUpdaterTask"
+Filename: "{sys}\schtasks.exe"; Parameters: "/Delete /F /TN ""KioskClinicaPC Update Startup"""; Flags: runhidden; RunOnceId: "DelManagedUpdaterStartupTask"
 
 [UninstallDelete]
 ; Limpia la carpeta de instalacion, la config del usuario y los datos machine-wide del updater

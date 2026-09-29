@@ -1,0 +1,44 @@
+ACTUALIZAR EL SERVIDOR DE LA VPS
+===============================
+
+Ejecuta estos comandos desde PowerShell, en la raíz del proyecto principal:
+
+  & .\deploy-server-vps.ps1 -PackageOnly   # Compila y prepara el paquete, sin subirlo
+  & .\deploy-server-vps.ps1                # Compila, sube y activa la nueva versión
+
+El segundo comando pide las credenciales de SSH y sudo de ubuntu cuando hagan
+falta. Antes de usarlo por primera vez, comprueba que puedes entrar por SSH y
+que el servicio kiosk-server funciona. No copies claves ni contraseñas al
+repositorio. Se necesitan el SDK .NET 10 local, ssh.exe y scp.exe, y Python 3
+en la VPS.
+
+El script crea un paquete en src/Kiosk.Server/bin/Release/vps-releases/. Incluye
+release-info.json con el commit, el estado de Git y el SHA-256 de la DLL. El
+servidor valida el SHA-256 del paquete, lo extrae en una carpeta nueva bajo
+/opt/kiosk-server/releases/, cambia /opt/kiosk-server/app a esa versión y
+comprueba GET http://127.0.0.1:5080/health. Si no arranca, restaura la versión
+anterior y vuelve a iniciar el servicio. El primer despliegue conserva la
+carpeta app actual como versión anterior.
+
+El paquete fija DataDir, AssetsDir, InstallersDir, SetupDir y UpdatesDir bajo
+/var/lib/kiosk-server. El despliegue no modifica /etc/kiosk-server, Caddy ni
+los datos de /var/lib/kiosk-server. Mantén una copia de seguridad de esos datos
+por separado.
+
+Tras el despliegue, comprueba la ruta pública:
+
+  curl.exe -4 -i https://vps-9c7061ff.vps.ovh.net/health
+
+Debe responder HTTP 200 y {"status":"ok"}. En la VPS puedes consultar qué
+compilación está activa sin leer secretos:
+
+  cat /opt/kiosk-server/app/release-info.json
+
+Publica preferiblemente desde un árbol Git confirmado. Si hay cambios sin
+confirmar en los archivos que forman el paquete del servidor, el script los
+marca como sourceDirty en release-info.json; el SHA-256 de la DLL sigue
+identificando exactamente el binario instalado.
+
+Los workflows de GitHub en .github/workflows/ publican actualizaciones de los
+kioscos, no este servidor. No uses el procedimiento anterior de rsync --delete
+sobre la carpeta app: sustituía la versión en uso sin una vuelta atrás.

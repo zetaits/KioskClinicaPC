@@ -1,0 +1,83 @@
+param(
+    [string]$HostName = 'vps-9c7061ff.vps.ovh.net',
+    [string]$UserName = 'ubuntu',
+    [switch]$PackageOnly
+)
+
+$ErrorActionPreference = 'Stop'
+if ($HostName -notmatch '^[A-Za-z0-9.-]+$' -or $UserName -notmatch '^[A-Za-z0-9_-]+$') {
+    throw 'Invalid SSH host or user.'
+}
+
+$publish = Join-Path $PSScriptRoot 'src\Kiosk.Server\bin\Release\publish-linux'
+$artifacts = Join-Path $PSScriptRoot 'src\Kiosk.Server\bin\Release\vps-releases'
+$remote = "$UserName@$HostName"
+$helper = Join-Path $PSScriptRoot 'deploy\ubuntu\deploy-release.sh'
+$commit = (& git -C $PSScriptRoot rev-parse HEAD).Trim()
+if ($LASTEXITCODE -ne 0 -or $commit -notmatch '^[0-9a-f]{40}$') { throw 'Cannot identify the source commit.' }
+$sourcePaths = @('src/Kiosk.Server', 'src/Kiosk.Shared', 'src/Kiosk.Client/Assets',
+    'src/Kiosk.Client/Fonts', 'docs', 'deploy/ubuntu', 'build-server-linux.ps1',
+    'deploy-server-vps.ps1', 'global.json')
+$sourceDirty = [bool]@(& git -C $PSScriptRoot status --porcelain --untracked-files=all -- $sourcePaths)
+if ($LASTEXITCODE -ne 0) { throw 'Cannot inspect Git status.' }
+if ($sourceDirty) { Write-Warning 'Server release inputs contain uncommitted changes; this is recorded in the release manifest.' }
+
+& (Join-Path $PSScriptRoot 'build-server-linux.ps1')
+if ($LASTEXITCODE -ne 0) { throw "Server build failed with exit code $LASTEXITCODE" }
+
+$settingsPath = Join-Path $publish 'appsettings.json'
+$settings = Get-Content -LiteralPath $settingsPath -Raw | ConvertFrom-Json
+foreach ($name in @('DataDir', 'AssetsDir', 'InstallersDir', 'SetupDir', 'UpdatesDir')) {
+    $directory = switch ($name) {
+        'DataDir' { 'data' }
+        'AssetsDir' { 'assets' }
+        'InstallersDir' { 'installers' }
+        'SetupDir' { 'setups' }
+        'UpdatesDir' { 'updates' }
+    }
+    $settings.Kiosk.$name = "/var/lib/kiosk-server/$directory"
+}
+$utf8 = New-Object System.Text.UTF8Encoding($false)
+[IO.File]::WriteAllText($settingsPath, ($settings | ConvertTo-Json -Depth 64), $utf8)
+
+$unsafe = Get-ChildItem -LiteralPath $publish -Recurse -Force | Where-Object {
+    ($_.Attributes -band [IO.FileAttributes]::ReparsePoint) -or
+    ($_.PSIsContainer -and $_.Name -in @('data', 'assets', 'installers', 'setups', 'updates'))
+}
+if ($unsafe) { throw "Package contains runtime data or links: $($unsafe.FullName -join ', ')" }
+
+New-Item -ItemType Directory -Path $artifacts -Force | Out-Null
+$dllHash = (Get-FileHash -LiteralPath (Join-Path $publish 'Kiosk.Server.dll') -Algorithm SHA256).Hash.ToLowerInvariant()
+$releaseId = (Get-Date -Format 'yyyyMMddHHmmss') + '-' + $dllHash.Substring(0, 16)
+$archive = Join-Path $artifacts "kiosk-server-$releaseId.tar.gz"
+if (Test-Path -LiteralPath $archive) { throw "Archive already exists: $archive" }
+$releaseInfo = [ordered]@{
+    releaseId = $releaseId
+    sourceCommit = $commit
+    sourceDirty = $sourceDirty
+    dllSha256 = $dllHash
+    packagedAtUtc = (Get-Date).ToUniversalTime().ToString('o')
+}
+[IO.File]::WriteAllText((Join-Path $publish 'release-info.json'), ($releaseInfo | ConvertTo-Json -Depth 4), $utf8)
+
+& tar.exe -czf $archive -C $publish .
+if ($LASTEXITCODE -ne 0) { throw "tar failed with exit code $LASTEXITCODE" }
+$archiveHash = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant()
+Write-Host "Release: $releaseId"
+Write-Host "DLL SHA-256: $dllHash"
+Write-Host "Package SHA-256: $archiveHash"
+if ($PackageOnly) {
+    Write-Host "Package prepared without uploading: $archive"
+    return
+}
+
+& scp.exe -- $archive "${remote}:/home/ubuntu/kiosk-server-$releaseId.tar.gz"
+if ($LASTEXITCODE -ne 0) { throw "Package upload failed with exit code $LASTEXITCODE" }
+& scp.exe -- $helper "${remote}:/home/ubuntu/kiosk-server-deploy-$releaseId.sh"
+if ($LASTEXITCODE -ne 0) { throw "Deployment helper upload failed with exit code $LASTEXITCODE" }
+
+# -tt lets ssh and sudo request passwords interactively. Arguments are locally validated.
+$command = "sudo bash /home/ubuntu/kiosk-server-deploy-$releaseId.sh $releaseId $archiveHash"
+& ssh.exe -tt -- $remote $command
+if ($LASTEXITCODE -ne 0) { throw "Remote deployment failed with exit code $LASTEXITCODE" }
+Write-Host "Server release $releaseId passed its local health check."

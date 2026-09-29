@@ -4,6 +4,7 @@ src/Kiosk.Server/data/
 src/Kiosk.Server/assets/
 src/Kiosk.Server/installers/
 src/Kiosk.Server/setups/
+src/Kiosk.Server/updates/
 
 # Visual Studio / Rider files
 .vs/
@@ -60,6 +61,9 @@ publish/
 publish-agent/
 publish-maintenance/
 publish-setup-helper/
+publish-update-runner/
+panel-vps/
+panel-vps.zip
 installer/Output/
 
 # Accidental shell artifacts. The pre-commit hook rejects extensionless files
@@ -67,3 +71,6 @@ installer/Output/
 
 # AI assistant instructions present in this project
 AGENTS.md
+
+# Copia original del portátil conservada durante la consolidación
+/KioskClinicaPC/

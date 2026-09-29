@@ -52,6 +52,10 @@ bajo). Todas las claves cuelgan de la sección `Kiosk`:
 | `AssetsDir` | `Kiosk__AssetsDir` | Carpeta de la biblioteca de imágenes. | `assets/` bajo el ContentRoot |
 | `InstallersDir` | `Kiosk__InstallersDir` | Binarios privados del catálogo de aplicaciones. | `installers/` bajo el ContentRoot |
 | `SetupDir` | `Kiosk__SetupDir` | Instaladores internos y manifiestos que el panel ofrece para descarga. | `setups/` bajo el ContentRoot |
+| `UpdatesDir` | `Kiosk__UpdatesDir` | Releases firmadas que CI importa y la VPS distribuye a los kioscos. | `updates/` bajo el ContentRoot |
+| `ReleasePublishKey` | `Kiosk__ReleasePublishKey` | Secreto exclusivo con el que CI importa releases; no se comparte con los kioscos. | vacío; publicación deshabilitada |
+| `UpdateTokenKey` | `Kiosk__UpdateTokenKey` | Secreto para derivar los tokens por equipo y trabajo. Debe ser distinto de las otras claves. | `ApiKey` o clave de desarrollo |
+| `UpdateSigningKeysDirectory` | `Kiosk__UpdateSigningKeysDirectory` | Carpeta de claves públicas ECDSA permitidas, una por fichero `<keyId>.pem`. | vacío |
 | `MaxInstallerBytes` | `Kiosk__MaxInstallerBytes` | Tamaño máximo de cada instalador subido. | `1073741824` (1 GiB) |
 | `SlideDurationMs` | `Kiosk__SlideDurationMs` | Duración de cada slide del attract. **Debe coincidir con el default del cliente (5200).** | `5200` |
 | `TimeZone` | `Kiosk__TimeZone` | Zona horaria de **la tienda** (no la del VPS) para evaluar la vigencia de los eventos. Id de Windows (p.ej. `Romance Standard Time`) o IANA en Linux (`Europe/Madrid`). Si no resuelve, cae a la hora local del servidor y **avisa en el log**. | zona local del servidor |
@@ -62,6 +66,10 @@ Ejemplo de variables de entorno (no guardes secretos reales en `appsettings.json
 Kiosk__ApiKey=una-clave-larga-y-secreta
 Kiosk__InitialSetupKey=otra-clave-hexadecimal-de-64-caracteres
 Kiosk__PanelInitialPassword=otra-contraseña-larga-y-distinta
+Kiosk__ReleasePublishKey=secreto-exclusivo-para-ci
+Kiosk__UpdateTokenKey=secreto-exclusivo-para-tokens
+Kiosk__UpdatesDir=/var/lib/kiosk-server/updates
+Kiosk__UpdateSigningKeysDirectory=/etc/kiosk-server/update-keys
 Kiosk__TimeZone=Europe/Madrid
 ```
 
@@ -134,6 +142,12 @@ contraseña, identidad y ajustes existentes, incluso si el UAC se aprobó con ot
 | `GET /api/config/version` | `X-Api-Key` | Hash conjunto de contenido e imágenes; el cliente lo sondea para detectar cambios. |
 | `GET /api/assets/manifest` | `X-Api-Key` | Inventario versionado con tamaño, dimensiones y SHA-256 de cada imagen. |
 | `GET /api/assets/{ruta}` | `X-Api-Key` | Imágenes de la biblioteca (con guardia anti-traversal). |
+| `POST /api/releases` | `X-Release-Publish-Key` | Importa desde CI un instalador y su manifiesto firmado; no lo activa. |
+| `GET /api/updates/assignment` | `X-Api-Key` | Devuelve al kiosco su versión objetivo, ventana y token de trabajo. |
+| `GET /api/updates/{id}/manifest` | API key + token de actualización | Manifiesto firmado ligado al trabajo. |
+| `GET /api/updates/{id}/download` | API key + token de actualización | Descarga reanudable del instalador desde la VPS. |
+| `GET /api/updates/{id}/authorize` | API key + token de actualización | Revalida justo antes de instalar que la release y la ventana siguen autorizadas. |
+| `POST /api/updates/{id}/status` | API key + token de actualización | Progreso, error y confirmación del runner privilegiado. |
 | `GET /api/installations/{id}/manifest` | API key + token de trabajo | Manifiesto inmutable ligado al equipo y paquete. |
 | `GET /api/installations/{id}/download` | API key + token de trabajo | Descarga privada con soporte de rangos. |
 | `POST /api/installations/{id}/status` | API key + token de trabajo | Progreso y resultado del agente. |
@@ -167,6 +181,7 @@ Bajo `DataDir` (`data/` por defecto):
 - `installers.json` + `install-jobs.json` — catálogo y últimos 500 trabajos de instalación.
 - `setup-installations.json` — últimas 500 sesiones de instalación inicial y sus resultados.
 - `maintenance-jobs.json` — últimos 500 trabajos de mantenimiento/desinstalación y su resultado.
+- `kiosk-updates.json` — releases de Kiosk, versión objetivo, ventana y trabajos de actualización.
 
 Bajo `AssetsDir` (`assets/` por defecto): `Brands/` y `SpecImages/` con las imágenes normalizadas de la
 biblioteca, más el marcador interno que evita resembrar imágenes borradas deliberadamente.
@@ -176,7 +191,12 @@ Bajo `InstallersDir` (`installers/` por defecto): binarios MSI/EXE privados, con
 Bajo `SetupDir` (`setups/` por defecto): el `Setup-EquipoClinicaPC-*.exe` interno y su
 `*.bundle.json`. El panel selecciona la versión válida más alta y nunca sirve un binario cuyo hash no coincida.
 
-Son ficheros JSON planos, sin base de datos. Para una copia de seguridad guarda `data/`, `assets/` e `installers/`.
+Bajo `UpdatesDir` (`updates/` por defecto): instaladores públicos inmutables importados por CI. Incluye esta
+carpeta en las copias de seguridad junto con `data/`, `assets/` e `installers/`.
+
+Son ficheros JSON planos, sin base de datos. Para una copia de seguridad guarda `data/`, `assets/`,
+`installers/`, `setups/` y `updates/`. El servidor conserva las diez releases más recientes (además de
+cualquier versión activa o todavía en instalación).
 
 <!-- SHOT (opcional): el panel con la carpeta de datos al lado, o un diagrama de despliegue VPS + kioscos -->
 
@@ -232,9 +252,50 @@ En el primer arranque con `ServerUrl`, el agente empareja ese origen HTTPS en
 instalado junto al agente. Si se migra el panel a otro dominio, un administrador debe detener el servicio,
 borrar ese valor y arrancar de nuevo el kiosko para realizar un nuevo emparejamiento.
 
+### Actualizaciones de Kiosk
+
+GitHub Actions compila y firma un manifiesto, publica la release como respaldo y la importa en la VPS. La
+release aparece en **Actualizaciones** y no afecta a la flota hasta pulsar **Activar en toda la flota**. Por
+defecto se instala entre las 04:00 y las 05:00, con hasta diez minutos de dispersión por equipo.
+
+Las releases son inmutables: el pipeline nunca sobrescribe assets de una versión existente. Si GitHub llega
+a publicar correctamente pero la VPS estaba temporalmente caída, ejecuta manualmente la acción
+**Retry VPS release import** indicando `X.Y.Z`; descargará esos mismos assets firmados y reintentará solo la
+importación, sin recompilar ni cambiar hashes.
+
+La firma usa ECDSA P-256. Genera el par una sola vez en una máquina segura:
+
+```bash
+openssl ecparam -name prime256v1 -genkey -noout -out kiosk-update-private.pem
+openssl ec -in kiosk-update-private.pem -pubout -out kiosk-update-public.pem
+```
+
+- Guarda la clave privada únicamente como `KIOSK_UPDATE_SIGNING_PRIVATE_KEY` en el environment protegido
+  `production` de GitHub.
+- Guarda la pública como `KIOSK_UPDATE_SIGNING_PUBLIC_KEY` y cópiala a
+  `/etc/kiosk-server/update-keys/production.pem`.
+- Configura las variables GitHub `KIOSK_UPDATE_SIGNING_KEY_ID=production` y `KIOSK_SERVER_URL`.
+- Configura el mismo secreto `KIOSK_RELEASE_PUBLISH_KEY` en GitHub y en la VPS.
+
+Para publicar, crea y sube un tag que coincida exactamente con la versión de los proyectos:
+
+```bash
+git tag v1.2.0
+git push origin v1.2.0
+```
+
+El primer `v1.2.0` es la release puente: los clientes 1.1.0 aún la reciben desde GitHub y, después del
+reinicio, pasan al flujo administrado. Comprueba en **Ordenadores** que todos reportan 1.2.0 antes de publicar
+la siguiente versión.
+
 ---
 
 ## Despliegue en Ubuntu 26.04 con Caddy
+
+Esta sección prepara la VPS por primera vez. Para actualizar una instalación
+existente desde Windows, usa `deploy-server-vps.ps1` como se explica en
+[ACTUALIZAR-PANEL-VPS.txt](ACTUALIZAR-PANEL-VPS.txt). Ese proceso conserva la
+versión anterior y la restaura si falla la comprobación de salud.
 
 El bundle es framework-dependent y requiere el runtime ASP.NET Core 10. En Ubuntu 26.04 está disponible
 directamente en el repositorio oficial de Ubuntu:
@@ -254,7 +315,9 @@ sudo install -d -o kiosk-server -g kiosk-server -m 750 /var/lib/kiosk-server/dat
 sudo install -d -o kiosk-server -g kiosk-server -m 750 /var/lib/kiosk-server/assets
 sudo install -d -o kiosk-server -g kiosk-server -m 750 /var/lib/kiosk-server/installers
 sudo install -d -o kiosk-server -g kiosk-server -m 750 /var/lib/kiosk-server/setups
+sudo install -d -o kiosk-server -g kiosk-server -m 750 /var/lib/kiosk-server/updates
 sudo install -d -o root -g root -m 700 /etc/kiosk-server
+sudo install -d -o root -g kiosk-server -m 750 /etc/kiosk-server/update-keys
 ```
 
 Sube por SFTP el contenido del paquete a `/home/ubuntu/kiosk-server-upload/` y colócalo en su ruta definitiva:

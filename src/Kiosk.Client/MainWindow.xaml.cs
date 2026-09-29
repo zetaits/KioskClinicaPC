@@ -80,6 +80,7 @@ namespace KioskClinicaPC
                 Dispatcher.InvokeAsync(() => { SystemPower.RelaunchApp(); ShutdownKiosk(); });
             _fleet.KioskUninstallAccepted += () =>
                 Dispatcher.InvokeAsync(() => { KioskManager.Release(); ShutdownKiosk(); });
+            _fleet.UpdateAvailableReceived += () => _ = UpdateService.CheckAndStageAsync(_settings);
 
             _hook = new KeyboardHook();
 
@@ -129,10 +130,9 @@ namespace KioskClinicaPC
             _fleet.Start();
 
 #if !DEBUG
-            // Auto-update: comprueba GitHub y deja la nueva versión lista en segundo plano. No
-            // bloquea ni puede tumbar el kiosko (todo va envuelto en try/catch). La aplica luego
-            // la tarea SYSTEM de madrugada.
-            _ = UpdateService.CheckAndStageAsync();
+            // La VPS decide la versión objetivo. El agente SYSTEM la prepara y el runner la aplica
+            // en la ventana de mantenimiento; también se comprueba de nuevo cada 15 minutos.
+            UpdateService.Start(_settings);
 #endif
         }
 

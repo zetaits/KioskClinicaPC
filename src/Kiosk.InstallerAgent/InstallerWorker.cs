@@ -29,6 +29,7 @@ public sealed class InstallerWorker : BackgroundService
     private readonly Channel<InstallerAgentRequest> _queue = Channel.CreateBounded<InstallerAgentRequest>(1);
     private int _busy;
     private readonly string _workRoot = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "KioskClinicaPC", "install-jobs");
+    private readonly string _updateRoot = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "KioskClinicaPC", "kiosk-updates");
 
     public InstallerWorker(ILogger<InstallerWorker> log) { _log = log; Directory.CreateDirectory(_workRoot); }
 
@@ -72,7 +73,7 @@ public sealed class InstallerWorker : BackgroundService
                         if (!response.Accepted) Interlocked.Exchange(ref _busy, 0);
                     }
                 }
-                else if (request == null || !ValidInstall(request))
+                else if (request == null || (!ValidInstall(request) && !ValidKioskUpdate(request)))
                     response = new() { Accepted = false, AgentVersion = Version, Error = "Petición incompleta." };
                 else if (Interlocked.CompareExchange(ref _busy, 1, 0) != 0)
                     response = new() { Accepted = false, AgentVersion = Version, Error = "Ya hay una instalación activa." };
@@ -131,6 +132,11 @@ public sealed class InstallerWorker : BackgroundService
 
     private async Task Process(InstallerAgentRequest request, CancellationToken serviceCt)
     {
+        if (request.Operation == "stage-kiosk-update")
+        {
+            await StageKioskUpdate(request, serviceCt);
+            return;
+        }
         string jobId = request.JobId!;
         using var http = CreateHttp(request.ServerUrl!, request.ApiKey, request.Token!);
         try
@@ -203,6 +209,105 @@ public sealed class InstallerWorker : BackgroundService
         return r.Operation == "install" && TrustOrValidateOrigin(r.ServerUrl, allowEnrollment: false, out _) &&
             IsHex(r.DeviceId, 32) && IsHex(r.JobId, 32) && IsHex(r.Token, 64);
     }
+
+    private static bool ValidKioskUpdate(InstallerAgentRequest r)
+    {
+        KioskUpdateAssignment? a = r.UpdateAssignment;
+        return r.Operation == "stage-kiosk-update" && TrustOrValidateOrigin(r.ServerUrl, allowEnrollment: false, out _) &&
+            a != null && IsHex(a.DeviceId, 32) && IsHex(a.JobId, 32) && IsHex(a.Token, 64) &&
+            r.DeviceId == a.DeviceId && KioskReleaseSecurity.TryParseVersion(a.Version, out _);
+    }
+
+    private async Task StageKioskUpdate(InstallerAgentRequest request, CancellationToken ct)
+    {
+        KioskUpdateAssignment assignment = request.UpdateAssignment!;
+        using var http = CreateUpdateHttp(request.ServerUrl!, request.ApiKey, assignment.Token);
+        string folder = Path.Combine(_updateRoot, assignment.JobId);
+        try
+        {
+            if (Directory.Exists(folder)) TryDeleteDirectory(folder);
+            CreateProtectedDirectory(folder);
+            await ReportUpdate(http, assignment, KioskUpdateState.Downloading, 0, null, "Descargando actualización.", ct);
+
+            using var manifestResponse = await http.GetAsync($"api/updates/{assignment.JobId}/manifest", ct);
+            manifestResponse.EnsureSuccessStatusCode();
+            byte[] manifestBytes = await manifestResponse.Content.ReadAsByteArrayAsync(ct);
+            string signature = manifestResponse.Headers.TryGetValues("X-Update-Signature", out var values)
+                ? values.Single() : throw new InvalidDataException("El servidor no entregó la firma del manifiesto.");
+            var unsigned = JsonSerializer.Deserialize<KioskReleaseManifest>(manifestBytes, Json)
+                ?? throw new InvalidDataException("Manifiesto vacío.");
+            KioskReleaseSecurity.ValidateManifest(unsigned); // valida KeyId antes de usarlo como nombre de fichero
+            string appRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, ".."));
+            string runner = Path.Combine(AppContext.BaseDirectory, "Update", "KioskUpdateRunner.exe");
+            if (!File.Exists(runner)) throw new FileNotFoundException("El runner de actualizaciones no está instalado.", runner);
+            string keySource = Path.Combine(appRoot, "update-keys", unsigned.KeyId + ".pem");
+            if (!File.Exists(keySource)) throw new InvalidDataException($"La clave de actualización '{unsigned.KeyId}' no está instalada.");
+            string publicKey = await File.ReadAllTextAsync(keySource, ct);
+            KioskReleaseManifest manifest = KioskReleaseSecurity.ParseAndVerify(manifestBytes, signature, publicKey);
+            if (manifest.Version != assignment.Version) throw new InvalidDataException("La release no coincide con el trabajo asignado.");
+            if (!KioskReleaseSecurity.TryParseVersion(Version, out var agentVersion) ||
+                !KioskReleaseSecurity.TryParseVersion(manifest.MinimumUpdaterVersion, out var minimum) || agentVersion < minimum)
+                throw new InvalidDataException($"El agente {Version} no cumple la versión mínima {manifest.MinimumUpdaterVersion}.");
+
+            string setupPath = Path.Combine(folder, manifest.FileName);
+            try
+            {
+                await PackageInstallation.DownloadResumable(http, $"api/updates/{assignment.JobId}/download", setupPath,
+                    manifest.SizeBytes, p => ReportUpdate(http, assignment, KioskUpdateState.Downloading, p, null, null, ct), ct);
+            }
+            catch when (!string.IsNullOrWhiteSpace(manifest.GitHubFallbackUrl))
+            {
+                _log.LogWarning("La descarga desde la VPS falló; usando el respaldo firmado de GitHub para {Version}.", manifest.Version);
+                using var fallback = new HttpClient { Timeout = TimeSpan.FromMinutes(20) };
+                await PackageInstallation.DownloadResumable(fallback, manifest.GitHubFallbackUrl!, setupPath,
+                    manifest.SizeBytes, _ => Task.CompletedTask, ct);
+            }
+            if (!KioskReleaseSecurity.Sha256(setupPath).Equals(manifest.Sha256, StringComparison.OrdinalIgnoreCase))
+                throw new CryptographicException("El SHA-256 del instalador descargado no coincide.");
+
+            string manifestPath = Path.Combine(folder, "manifest.json");
+            string signaturePath = Path.Combine(folder, "manifest.sig");
+            string keyPath = Path.Combine(folder, unsigned.KeyId + ".pem");
+            await File.WriteAllBytesAsync(manifestPath, manifestBytes, ct);
+            await File.WriteAllTextAsync(signaturePath, signature, ct);
+            File.Copy(keySource, keyPath, true);
+            string requestPath = Path.Combine(folder, "request.json");
+            await File.WriteAllTextAsync(requestPath, JsonSerializer.Serialize(new KioskUpdateRunnerRequest
+            {
+                Assignment = assignment, Manifest = manifest, ManifestPath = manifestPath, SignaturePath = signaturePath,
+                SetupPath = setupPath, PublicKeyPath = keyPath, ServerUrl = request.ServerUrl!, ApiKey = request.ApiKey
+            }, Json), ct);
+            await ReportUpdate(http, assignment, KioskUpdateState.Staged, 100, null, "Actualización verificada y preparada.", ct);
+            await ReportUpdate(http, assignment, KioskUpdateState.WaitingWindow, 100, null,
+                $"Esperando a {assignment.InstallAfterUtc:u}.", ct);
+        }
+        catch (Exception ex)
+        {
+            _log.LogError(ex, "Falló la preparación de la actualización {JobId}.", assignment.JobId);
+            await TryReportUpdate(http, assignment, KioskUpdateState.Failed, null, null, ex.Message, CancellationToken.None);
+            TryDeleteDirectory(folder);
+        }
+    }
+
+    private static HttpClient CreateUpdateHttp(string serverUrl, string? apiKey, string token)
+    {
+        var http = new HttpClient { Timeout = TimeSpan.FromMinutes(20), BaseAddress = new Uri(serverUrl.TrimEnd('/') + "/") };
+        if (!string.IsNullOrWhiteSpace(apiKey)) http.DefaultRequestHeaders.Add("X-Api-Key", apiKey);
+        http.DefaultRequestHeaders.Add("X-Update-Token", token);
+        return http;
+    }
+
+    private static async Task ReportUpdate(HttpClient http, KioskUpdateAssignment assignment, KioskUpdateState state,
+        int? progress, int? exitCode, string? message, CancellationToken ct)
+    {
+        using var response = await http.PostAsJsonAsync($"api/updates/{assignment.JobId}/status", new KioskUpdateStatusUpdate
+        { DeviceId = assignment.DeviceId, State = state, ProgressPercent = progress, ExitCode = exitCode, Message = message }, Json, ct);
+        response.EnsureSuccessStatusCode();
+    }
+
+    private static async Task TryReportUpdate(HttpClient http, KioskUpdateAssignment assignment, KioskUpdateState state,
+        int? progress, int? exitCode, string? message, CancellationToken ct)
+    { try { await ReportUpdate(http, assignment, state, progress, exitCode, message, ct); } catch { } }
 
     private InstallerAgentResponse StartKioskUninstall(InstallerAgentRequest request, ClientIdentity identity)
     {

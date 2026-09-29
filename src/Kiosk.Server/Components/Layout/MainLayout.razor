@@ -42,6 +42,10 @@
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16v13H4zM8 7V4h8v3M9 12h6M12 9v6" /></svg>
                         <span class="label">Aplicaciones</span>
                     </NavLink>
+                    <NavLink href="/actualizaciones" @onclick="CloseNav">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v12M7 10l5 5 5-5M4 20h16" /></svg>
+                        <span class="label">Actualizaciones</span>
+                    </NavLink>
 
                     <div class="nav-section">// Contenido</div>
                     <NavLink href="/imagenes" @onclick="CloseNav">
@@ -156,6 +160,7 @@
             "/ordenadores" => ("// Flota · tiempo real", "Ordenadores de la tienda"),
             "/eventos" => ("// Campañas programadas", "Eventos"),
             "/aplicaciones" => ("// Despliegue remoto", "Aplicaciones"),
+            "/actualizaciones" => ("// Versiones de Kiosk", "Actualizaciones"),
             "/imagenes" => ("// Biblioteca de assets", "Imágenes y marcas"),
             "/contenido" => ("// Contenido compartido", "Contenido de los kioscos"),
             "/instalador" => ("// Preparación de equipos", "Instalador"),

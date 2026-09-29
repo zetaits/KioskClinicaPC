@@ -1,0 +1,152 @@
+@page "/actualizaciones"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@implements IDisposable
+@using KioskClinicaPC.Core.Sync
+@inject KioskUpdateStore UpdateStore
+@inject FleetRegistry Fleet
+@inject IHubContext<FleetHub> Hub
+
+<section class="card">
+    <div class="card-head">
+        <div><h2>Versiones de Kiosk</h2><p class="muted section-copy">Las releases llegan firmadas desde CI y requieren aprobación.</p></div>
+        <span class="mono-note">Activa: @(UpdateStore.ActiveVersion is null ? "ninguna" : $"v{UpdateStore.ActiveVersion}")</span>
+    </div>
+    @if (!Releases.Any())
+    {
+        <div class="empty-state compact"><div class="empty-icon">↻</div><div><b>Sin releases importadas</b><p>Publica un tag válido desde GitHub Actions.</p></div></div>
+    }
+    else
+    {
+        <div class="job-list">
+            @foreach (KioskReleaseRecord release in Releases)
+            {
+                <article class="job-row">
+                    <div class="job-title"><b>v@release.Version</b><span>@release.FileName · @Size(release.SizeBytes)</span></div>
+                    <span class="badge @ReleaseCss(release.State)">@ReleaseLabel(release.State)</span>
+                    <div class="job-progress"><small>SHA-256 @release.Sha256[..12]… · clave @release.KeyId<br />@release.ReleaseNotes</small></div>
+                    <div class="actions">
+                        @if (release.State is not (KioskReleaseState.Active or KioskReleaseState.Withdrawn))
+                        { <button class="primary" @onclick="() => AskActivate(release)">Activar en toda la flota</button> }
+                        @if (release.State != KioskReleaseState.Withdrawn)
+                        { <button class="danger" @onclick="() => AskWithdraw(release)">Retirar</button> }
+                    </div>
+                    <time>@UpdateStore.StoreLocalTime(release.PublishedAtUtc).ToString("dd/MM/yyyy HH:mm")</time>
+                </article>
+            }
+        </div>
+    }
+</section>
+
+<section class="card">
+    <div class="card-head"><div><h2>Ventana de mantenimiento</h2><p class="muted section-copy">Hora local de la tienda; los equipos reciben hasta diez minutos de dispersión.</p></div></div>
+    <div class="deploy-toolbar">
+        <div class="field"><label class="field-label">Desde</label><input type="time" @bind="_windowStart" /></div>
+        <div class="field"><label class="field-label">Hasta</label><input type="time" @bind="_windowEnd" /></div>
+        <button class="primary" @onclick="SaveWindow">Guardar horario</button>
+    </div>
+</section>
+
+<section class="card">
+    <div class="card-head"><div><h2>Estado del despliegue</h2><p class="muted section-copy">El éxito se confirma cuando el equipo vuelve a reportar la versión objetivo.</p></div><span class="mono-note">@Jobs.Count trabajos</span></div>
+    @if (!Jobs.Any())
+    {
+        <div class="empty-state compact"><div class="empty-icon">○</div><div><b>Sin despliegues</b><p>Activa una release para crear las asignaciones.</p></div></div>
+    }
+    else
+    {
+        <div class="job-list">
+            @foreach (KioskUpdateJob job in Jobs)
+            {
+                <article class="job-row">
+                    <div class="job-title"><b>@job.DeviceName</b><span>@job.FromVersion → @job.TargetVersion · @Operation(job.Operation)</span></div>
+                    <span class="badge @JobCss(job.State)">@JobLabel(job.State)</span>
+                    <div class="job-progress">
+                        <div class="track"><span style="@($"width:{job.ProgressPercent ?? (job.IsTerminal ? 100 : 8)}%")"></span></div>
+                        <small>@(job.Message ?? $"Ventana: {UpdateStore.StoreLocalTime(job.InstallAfterUtc):dd/MM HH:mm}–{UpdateStore.StoreLocalTime(job.InstallBeforeUtc):HH:mm}")</small>
+                    </div>
+                    <div class="actions">
+                        @if (!job.IsTerminal && job.State < KioskUpdateState.Installing)
+                        { <button @onclick="() => RunNow(job)">Actualizar ahora</button> }
+                        @if (job.State == KioskUpdateState.Failed)
+                        { <button @onclick="() => Retry(job)">Reintentar</button> }
+                    </div>
+                    <time>@UpdateStore.StoreLocalTime(job.UpdatedAtUtc).ToString("dd/MM HH:mm")</time>
+                </article>
+            }
+        </div>
+    }
+</section>
+
+<ConfirmDialog Model="_confirm" OnClose="() => _confirm = null" />
+<Toast Message="@_toast" IsError="@_toastError" />
+
+@code {
+    private TimeOnly? _windowStart = new(4, 0);
+    private TimeOnly? _windowEnd = new(5, 0);
+    private string? _toast;
+    private bool _toastError;
+    private ConfirmDialog.Options? _confirm;
+    private IReadOnlyList<KioskReleaseRecord> Releases => UpdateStore.Releases();
+    private IReadOnlyList<KioskUpdateJob> Jobs => UpdateStore.RecentJobs();
+
+    protected override void OnInitialized()
+    {
+        _windowStart = TimeOnly.FromTimeSpan(UpdateStore.WindowStart);
+        _windowEnd = TimeOnly.FromTimeSpan(UpdateStore.WindowEnd);
+        UpdateStore.Changed += Refresh;
+        Fleet.Changed += Refresh;
+    }
+    public void Dispose() { UpdateStore.Changed -= Refresh; Fleet.Changed -= Refresh; }
+    private void Refresh() => InvokeAsync(StateHasChanged);
+
+    private void AskActivate(KioskReleaseRecord release) => _confirm = new()
+    {
+        Title = UpdateStore.ActiveVersion == null ? $"Activar v{release.Version}" : $"Cambiar a v{release.Version}",
+        Body = $"Se asignará v{release.Version} a toda la flota. Los equipos la instalarán durante la ventana configurada.",
+        Label = "Activar en toda la flota", Confirmed = EventCallback.Factory.Create(this, () => Activate(release))
+    };
+    private async Task Activate(KioskReleaseRecord release)
+    {
+        _confirm = null;
+        try
+        {
+            UpdateStore.Activate(release.Version, Fleet.Devices);
+            await Hub.Clients.All.SendAsync("UpdateAvailable");
+            _toast = $"v{release.Version} asignada a toda la flota."; _toastError = false;
+        }
+        catch (Exception ex) { _toast = ex.Message; _toastError = true; }
+    }
+    private void AskWithdraw(KioskReleaseRecord release) => _confirm = new()
+    {
+        Title = $"Retirar v{release.Version}", Body = "Se cancelarán los trabajos que todavía no hayan empezado a instalar.",
+        Label = "Retirar release", Confirmed = EventCallback.Factory.Create(this, () => Withdraw(release))
+    };
+    private void Withdraw(KioskReleaseRecord release)
+    { UpdateStore.Withdraw(release.Version); _confirm = null; _toast = "Release retirada."; _toastError = false; }
+    private void SaveWindow()
+    {
+        if (_windowStart is not { } startValue || _windowEnd is not { } endValue)
+        { _toast = "Horario no válido."; _toastError = true; return; }
+        try { UpdateStore.SetWindow(startValue.ToTimeSpan(), endValue.ToTimeSpan()); _toast = "Ventana de mantenimiento guardada."; _toastError = false; }
+        catch (Exception ex) { _toast = ex.Message; _toastError = true; }
+    }
+    private async Task RunNow(KioskUpdateJob job)
+    { UpdateStore.RunNow(job.DeviceId); await Hub.Clients.All.SendAsync("UpdateAvailable"); _toast = $"Actualización inmediata solicitada para {job.DeviceName}."; _toastError = false; }
+    private async Task Retry(KioskUpdateJob job)
+    { UpdateStore.Retry(job.DeviceId, Fleet.Find(job.DeviceId)?.AppVersion ?? job.FromVersion, job.DeviceName); await Hub.Clients.All.SendAsync("UpdateAvailable"); _toast = $"Reintento preparado para {job.DeviceName}."; _toastError = false; }
+
+    private static string Size(long n) => n >= 1024 * 1024 ? $"{n / 1024d / 1024d:N1} MB" : $"{n / 1024d:N0} KB";
+    private static string ReleaseLabel(KioskReleaseState s) => s switch { KioskReleaseState.Active => "Activa", KioskReleaseState.Withdrawn => "Retirada", _ => "Disponible" };
+    private static string ReleaseCss(KioskReleaseState s) => s switch { KioskReleaseState.Active => "ok", KioskReleaseState.Withdrawn => "off", _ => "accent" };
+    private static string Operation(KioskUpdateOperation o) => o == KioskUpdateOperation.Rollback ? "rollback" : "actualización";
+    private static string JobLabel(KioskUpdateState s) => s switch
+    {
+        KioskUpdateState.Assigned => "Asignada", KioskUpdateState.Downloading => "Descargando",
+        KioskUpdateState.Staged => "Preparada", KioskUpdateState.WaitingWindow => "Esperando ventana",
+        KioskUpdateState.Installing => "Instalando", KioskUpdateState.AwaitingRestart => "Confirmando reinicio",
+        KioskUpdateState.Succeeded => "Instalada", _ => "Error"
+    };
+    private static string JobCss(KioskUpdateState s) => s switch
+    { KioskUpdateState.Succeeded => "ok", KioskUpdateState.Failed => "off", KioskUpdateState.AwaitingRestart => "warn", _ => "accent" };
+}

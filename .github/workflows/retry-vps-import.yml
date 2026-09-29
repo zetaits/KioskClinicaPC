@@ -1,0 +1,52 @@
+name: Retry VPS release import
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Existing immutable release version (X.Y.Z)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  import-existing-release:
+    runs-on: windows-latest
+    environment: production
+    steps:
+      - name: Download the exact signed GitHub assets and import them
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          KIOSK_RELEASE_PUBLISH_KEY: ${{ secrets.KIOSK_RELEASE_PUBLISH_KEY }}
+          KIOSK_SERVER_URL: ${{ vars.KIOSK_SERVER_URL }}
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          $version = $env:RELEASE_VERSION
+          if ($version -notmatch '^\d+\.\d+\.\d+$') { throw "La versión debe tener formato X.Y.Z." }
+          New-Item -ItemType Directory -Path release-import | Out-Null
+          gh release download "v$version" --repo $env:GITHUB_REPOSITORY --dir release-import
+          if ($LASTEXITCODE -ne 0) { throw "No se pudo descargar la release v$version." }
+
+          $manifestPath = Join-Path release-import "kiosk-release-$version.json"
+          $signaturePath = "$manifestPath.sig"
+          if (-not (Test-Path -LiteralPath $manifestPath) -or -not (Test-Path -LiteralPath $signaturePath)) {
+            throw "La release no contiene su manifiesto firmado."
+          }
+          $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
+          if ($manifest.version -ne $version -or [IO.Path]::GetFileName($manifest.fileName) -ne $manifest.fileName) {
+            throw "El manifiesto no corresponde con la versión solicitada."
+          }
+          $setupPath = Join-Path release-import $manifest.fileName
+          if (-not (Test-Path -LiteralPath $setupPath)) { throw "Falta el instalador indicado por el manifiesto." }
+
+          $headers = @{ 'X-Release-Publish-Key' = $env:KIOSK_RELEASE_PUBLISH_KEY }
+          $form = @{
+            manifest = Get-Item -LiteralPath $manifestPath
+            signature = Get-Content -LiteralPath $signaturePath -Raw
+            setup = Get-Item -LiteralPath $setupPath
+          }
+          Invoke-RestMethod -Method Post -Uri "$($env:KIOSK_SERVER_URL.TrimEnd('/'))/api/releases" `
+            -Headers $headers -Form $form | Out-Null

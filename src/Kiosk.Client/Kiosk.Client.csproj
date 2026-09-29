@@ -13,7 +13,7 @@
     <ApplicationIcon>Assets/clinicapc-logo.ico</ApplicationIcon>
     <!-- Version = fuente unica. La lee la app en runtime (Assembly version) para el auto-update,
          y build-installer.ps1 la pasa a ISCC (/DMyAppVersion) para que el Setup cuadre. -->
-    <Version>1.1.0</Version>
+    <Version>1.2.0</Version>
 </PropertyGroup>
 
     <!-- Modelos de contenido compartidos con el servidor. -->

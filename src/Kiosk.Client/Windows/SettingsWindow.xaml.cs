@@ -394,21 +394,21 @@ namespace KioskClinicaPC.Windows
             if (btn != null) { btn.IsEnabled = false; btn.Content = "Comprobando…"; }
             try
             {
-                var result = await UpdateService.CheckAndStageAsync();
+                var result = await UpdateService.CheckAndStageAsync(_settings);
                 switch (result.Outcome)
                 {
                     case UpdateService.UpdateOutcome.UpToDate:
                         KioskDialog.Alert(this, "Actualizaciones",
-                            $"Ya tienes la última versión instalada (v{UpdateService.CurrentVersion}).");
+                            $"No hay una actualización aprobada para este equipo (v{UpdateService.CurrentVersion}).");
                         break;
                     case UpdateService.UpdateOutcome.Staged:
-                        KioskDialog.Alert(this, "Actualización lista",
-                            $"Se descargó la versión {result.LatestVersion} y se aplicará automáticamente esta " +
-                            "madrugada (el equipo se reiniciará). Para aplicarla ahora, reinicia el PC.");
+                        KioskDialog.Alert(this, "Actualización asignada",
+                            $"La versión {result.LatestVersion} se está preparando y se instalará durante la " +
+                            "ventana definida en el servidor. El equipo se reiniciará al terminar.");
                         break;
                     default:
                         KioskDialog.Alert(this, "Actualizaciones",
-                            "No se pudo comprobar si hay actualizaciones. Revisa la conexión a internet.", danger: true);
+                            $"No se pudo comprobar si hay actualizaciones. {result.Error}", danger: true);
                         break;
                 }
             }

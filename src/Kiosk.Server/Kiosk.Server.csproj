@@ -15,8 +15,8 @@
   <!-- Estado generado en ejecución. Nunca debe filtrarse al bundle (puede contener hashes, actividad y
        contenido real de una tienda). Producción lo guarda fuera de /opt, bajo /var/lib/kiosk-server. -->
   <ItemGroup>
-    <Content Remove="data\**;assets\**;installers\**;setups\**" />
-    <None Remove="data\**;assets\**;installers\**;setups\**" />
+    <Content Remove="data\**;assets\**;installers\**;setups\**;updates\**" />
+    <None Remove="data\**;assets\**;installers\**;setups\**;updates\**" />
   </ItemGroup>
 
   <ItemGroup>

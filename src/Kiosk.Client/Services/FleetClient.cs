@@ -52,6 +52,7 @@ namespace KioskClinicaPC.Services
 
         /// <summary>El runner privilegiado aceptó una autodesinstalación; la UI debe cerrarse limpiamente.</summary>
         public event Action? KioskUninstallAccepted;
+        public event Action? UpdateAvailableReceived;
 
         public FleetClient(string? serverUrl, string? apiKey, string deviceId, string deviceName, string settingsPath)
         {
@@ -80,6 +81,7 @@ namespace KioskClinicaPC.Services
                 .Build();
 
             _connection.On<FleetCommand>("Command", HandleCommand);
+            _connection.On("UpdateAvailable", () => UpdateAvailableReceived?.Invoke());
             // Al reconectar, re-registrar de inmediato (el servidor pudo reiniciar y perder el estado).
             _connection.Reconnected += async _ => await SafeSend("Register");
             _connection.Closed += async _ =>

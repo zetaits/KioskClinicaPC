@@ -110,6 +110,7 @@ namespace KioskClinicaPC.Core.Sync
         public string? Token { get; set; }
         public int? KioskProcessId { get; set; }
         public string? UserDataDirectory { get; set; }
+        public KioskUpdateAssignment? UpdateAssignment { get; set; }
     }
 
     public sealed class InstallerAgentResponse
