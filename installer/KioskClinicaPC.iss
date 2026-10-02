@@ -406,9 +406,9 @@ begin
   if (NormalizedServerUrl() = '') or (ProvisionedServerApiKey = '') then
     exit;
 
-  { Se escribe en Program Files. El kiosco, ya bajo el usuario interactivo correcto, lo aplica solo si
-    todavía no existe su KioskSettings.json. Así una elevación con otra cuenta admin no configura el
-    perfil equivocado y los upgrades nunca pisan contraseña, identidad ni ajustes existentes. }
+  { Se escribe en Program Files. El kiosco, ya bajo el usuario interactivo correcto, lo aplica
+    si su perfil aún no tiene servidor. Así una elevación con otra cuenta admin no configura el
+    perfil equivocado y los upgrades conservan contraseña, identidad y demás ajustes. }
   ProvisioningPath := ExpandConstant('{app}\KioskProvisioning.json');
   Json := '{' + #13#10 +
     '  "ServerUrl": "' + JsonEscape(NormalizedServerUrl()) + '",' + #13#10 +
@@ -460,10 +460,10 @@ begin
   end;
 
   if TestProvisionedServer(Detail) then
-    MsgBox('El kiosco se ha configurado y conectado correctamente al servidor.' + #13#10 +
+    MsgBox('El servidor responde. El kiosco aplicará estos datos al iniciarse si aún no tiene servidor configurado.' + #13#10 +
       NormalizedServerUrl(), mbInformation, MB_OK)
   else
-    MsgBox('El kiosco se ha configurado, pero no ha podido verificar la conexión con el servidor.' + #13#10#13#10 +
+    MsgBox('El instalador incluye los datos del servidor, pero no ha podido verificar la conexión.' + #13#10#13#10 +
       Detail + #13#10#13#10 +
       'La instalación continuará y el kiosco volverá a intentarlo automáticamente al iniciarse.',
       mbError, MB_OK);

@@ -24,16 +24,9 @@ En desarrollo (arranca en `http://localhost:5xxx`, lo imprime en consola):
 dotnet run --project src/Kiosk.Server
 ```
 
-Para desplegar, genera el bundle publicable y cópialo al host (mini-PC de la trastienda o un VPS barato):
+La VPS de producción se actualiza con el [procedimiento único](ACTUALIZAR-PANEL-VPS.txt). El host necesita el runtime ASP.NET Core 10 y ejecuta el bundle como servicio `systemd`.
 
-```
-dotnet publish src/Kiosk.Server -c Release -o publish
-```
-
-El host solo necesita el **runtime** de ASP.NET Core 10 (no el SDK). Arranca con `dotnet Kiosk.Server.dll`.
-En Linux conviene ponerlo como servicio (`systemd`) o en un contenedor; en Windows, como servicio o tarea.
-
-Comprobación de vida (sin auth): `GET /health` → `{"status":"ok"}`.
+Sondas sin auth: `GET /health` comprueba que responde el proceso; `GET /health/ready` comprueba además el estado persistente. Ambas devuelven `{"status":"ok"}` cuando pasan.
 La ficha pública que abren los QR queda incluida en el mismo bundle: `GET /ficha/`.
 
 ---
@@ -110,7 +103,7 @@ HTTP queda limitado a `localhost` para desarrollo.
 
 En cada kiosko: **Ajustes → servidor** (o lo rellena el instalador del cliente). Escribe:
 
-- `ServerUrl` — la URL pública del servidor (p.ej. `https://panel.mitienda.com`).
+- `ServerUrl` — la URL pública del servidor: `https://panel.clinicapc.es`.
 - `ServerApiKey` — la misma `ApiKey` del servidor.
 
 Se guardan en `KioskSettings.json` del cliente. Con `ServerUrl` **vacío**, el kiosko vuelve al modo local puro.
@@ -121,7 +114,7 @@ Para generar un instalador ya provisionado, sin pedir estos datos al encargado d
 
 ```powershell
 $env:KIOSK_SERVER_API_KEY = '<clave de 64 caracteres>'
-.\build-installer.ps1 -ServerUrl 'https://panel.mitienda.com'
+.\build-installer.ps1 -ServerUrl 'https://panel.clinicapc.es'
 Remove-Item Env:KIOSK_SERVER_API_KEY
 ```
 
@@ -137,6 +130,7 @@ contraseña, identidad y ajustes existentes, incluso si el UAC se aprobó con ot
 | Ruta | Auth | Qué hace |
 |---|---|---|
 | `GET /health` | — | Sonda de vida. |
+| `GET /health/ready` | — | Sonda de contenido y datos persistentes. |
 | `GET /ficha/` | — | Aplicación autocontenida que abre el QR y genera el PDF en el móvil. |
 | `GET /api/config` | `X-Api-Key` | Contenido **efectivo** (base + evento vigente) que consumen los kioscos. |
 | `GET /api/config/version` | `X-Api-Key` | Hash conjunto de contenido e imágenes; el cliente lo sondea para detectar cambios. |
@@ -238,14 +232,15 @@ durante el build interno:
 ```powershell
 $env:KIOSK_SERVER_API_KEY = '<api key de 64 hex>'
 $env:KIOSK_INITIAL_SETUP_KEY = '<setup key distinta de 64 hex>'
-.\build-installer.ps1 -ServerUrl 'https://panel.mitienda.com'
+.\build-installer.ps1 -ServerUrl 'https://panel.clinicapc.es'
 Remove-Item Env:KIOSK_SERVER_API_KEY, Env:KIOSK_INITIAL_SETUP_KEY
 ```
 
-El build genera dos variantes. `Setup-KioskClinicaPC-*` no contiene secretos y es la única que puede
-publicarse para auto-update. Copia `Setup-EquipoClinicaPC-*.exe` y su `*.bundle.json` a `SetupDir`; no copies
-solo uno de los dos. Rotar la clave invalida la descarga del pack en Setups internos antiguos, aunque estos
-siguen pudiendo instalar Kiosk.
+El build genera dos variantes. `Setup-KioskClinicaPC-*` se publica para auto-update y contiene
+la `ApiKey` de la flota para conectar kioscos nuevos y anteriores sin servidor; cualquiera que
+descargue la release puede extraerla. `Setup-EquipoClinicaPC-*` añade la clave limitada del pack:
+copia su `.exe` y `*.bundle.json` a `SetupDir`, nunca al release público. Rotar la clave del pack
+invalida su descarga en Setups internos antiguos, aunque estos siguen pudiendo instalar Kiosk.
 
 En el primer arranque con `ServerUrl`, el agente empareja ese origen HTTPS en
 `HKLM\SOFTWARE\ClinicaPC\Kiosk\InstallerServerUrl`; además, el pipe solo acepta al `KioskClinicaPC.exe`
@@ -274,8 +269,9 @@ openssl ec -in kiosk-update-private.pem -pubout -out kiosk-update-public.pem
   `production` de GitHub.
 - Guarda la pública como `KIOSK_UPDATE_SIGNING_PUBLIC_KEY` y cópiala a
   `/etc/kiosk-server/update-keys/production.pem`.
-- Configura las variables GitHub `KIOSK_UPDATE_SIGNING_KEY_ID=production` y `KIOSK_SERVER_URL`.
+- Configura la variable GitHub `KIOSK_UPDATE_SIGNING_KEY_ID=production`. Los workflows usan `https://panel.clinicapc.es` para publicar e importar releases.
 - Configura el mismo secreto `KIOSK_RELEASE_PUBLISH_KEY` en GitHub y en la VPS.
+- Configura el secreto GitHub `KIOSK_SERVER_API_KEY` en el entorno `production` con el mismo valor que `Kiosk__ApiKey` de la VPS. El workflow falla si falta; no guardes la clave en Git.
 
 Para publicar, crea y sube un tag que coincida exactamente con la versión de los proyectos:
 
@@ -284,9 +280,14 @@ git tag v1.2.0
 git push origin v1.2.0
 ```
 
-El primer `v1.2.0` es la release puente: los clientes 1.1.0 aún la reciben desde GitHub y, después del
-reinicio, pasan al flujo administrado. Comprueba en **Ordenadores** que todos reportan 1.2.0 antes de publicar
-la siguiente versión.
+`v1.2.0` es la release puente. Los kioscos antiguos con el actualizador de GitHub descargan
+el instalador público y lo aplican con su tarea programada. Al arrancar, la nueva versión rellena
+`ServerUrl` y `ServerApiKey` **solo si ambos estaban vacíos**; conserva contraseña, identidad y
+ajustes locales. Los perfiles que aún usan la política de contraseña antigua deben renovarla
+en el primer arranque; el kiosco se registra después de completar ese paso. Comprueba en
+**Ordenadores** que aparecen antes de gestionar sus siguientes
+actualizaciones desde **Actualizaciones**. Un equipo sin el actualizador antiguo o sin acceso a
+GitHub necesita instalar la versión nueva encima manualmente, sin desinstalar la anterior.
 
 ---
 
@@ -332,8 +333,7 @@ sudo nano /etc/kiosk-server/kiosk-server.env
 ```
 
 Genera dos secretos **distintos** con `openssl rand -hex 32`, guárdalos en un gestor de contraseñas y
-sustituye los marcadores del fichero. En `AllowedHosts`, sustituye solo `panel.ejemplo.com` por el dominio
-real y conserva `;localhost;127.0.0.1` para la sonda local. Arranca:
+sustituye los marcadores del fichero. `AllowedHosts` incluye el dominio público, el host técnico y loopback para la sonda local. Arranca:
 
 ```bash
 sudo systemctl daemon-reload
@@ -344,9 +344,7 @@ curl --fail http://127.0.0.1:5080/health
 
 La sonda debe devolver `{"status":"ok"}`. Si no, revisa `sudo journalctl -u kiosk-server -n 100 --no-pager`.
 
-Instala Caddy desde su repositorio oficial, copia `deploy/Caddyfile.example` a `/etc/caddy/Caddyfile`, cambia el
-dominio y valida antes de recargar. Caddy obtiene y renueva HTTPS automáticamente; `reverse_proxy` soporta
-WebSockets sin reglas adicionales.
+Instala Caddy desde su repositorio oficial. La plantilla `deploy/ubuntu/Caddyfile.example` se incluye en el bundle como `deploy/Caddyfile.example`; cópiala a `/etc/caddy/Caddyfile` y valida antes de recargar. Sirve `panel.clinicapc.es` y el host técnico. Caddy obtiene y renueva HTTPS automáticamente; `reverse_proxy` soporta WebSockets.
 
 ```bash
 sudo apt install -y debian-keyring debian-archive-keyring apt-transport-https curl

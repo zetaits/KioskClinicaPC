@@ -6,7 +6,7 @@
 #       .\build-installer.ps1 -Publish        (ademas crea el GitHub Release vX.Y.Z)
 param(
     [string]$Version,
-    [string]$ServerUrl = "https://vps-9c7061ff.vps.ovh.net",
+    [string]$ServerUrl = "https://panel.clinicapc.es",
     [string]$ServerApiKey = $env:KIOSK_SERVER_API_KEY,
     [string]$InitialSetupKey = $env:KIOSK_INITIAL_SETUP_KEY,
     [string]$SigningKeyId = $env:KIOSK_UPDATE_SIGNING_KEY_ID,
@@ -64,6 +64,9 @@ if ($InitialSetupKey -and $InitialSetupKey -notmatch '^[0-9a-fA-F]{64}$') {
 if ([string]::IsNullOrWhiteSpace($ServerApiKey)) {
     Write-Warning "No se indicó ServerApiKey: el instalador no preconfigurará el servidor."
 }
+if ($Publish -and ([string]::IsNullOrWhiteSpace($ServerUrl) -or [string]::IsNullOrWhiteSpace($ServerApiKey))) {
+    throw "Para publicar una release que conecte los kioscos se requieren ServerUrl y KIOSK_SERVER_API_KEY."
+}
 if ([string]::IsNullOrWhiteSpace($InitialSetupKey)) {
     Write-Warning "No se indicó InitialSetupKey: no se generará el instalador interno con pack."
 }
@@ -108,9 +111,16 @@ if ($SigningKeyId -and $SigningPublicKey) {
 }
 elseif ($Publish) { throw "Para publicar se requieren KIOSK_UPDATE_SIGNING_KEY_ID y KIOSK_UPDATE_SIGNING_PUBLIC_KEY." }
 
-# 3. Compila primero el artefacto público/auto-update, siempre Kiosk-only y sin secretos.
+# 3. Compila el Setup público Kiosk-only. Con API key, la incluye para aprovisionar
+#    perfiles antiguos sin servidor; cualquiera que descargue el Setup puede extraerla.
 Write-Host "==> Compilando instalador público Kiosk-only..." -ForegroundColor Cyan
-& $iscc "/DMyAppVersion=$Version" $iss
+$publicArgs = @("/DMyAppVersion=$Version")
+if ($ServerUrl -and $ServerApiKey) {
+    $publicArgs += "/DDefaultServerUrl=$ServerUrl"
+    $publicArgs += "/DDefaultServerApiKey=$ServerApiKey"
+}
+$publicArgs += $iss
+& $iscc @publicArgs
 if ($LASTEXITCODE -ne 0) { throw "ISCC fallo (exit $LASTEXITCODE)" }
 
 # El instalador interno se sirve desde el panel y contiene credenciales de provisión de esta tienda.

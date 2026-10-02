@@ -114,7 +114,7 @@ public sealed class InstallerCatalog
                 hash = Convert.ToHexString(sha.Hash!).ToLowerInvariant();
             }
 
-            InstallerPackageKind kind = DetectKind(tmp, ext);
+            InstallerPackageKind kind = DetectKind(tmp, ext, originalName);
             bool hasSignature = HasPeCertificate(tmp, ext);
             if (!hasSignature && !allowUnsigned)
                 throw new UnsignedInstallerException("El instalador no contiene una firma digital. Confirma expresamente que deseas admitirlo.");
@@ -191,7 +191,7 @@ public sealed class InstallerCatalog
         return full;
     }
 
-    private static InstallerPackageKind DetectKind(string path, string ext)
+    private static InstallerPackageKind DetectKind(string path, string ext, string originalName)
     {
         byte[] head = new byte[(int)Math.Min(new FileInfo(path).Length, 4 * 1024 * 1024)];
         using (var fs = File.OpenRead(path)) fs.ReadExactly(head);
@@ -204,7 +204,27 @@ public sealed class InstallerCatalog
         if (head.Length < 2 || head[0] != 'M' || head[1] != 'Z') throw new ArgumentException("El archivo no es un ejecutable PE válido.");
         if (ContainsAnyAscii(path, "Inno Setup Setup Data", "Inno Setup")) return InstallerPackageKind.InnoSetup;
         if (ContainsAnyAscii(path, "Nullsoft", "NSIS")) return InstallerPackageKind.Nsis;
-        throw new ArgumentException("No se reconoce un modo silencioso fiable para este EXE. Usa un MSI, Inno Setup o NSIS.");
+        if (Path.GetFileName(originalName).StartsWith("AcroRdrDC", StringComparison.OrdinalIgnoreCase) &&
+            ContainsUtf16(path, "Adobe Self Extractor")) return InstallerPackageKind.AdobeReader;
+        throw new ArgumentException("No se reconoce un modo silencioso fiable para este EXE. Usa un MSI, Inno Setup, NSIS o el instalador de Adobe Reader.");
+    }
+
+    private static bool ContainsUtf16(string path, string value)
+    {
+        byte[] pattern = System.Text.Encoding.Unicode.GetBytes(value);
+        byte[] buffer = new byte[1024 * 1024 + pattern.Length - 1];
+        int kept = 0;
+        using var stream = File.OpenRead(path);
+        while (true)
+        {
+            int read = stream.Read(buffer, kept, buffer.Length - kept);
+            if (read == 0) return false;
+            int count = kept + read;
+            var span = buffer.AsSpan(0, count);
+            if (span.IndexOf(pattern) >= 0) return true;
+            kept = Math.Min(pattern.Length - 1, count);
+            span[^kept..].CopyTo(buffer);
+        }
     }
 
     private static bool ContainsAnyAscii(string path, params string[] needles)

@@ -34,7 +34,8 @@ jobs:
           KIOSK_UPDATE_SIGNING_PUBLIC_KEY: ${{ secrets.KIOSK_UPDATE_SIGNING_PUBLIC_KEY }}
           KIOSK_UPDATE_SIGNING_PRIVATE_KEY: ${{ secrets.KIOSK_UPDATE_SIGNING_PRIVATE_KEY }}
           KIOSK_RELEASE_PUBLISH_KEY: ${{ secrets.KIOSK_RELEASE_PUBLISH_KEY }}
-          KIOSK_SERVER_URL: ${{ vars.KIOSK_SERVER_URL }}
+          KIOSK_SERVER_API_KEY: ${{ secrets.KIOSK_SERVER_API_KEY }}
+          KIOSK_SERVER_URL: https://panel.clinicapc.es
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
           $tag = $env:RELEASE_TAG

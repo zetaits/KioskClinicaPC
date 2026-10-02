@@ -24,7 +24,7 @@
             <h2>Añadir aplicación</h2>
             <p class="muted section-copy">El binario queda privado y solo se entrega a equipos autorizados.</p>
         </div>
-        <span class="mono-note">MSI · Inno Setup · NSIS · máx. @(Catalog.MaxBytes / 1024 / 1024) MB</span>
+        <span class="mono-note">MSI · Inno Setup · NSIS · Adobe Reader · máx. @(Catalog.MaxBytes / 1024 / 1024) MB</span>
     </div>
 
     <form method="post"
@@ -36,7 +36,7 @@
         <div class="installer-fields">
             <div class="field">
                 <label class="field-label" for="installer-name">Nombre visible</label>
-                <input id="installer-name" required maxlength="100" name="displayName" placeholder="Ej. Google Chrome" />
+                <input type="text" id="installer-name" required maxlength="100" name="displayName" placeholder="Ej. Google Chrome" />
             </div>
             <label class="installer-drop">
                 <span class="ico" aria-hidden="true">＋</span>
@@ -206,7 +206,7 @@
     <div class="modal-backdrop" @onclick="() => _rename = null">
         <div class="modal" role="dialog" aria-modal="true" aria-labelledby="rename-title" @onclick:stopPropagation="true">
             <h2 id="rename-title">Renombrar aplicación</h2>
-            <input aria-label="Nuevo nombre" maxlength="100" @bind="_renameValue" />
+            <input type="text" aria-label="Nuevo nombre" maxlength="100" @bind="_renameValue" />
             <div class="actions"><button @onclick="() => _rename = null">Cancelar</button><button class="primary" @onclick="SaveRename">Guardar</button></div>
         </div>
     </div>
@@ -348,7 +348,14 @@
     private string DeviceReason(FleetDevice d) =>
         JobsReason(d) ?? (d.CanInstall ? $"Agente {d.InstallerAgentVersion}" : "Actualiza el kiosko para habilitar instalaciones");
     private string? JobsReason(FleetDevice d) => Jobs.HasActiveJob(d.Id) ? "Ya tiene una instalación activa" : null;
-    private static string Kind(InstallerPackageKind k) => k switch { InstallerPackageKind.Msi => "MSI", InstallerPackageKind.InnoSetup => "Inno Setup", _ => "NSIS" };
+    private static string Kind(InstallerPackageKind k) => k switch
+    {
+        InstallerPackageKind.Msi => "MSI",
+        InstallerPackageKind.InnoSetup => "Inno Setup",
+        InstallerPackageKind.Nsis => "NSIS",
+        InstallerPackageKind.AdobeReader => "Adobe Reader",
+        _ => "Desconocido"
+    };
     private static string KindShort(InstallerPackageKind k) => k == InstallerPackageKind.Msi ? "MSI" : "EXE";
     private static string Size(long n) => n >= 1024 * 1024 ? $"{n / 1024d / 1024d:N1} MB" : $"{n / 1024d:N0} KB";
     private static string State(InstallationJobState s) => s switch { InstallationJobState.Pending => "Pendiente", InstallationJobState.Dispatched => "Enviada", InstallationJobState.Downloading => "Descargando", InstallationJobState.Verifying => "Verificando", InstallationJobState.Installing => "Instalando", InstallationJobState.Succeeded => "Instalada", InstallationJobState.RebootRequired => "Reinicio pendiente", _ => "Error" };

@@ -55,6 +55,20 @@ public sealed class QrWebIntegrationTests : IAsyncLifetime
         Assert.Contains(manifest!.Files, x => x.Category == "Brands" && x.FileName == "lenovo.png");
     }
 
+    [Fact]
+    public async Task Readiness_detects_damaged_persistent_content()
+    {
+        HttpClient client = _factory.CreateClient();
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/health/ready")).StatusCode);
+
+        File.WriteAllText(Path.Combine(_root, "KioskConfig.json"), "not-json");
+
+        HttpResponseMessage readiness = await client.GetAsync("/health/ready");
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, readiness.StatusCode);
+        Assert.Equal("{\"status\":\"unavailable\"}", await readiness.Content.ReadAsStringAsync());
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/health")).StatusCode);
+    }
+
     public Task DisposeAsync()
     {
         _factory.Dispose();

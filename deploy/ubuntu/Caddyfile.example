@@ -1,4 +1,4 @@
-panel.ejemplo.com {
+panel.clinicapc.es, vps-9c7061ff.vps.ovh.net {
 	encode zstd gzip
 	reverse_proxy 127.0.0.1:5080
 }

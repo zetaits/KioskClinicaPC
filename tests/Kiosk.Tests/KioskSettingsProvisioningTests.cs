@@ -14,7 +14,6 @@ public sealed class KioskSettingsProvisioningTests
         string dir = NewTempDirectory();
         try
         {
-            string settingsPath = Path.Combine(dir, "profile", "KioskSettings.json");
             string provisioningPath = Path.Combine(dir, "KioskProvisioning.json");
             File.WriteAllText(provisioningPath, JsonConvert.SerializeObject(new
             {
@@ -24,7 +23,7 @@ public sealed class KioskSettingsProvisioningTests
 
             var settings = new KioskSettings();
 
-            Assert.True(settings.ApplyProvisioningIfNew(settingsPath, provisioningPath));
+            Assert.True(settings.ApplyProvisioningIfMissingServer(provisioningPath));
             Assert.Equal("https://panel.example.test", settings.ServerUrl);
             Assert.Equal(new string('a', 64), settings.ServerApiKey);
         }
@@ -35,14 +34,40 @@ public sealed class KioskSettingsProvisioningTests
     }
 
     [Fact]
-    public void ExistingProfile_IsNeverOverwritten()
+    public void ExistingProfileWithoutServer_GetsProvisioningAndKeepsLocalSettings()
     {
         string dir = NewTempDirectory();
         try
         {
             string settingsPath = Path.Combine(dir, "KioskSettings.json");
             string provisioningPath = Path.Combine(dir, "KioskProvisioning.json");
-            File.WriteAllText(settingsPath, "{}");
+            File.WriteAllText(settingsPath, "{\"InactivitySeconds\":123,\"DeviceId\":\"existing-device\"}");
+            File.WriteAllText(provisioningPath, JsonConvert.SerializeObject(new
+            {
+                ServerUrl = "https://new.example.test",
+                ServerApiKey = new string('b', 64)
+            }));
+            var settings = KioskSettings.Load(settingsPath);
+
+            Assert.True(settings.ApplyProvisioningIfMissingServer(provisioningPath));
+            Assert.Equal("https://new.example.test", settings.ServerUrl);
+            Assert.Equal(new string('b', 64), settings.ServerApiKey);
+            Assert.Equal(123, settings.InactivitySeconds);
+            Assert.Equal("existing-device", settings.DeviceId);
+        }
+        finally
+        {
+            Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void ConfiguredServer_IsNeverOverwritten()
+    {
+        string dir = NewTempDirectory();
+        try
+        {
+            string provisioningPath = Path.Combine(dir, "KioskProvisioning.json");
             File.WriteAllText(provisioningPath, JsonConvert.SerializeObject(new
             {
                 ServerUrl = "https://new.example.test",
@@ -54,7 +79,7 @@ public sealed class KioskSettingsProvisioningTests
                 ServerApiKey = "existing"
             };
 
-            Assert.False(settings.ApplyProvisioningIfNew(settingsPath, provisioningPath));
+            Assert.False(settings.ApplyProvisioningIfMissingServer(provisioningPath));
             Assert.Equal("https://existing.example.test", settings.ServerUrl);
             Assert.Equal("existing", settings.ServerApiKey);
         }
@@ -78,7 +103,7 @@ public sealed class KioskSettingsProvisioningTests
             }));
             var settings = new KioskSettings();
 
-            Assert.False(settings.ApplyProvisioningIfNew(Path.Combine(dir, "missing.json"), provisioningPath));
+            Assert.False(settings.ApplyProvisioningIfMissingServer(provisioningPath));
             Assert.Null(settings.ServerUrl);
             Assert.Null(settings.ServerApiKey);
         }

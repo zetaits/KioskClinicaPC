@@ -15,6 +15,7 @@ using System.Security.Cryptography;
 using System.Text;
 using Microsoft.AspNetCore.RateLimiting;
 using System.Threading.RateLimiting;
+using Newtonsoft.Json.Linq;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -203,6 +204,27 @@ app.Use(async (ctx, next) =>
 
 // Sonda de vida (sin auth): el cliente puede comprobar conectividad barata.
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
+
+// La sonda de despliegue comprueba el estado que /health deliberadamente no consulta.
+// No devuelve contenido ni detalles internos al visitante.
+app.MapGet("/health/ready", () =>
+{
+    try
+    {
+        if (JToken.Parse(configStore.ReadJson()) is not JObject ||
+            JToken.Parse(File.ReadAllText(Path.Combine(dataDir, "panel.json"))) is not JObject panel ||
+            string.IsNullOrWhiteSpace(panel.Value<string>("PasswordHash")) ||
+            JToken.Parse(File.ReadAllText(Path.Combine(dataDir, "events.json"))) is not JArray ||
+            !Directory.Exists(assetsDir) || !Directory.Exists(installersDir) ||
+            !Directory.Exists(setupDir) || !Directory.Exists(updatesDir))
+            return Results.Json(new { status = "unavailable" }, statusCode: 503);
+        return Results.Ok(new { status = "ok" });
+    }
+    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or Newtonsoft.Json.JsonException)
+    {
+        return Results.Json(new { status = "unavailable" }, statusCode: 503);
+    }
+});
 
 // Ficha PDF pública que abren los QR. En desarrollo se sirve directamente desde docs/; el publish
 // copia exactamente esos recursos a wwwroot/ficha, por lo que producción no depende del repositorio.
@@ -501,13 +523,28 @@ app.MapGet("/panel/assets/{category}/{file}", (string category, string file, Ass
     return Results.File(full, mime);
 }).RequireAuthorization();
 
-app.MapGet("/panel/setup/download", (InitialSetupBundleStore bundles) =>
+app.MapGet("/panel/setup/download", (HttpContext ctx, InitialSetupBundleStore bundles) =>
 {
     var bundle = bundles.Latest(out _);
-    return bundle == null
-        ? Results.NotFound()
-        : Results.File(bundle.FullPath, "application/vnd.microsoft.portable-executable",
-            bundle.Manifest.FileName, enableRangeProcessing: true);
+    if (bundle is null) return Results.NotFound();
+
+    // La página usa este marcador para retirar el indicador cuando empieza la respuesta.
+    // La descarga sigue siendo nativa y el archivo se valida antes de enviarlo.
+    if (Guid.TryParseExact(ctx.Request.Query["downloadId"].ToString(), "N", out var downloadId))
+    {
+        ctx.Response.Cookies.Append("kioskSetupDownload", downloadId.ToString("N"), new CookieOptions
+        {
+            Path = "/instalador",
+            HttpOnly = false,
+            Secure = ctx.Request.IsHttps,
+            SameSite = SameSiteMode.Strict,
+            MaxAge = TimeSpan.FromMinutes(2),
+            IsEssential = true
+        });
+    }
+
+    return Results.File(bundle.FullPath, "application/vnd.microsoft.portable-executable",
+        bundle.Manifest.FileName, enableRangeProcessing: true);
 }).RequireAuthorization();
 
 // Subida desde formulario SSR para no transportar binarios grandes por el circuito de Blazor.

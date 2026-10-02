@@ -21,7 +21,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           KIOSK_RELEASE_PUBLISH_KEY: ${{ secrets.KIOSK_RELEASE_PUBLISH_KEY }}
-          KIOSK_SERVER_URL: ${{ vars.KIOSK_SERVER_URL }}
+          KIOSK_SERVER_URL: https://panel.clinicapc.es
           RELEASE_VERSION: ${{ inputs.version }}
         run: |
           $version = $env:RELEASE_VERSION

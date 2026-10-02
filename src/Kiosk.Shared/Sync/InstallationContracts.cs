@@ -4,7 +4,8 @@ namespace KioskClinicaPC.Core.Sync
     {
         Msi,
         InnoSetup,
-        Nsis
+        Nsis,
+        AdobeReader
     }
 
     public enum InstallationJobState

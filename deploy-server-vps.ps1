@@ -1,18 +1,33 @@
 param(
     [string]$HostName = 'vps-9c7061ff.vps.ovh.net',
     [string]$UserName = 'ubuntu',
-    [switch]$PackageOnly
+    [switch]$PackageOnly,
+    [switch]$CheckOnly
 )
 
 $ErrorActionPreference = 'Stop'
 if ($HostName -notmatch '^[A-Za-z0-9.-]+$' -or $UserName -notmatch '^[A-Za-z0-9_-]+$') {
     throw 'Invalid SSH host or user.'
 }
+if ($PackageOnly -and $CheckOnly) { throw 'Use either -PackageOnly or -CheckOnly.' }
 
 $publish = Join-Path $PSScriptRoot 'src\Kiosk.Server\bin\Release\publish-linux'
 $artifacts = Join-Path $PSScriptRoot 'src\Kiosk.Server\bin\Release\vps-releases'
 $remote = "$UserName@$HostName"
 $helper = Join-Path $PSScriptRoot 'deploy\ubuntu\deploy-release.sh'
+$preflight = Join-Path $PSScriptRoot 'deploy\ubuntu\preflight.py'
+
+if (-not $PackageOnly) {
+    # Stream the read-only script into remote Python. sudo reads its password from the SSH TTY.
+    # The payload contains only base64 characters, so no nested SSH/shell quotes are needed.
+    $payload = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes(
+        [IO.File]::ReadAllText($preflight)))
+    $command = "printf %s $payload | base64 -d | sudo python3 -"
+    & ssh.exe -tt -o StrictHostKeyChecking=yes -o ConnectTimeout=10 -- $remote $command
+    if ($LASTEXITCODE -ne 0) { throw "Remote preflight failed with exit code $LASTEXITCODE" }
+    if ($CheckOnly) { return }
+}
+
 $commit = (& git -C $PSScriptRoot rev-parse HEAD).Trim()
 if ($LASTEXITCODE -ne 0 -or $commit -notmatch '^[0-9a-f]{40}$') { throw 'Cannot identify the source commit.' }
 $sourcePaths = @('src/Kiosk.Server', 'src/Kiosk.Shared', 'src/Kiosk.Client/Assets',
@@ -66,18 +81,24 @@ $archiveHash = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLow
 Write-Host "Release: $releaseId"
 Write-Host "DLL SHA-256: $dllHash"
 Write-Host "Package SHA-256: $archiveHash"
+Get-ChildItem -LiteralPath $artifacts -Filter 'kiosk-server-*.tar.gz' -File |
+    Where-Object FullName -ne $archive | Remove-Item -Force
 if ($PackageOnly) {
     Write-Host "Package prepared without uploading: $archive"
     return
 }
 
-& scp.exe -- $archive "${remote}:/home/ubuntu/kiosk-server-$releaseId.tar.gz"
+# OpenSSH 9 uses SFTP by default; the VPS closed that upload connection after SSH login.
+# The upload names are generated locally and contain only validated ASCII characters.
+& scp.exe -O -o StrictHostKeyChecking=yes -- $archive "${remote}:/home/ubuntu/kiosk-server-$releaseId.tar.gz"
 if ($LASTEXITCODE -ne 0) { throw "Package upload failed with exit code $LASTEXITCODE" }
-& scp.exe -- $helper "${remote}:/home/ubuntu/kiosk-server-deploy-$releaseId.sh"
+& scp.exe -O -o StrictHostKeyChecking=yes -- $helper "${remote}:/home/ubuntu/kiosk-server-deploy-$releaseId.sh"
 if ($LASTEXITCODE -ne 0) { throw "Deployment helper upload failed with exit code $LASTEXITCODE" }
+& scp.exe -O -o StrictHostKeyChecking=yes -- $preflight "${remote}:/home/ubuntu/kiosk-server-preflight-$releaseId.py"
+if ($LASTEXITCODE -ne 0) { throw "Preflight helper upload failed with exit code $LASTEXITCODE" }
 
 # -tt lets ssh and sudo request passwords interactively. Arguments are locally validated.
-$command = "sudo bash /home/ubuntu/kiosk-server-deploy-$releaseId.sh $releaseId $archiveHash"
-& ssh.exe -tt -- $remote $command
+$command = "sudo python3 /home/ubuntu/kiosk-server-preflight-$releaseId.py && sudo bash /home/ubuntu/kiosk-server-deploy-$releaseId.sh $releaseId $archiveHash"
+& ssh.exe -tt -o StrictHostKeyChecking=yes -o ConnectTimeout=10 -- $remote $command
 if ($LASTEXITCODE -ne 0) { throw "Remote deployment failed with exit code $LASTEXITCODE" }
-Write-Host "Server release $releaseId passed its local health check."
+Write-Host "Server release $releaseId passed its local readiness check."

@@ -17,5 +17,5 @@ public sealed class FichaPdfUrlTests
     [InlineData("http://127.0.0.1:5080")]
     [InlineData("no-es-una-url")]
     public void Resolve_SinServidorPublicoUsaFallback(string? serverUrl) =>
-        Assert.Equal(FichaPdfUrl.PublicFallback, FichaPdfUrl.Resolve(serverUrl));
+        Assert.Equal("https://panel.clinicapc.es/ficha/", FichaPdfUrl.Resolve(serverUrl));
 }

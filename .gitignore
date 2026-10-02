@@ -66,11 +66,12 @@ panel-vps/
 panel-vps.zip
 installer/Output/
 
+# Instaladores de terceros: se conservan localmente, no en el repositorio público.
+instaladores/*.exe
+instaladores/*.msi
+
 # Accidental shell artifacts. The pre-commit hook rejects extensionless files
 # added at the repository root.
-
-# AI assistant instructions present in this project
-AGENTS.md
 
 # Copia original del portátil conservada durante la consolidación
 /KioskClinicaPC/

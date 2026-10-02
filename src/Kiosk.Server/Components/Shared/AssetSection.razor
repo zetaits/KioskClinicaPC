@@ -15,8 +15,12 @@
     <div class="asset-upload">
         <div class="asset-name-field">
             <label class="field-label" for="@($"{Category}-name")">@NameLabel</label>
-            <input id="@($"{Category}-name")" @bind="_logicalName" placeholder="@Placeholder" />
+            <input type="text" id="@($"{Category}-name")" @bind="_logicalName" placeholder="@Placeholder" />
             <span class="field-help">El nombre se normaliza para que el kiosko pueda emparejarlo.</span>
+            <label class="check-row">
+                <input type="checkbox" @bind="_replace" />
+                <span>Reemplazar si ya existe</span>
+            </label>
         </div>
         <label class="drop-tile compact">
             <span class="ico" aria-hidden="true">
@@ -27,10 +31,6 @@
             <InputFile disabled="@_uploading"
                        OnChange="Upload"
                        accept=".png,.jpg,.jpeg,.webp,.gif,.bmp" />
-        </label>
-        <label class="check-row">
-            <input type="checkbox" @bind="_replace" />
-            <span>Reemplazar si ya existe</span>
         </label>
     </div>
 

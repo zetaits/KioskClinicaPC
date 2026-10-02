@@ -22,16 +22,41 @@ incoming=$releases/.incoming-$release_id
 new_release=$releases/$release_id
 next_link=$base/.app-next-$release_id
 rollback_link=$base/.app-rollback-$release_id
+state=/var/lib/kiosk-server
+backup_root=/var/backups/kiosk-server
+backup_tmp=$backup_root/.previous-$release_id.tar.gz
+backup=
 
 command -v python3 >/dev/null
 command -v curl >/dev/null
 command -v sha256sum >/dev/null
+command -v flock >/dev/null
+command -v tar >/dev/null
+[[ ! -L $base && ! -L $releases && ! -L $state ]] || {
+    echo 'Installation, release, and state roots must not be symlinks.' >&2
+    exit 1
+}
+exec 9>"$base/.deploy.lock"
+flock -n 9 || { echo 'Another server deployment is running.' >&2; exit 1; }
 [[ -f $upload && ! -L $upload ]] || { echo 'Upload missing or is a symlink.' >&2; exit 1; }
 [[ -d $app || -L $app ]] || { echo 'Current application is missing.' >&2; exit 1; }
 install -d -o root -g root -m 755 "$releases"
 for path in "$archive" "$incoming" "$new_release" "$next_link" "$rollback_link"; do
     [[ ! -e $path && ! -L $path ]] || { echo "Already exists: $path" >&2; exit 1; }
 done
+
+cleanup_staging() {
+    local result=$?
+    trap - EXIT
+    set +e
+    if (( result != 0 )); then
+        rm -rf -- "$incoming"
+        rm -f -- "$archive" "$upload" "/home/ubuntu/kiosk-server-deploy-$release_id.sh" \
+            "/home/ubuntu/kiosk-server-preflight-$release_id.py"
+    fi
+    exit "$result"
+}
+trap cleanup_staging EXIT
 
 # Copy the untrusted user-owned upload before hashing and extracting it as root.
 install -o root -g root -m 600 "$upload" "$archive"
@@ -114,11 +139,22 @@ health() {
     body=$(curl --fail --silent --show-error --max-time 3 http://127.0.0.1:5080/health) || return 1
     [[ $body == '{"status":"ok"}' ]] && systemctl is-active --quiet kiosk-server
 }
+ready() {
+    local body pid cwd
+    health || return 1
+    body=$(curl --fail --silent --show-error --max-time 3 http://127.0.0.1:5080/health/ready) || return 1
+    [[ $body == '{"status":"ok"}' ]] || return 1
+    pid=$(systemctl show kiosk-server --property=MainPID --value) || return 1
+    [[ $pid =~ ^[1-9][0-9]*$ ]] || return 1
+    cwd=$(readlink -f "/proc/$pid/cwd") || return 1
+    [[ $cwd == "$new_release" ]]
+}
 on_exit() {
     local result=$1
     trap - EXIT
+    set +e
+    rm -f -- "$backup_tmp"
     if (( result != 0 && rollback_needed )); then
-        set +e
         echo 'Deployment failed; restoring the previous release.' >&2
         if [[ -L $app ]]; then
             ln -s "$old_target" "$rollback_link"
@@ -135,6 +171,15 @@ on_exit() {
                 sleep 1
             done
         fi
+        [[ -z $backup ]] || echo "Data snapshot for manual recovery: $backup" >&2
+    fi
+    if (( result != 0 )); then
+        if [[ ! -L $app ]] || [[ $(readlink -f "$app") != "$new_release" ]]; then
+            rm -rf -- "$new_release"
+        fi
+        rm -rf -- "$incoming"
+        rm -f -- "$archive" "$upload" "/home/ubuntu/kiosk-server-deploy-$release_id.sh" \
+            "/home/ubuntu/kiosk-server-preflight-$release_id.py"
     fi
     exit "$result"
 }
@@ -142,8 +187,8 @@ trap 'on_exit $?' EXIT
 
 if [[ -L $app ]]; then
     old_target=$(readlink -f "$app")
-    [[ -d $old_target && $old_target == "$base/"* ]] || {
-        echo 'Current app symlink points outside the installation.' >&2
+    [[ -d $old_target && $old_target == "$releases/"* ]] || {
+        echo 'Current app symlink must point to a release inside the installation.' >&2
         exit 1
     }
 else
@@ -152,8 +197,40 @@ else
     old_target=$baseline
 fi
 
+[[ ! -L $backup_root ]] || { echo 'Backup directory must not be a symlink.' >&2; exit 1; }
+install -d -o root -g root -m 700 "$backup_root"
+for name in data assets installers setups updates; do
+    if [[ $name != data && ! -e $state/$name && ! -L $state/$name ]]; then
+        install -d -o kiosk-server -g kiosk-server -m 750 "$state/$name"
+    fi
+    [[ -d $state/$name && ! -L $state/$name ]] || {
+        echo "Persistent directory missing or linked: $state/$name" >&2
+        exit 1
+    }
+done
+size_kb=$(du -skc "$state"/{data,assets,installers,setups,updates} | tail -n 1 | awk '{print $1}')
+free_kb=$(df -Pk "$backup_root" | awk 'END {print $4}')
+[[ $size_kb =~ ^[0-9]+$ && $free_kb =~ ^[0-9]+$ ]] || {
+    echo 'Cannot measure backup space.' >&2
+    exit 1
+}
+if (( free_kb < size_kb + size_kb / 10 + 102400 )); then
+    echo 'Not enough free space for a complete data snapshot.' >&2
+    exit 1
+fi
 rollback_needed=1
 systemctl stop kiosk-server
+tar -C "$state" -czf "$backup_tmp" data assets installers setups updates
+tar -tzf "$backup_tmp" >/dev/null
+backup_hash=$(sha256sum "$backup_tmp")
+backup_hash=${backup_hash%% *}
+backup=$backup_root/previous-$backup_hash.tar.gz
+chmod 600 "$backup_tmp"
+mv -Tf "$backup_tmp" "$backup"
+for previous in "$backup_root"/previous-*.tar.gz; do
+    [[ $previous == "$backup" ]] || rm -f -- "$previous"
+done
+state_before=$(sha256sum "$state/data/KioskConfig.json" "$state/data/panel.json" "$state/data/events.json" | sha256sum)
 if [[ ! -L $app ]]; then
     mv -T "$app" "$old_target"
     migrated=1
@@ -163,9 +240,30 @@ ln -s "$new_release" "$next_link"
 mv -Tf "$next_link" "$app"
 systemctl start kiosk-server
 for (( attempt=1; attempt<=20; attempt++ )); do
-    if health; then
+    if ready; then
+        state_after=$(sha256sum "$state/data/KioskConfig.json" "$state/data/panel.json" "$state/data/events.json" | sha256sum)
+        [[ $state_after == "$state_before" ]] || {
+            echo 'Persistent content changed during startup.' >&2
+            exit 1
+        }
         rollback_needed=0
-        echo "Deployed $release_id; previous release: $old_target"
+        for path in "$releases"/*; do
+            [[ -d $path && ! -L $path ]] || continue
+            [[ $path == "$new_release" || $path == "$old_target" ]] && continue
+            name=${path##*/}
+            if [[ $name =~ ^([0-9]{14}-[0-9a-f]{16}|baseline-[0-9]{14})$ ]]; then
+                rm -rf -- "$path" || echo "Could not remove old release: $path" >&2
+            fi
+        done
+        for path in "$releases"/*.tar.gz; do
+            name=${path##*/}
+            if [[ $name =~ ^[0-9]{14}-[0-9a-f]{16}\.tar\.gz$ ]]; then
+                rm -f -- "$path" || echo "Could not remove package: $path" >&2
+            fi
+        done
+        rm -f -- "$upload" "/home/ubuntu/kiosk-server-deploy-$release_id.sh" \
+            "/home/ubuntu/kiosk-server-preflight-$release_id.py" || true
+        echo "Deployed $release_id; previous release: $old_target; one data snapshot: $backup"
         exit 0
     fi
     sleep 1

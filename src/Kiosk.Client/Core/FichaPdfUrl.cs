@@ -5,7 +5,7 @@ namespace KioskClinicaPC.Core
     /// <summary>Resuelve el destino público de la ficha PDF sin acoplar los QR a GitHub Pages.</summary>
     public static class FichaPdfUrl
     {
-        public const string PublicFallback = "https://vps-9c7061ff.vps.ovh.net/ficha/";
+        public const string PublicFallback = "https://panel.clinicapc.es/ficha/";
 
         public static string Resolve(string? serverUrl)
         {

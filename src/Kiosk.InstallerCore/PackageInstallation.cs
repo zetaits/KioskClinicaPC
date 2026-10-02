@@ -85,6 +85,10 @@ public static class PackageInstallation
                 exe = file;
                 args = ["/S"];
                 break;
+            case InstallerPackageKind.AdobeReader:
+                exe = file;
+                args = ["/sAll", "/rs", "/msi", "EULA_ACCEPT=YES"];
+                break;
             default:
                 throw new InvalidDataException("Tipo de instalador no permitido.");
         }

@@ -45,6 +45,18 @@ public sealed class InstallerCatalogTests : IDisposable
     }
 
     [Fact]
+    public async Task Recognizes_Adobe_Reader_self_extractor_but_not_an_unrelated_exe()
+    {
+        byte[] adobe = new byte[256]; adobe[0] = (byte)'M'; adobe[1] = (byte)'Z';
+        System.Text.Encoding.Unicode.GetBytes("Adobe Self Extractor").CopyTo(adobe, 80);
+        var catalog = Catalog();
+        var package = await catalog.AddAsync("Adobe Reader", "AcroRdrDC2600221931_es_ES.exe", new MemoryStream(adobe), true);
+        Assert.Equal(InstallerPackageKind.AdobeReader, package.Kind);
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            catalog.AddAsync("Otro", "setup.exe", new MemoryStream(adobe), true));
+    }
+
+    [Fact]
     public async Task Enforces_configured_size_limit()
     {
         byte[] msi = { 0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1 };

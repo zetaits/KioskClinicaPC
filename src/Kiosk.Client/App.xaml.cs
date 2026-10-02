@@ -108,7 +108,7 @@ namespace KioskClinicaPC
             // Ya no existe una clave compartida: perfiles nuevos y anteriores a la política actual deben
             // elegir una propia. Si el encargado cancela, OnExit libera la protección del escritorio.
             var settings = KioskSettings.Load(SettingsFilePath);
-            bool seeded = settings.ApplyProvisioningIfNew(SettingsFilePath, ProvisioningFilePath);
+            bool seeded = settings.ApplyProvisioningIfMissingServer(ProvisioningFilePath);
             if (settings.RequiresPasswordSetup())
             {
                 var passwordSetup = new PasswordSetupWindow(settings);

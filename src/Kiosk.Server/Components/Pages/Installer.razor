@@ -7,12 +7,18 @@
 @inject InitialSetupSessionStore Sessions
 @inject InstallerCatalog Catalog
 
-<section class="card">
-    <div class="card-head">
+<div class="setup-page">
+<section class="card setup-hero">
+    <div class="setup-hero-heading">
         <div>
+            <span class="mono-label">Instalación inicial</span>
             <h2>Instalador de equipos</h2>
-            <p class="muted section-copy">Instala Kiosk, el pack de aplicaciones o ambos desde un único asistente.</p>
+            <p class="muted">Prepara un ordenador con Kiosk, el pack de aplicaciones o ambos desde un único asistente.</p>
         </div>
+        @if (_bundle is not null)
+        {
+            <span class="badge ok">Disponible para descargar</span>
+        }
     </div>
 
     @if (_bundle is null)
@@ -25,26 +31,40 @@
     }
     else
     {
-        <div class="kv">
-            <div class="r"><span class="k">Versión</span><span class="v">@_bundle.Manifest.Version</span></div>
-            <div class="r"><span class="k">Tamaño</span><span class="v">@Size(_bundle.Manifest.SizeBytes)</span></div>
-            <div class="r"><span class="k">Servidor incluido</span><span class="v">@_bundle.Manifest.ServerUrl</span></div>
-            <div class="r"><span class="k">SHA-256</span><span class="v">@_bundle.Manifest.Sha256[..12]…</span></div>
+        <div class="setup-download-row">
+            <div class="setup-file">
+                <span class="setup-file-icon" aria-hidden="true">
+                    <svg width="25" height="25" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M7 3.5h7l4 4V20H7a2 2 0 0 1-2-2V5.5a2 2 0 0 1 2-2Z" /><path d="M14 3.5V8h4M9 13h6M9 16h6" /></svg>
+                </span>
+                <div>
+                    <strong>@_bundle.Manifest.FileName</strong>
+                    <span>Versión @_bundle.Manifest.Version · @Size(_bundle.Manifest.SizeBytes)</span>
+                </div>
+            </div>
+            <div class="setup-download-action">
+                <a class="btn primary button-link setup-download-button" href="/panel/setup/download" data-setup-download>
+                    <span class="setup-spinner" aria-hidden="true"></span>
+                    <svg class="setup-download-icon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M4 20h16" /></svg>
+                    <span data-setup-download-label>Descargar instalador</span>
+                </a>
+                <p class="setup-download-status" data-setup-download-status role="status" aria-live="polite" hidden></p>
+            </div>
         </div>
-        <div style="margin-top:18px">
-            <a class="primary button-link" href="/panel/setup/download">Descargar instalador</a>
+        <div class="setup-details">
+            <div><span>Servidor incluido</span><strong>@_bundle.Manifest.ServerUrl</strong></div>
+            <div><span>Integridad SHA-256</span><code>@_bundle.Manifest.Sha256[..12]…</code></div>
         </div>
     }
 </section>
 
-<section class="card">
+<section class="card setup-section">
     <div class="card-head">
-        <h2>Pack predeterminado</h2>
-        <span class="mono-note">@Catalog.InitialSetupList().Count disponibles</span>
+        <div><span class="mono-label">Aplicaciones</span><h2>Pack predeterminado</h2><p class="muted section-copy">Aplicaciones que el asistente puede instalar junto a Kiosk.</p></div>
+        <span class="setup-count">@Catalog.InitialSetupList().Count disponibles</span>
     </div>
     @if (Catalog.InitialSetupList().Count == 0)
     {
-        <div class="empty-state compact"><div><b>Pack vacío</b><p>Configura las aplicaciones desde la página Aplicaciones.</p></div></div>
+        <div class="empty-state compact"><div class="empty-icon" aria-hidden="true">+</div><div><b>Pack vacío</b><p>Configura las aplicaciones desde la página Aplicaciones.</p></div></div>
     }
     else
     {
@@ -62,11 +82,11 @@
     }
 </section>
 
-<section class="card">
-    <div class="card-head"><h2>Instalaciones iniciales recientes</h2></div>
+<section class="card setup-section">
+    <div class="card-head"><div><span class="mono-label">Seguimiento</span><h2>Instalaciones recientes</h2><p class="muted section-copy">Resultados enviados por los equipos durante la instalación inicial.</p></div></div>
     @if (Sessions.Recent().Count == 0)
     {
-        <div class="empty-state compact"><div><b>Sin actividad</b><p>Las ejecuciones del Setup aparecerán aquí.</p></div></div>
+        <div class="empty-state compact"><div class="empty-icon" aria-hidden="true">↗</div><div><b>Sin actividad todavía</b><p>Las ejecuciones del Setup aparecerán aquí.</p></div></div>
     }
     else
     {
@@ -83,6 +103,7 @@
         </div>
     }
 </section>
+</div>
 
 @code {
     private ValidatedInitialSetupBundle? _bundle;

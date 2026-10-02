@@ -21,7 +21,7 @@ You set the kiosk up on a shop machine. The app:
 1. **Attracts** — a storefront-style loop of screens with your marketing.
 2. **Scans** — a radar animation while it reads the real hardware.
 3. **Shows** — a spec sheet with CPU, RAM, GPU, disk, display, battery, etc., with a price and a tier note per component.
-4. **Hands out** — a QR code the customer scans to download the sheet as a PDF, no internet needed.
+4. **Hands out** — a QR code the customer scans to open the sheet and save it as a PDF on their phone.
 
 Everything editable by hand from the screen itself. No code required.
 
@@ -50,8 +50,7 @@ Tap any spec and its expanded explanation opens: what it is, why it matters and 
 ![Detail](docs/screenshots/04-detail.png)
 
 ### Spec sheet on the customer's phone
-The QR opens a page that **generates the PDF right on the phone**. The specs travel inside the QR,
-so there's no need for internet at the shop nor a server to store anything. The sheet carries the shop's address,
+The QR opens a page that **generates the PDF right on the phone**. The phone needs a connection to load the page; the specs travel inside the QR and are never stored on the server. The sheet carries the shop's address,
 email, phone and WhatsApp, clickable to message or call on the spot.
 
 ---

@@ -64,13 +64,14 @@ namespace KioskClinicaPC.Core.Config
         }
 
         /// <summary>
-        /// Aplica la URL y la clave sembradas por el instalador únicamente para un perfil nuevo. El Setup
-        /// deja el fichero junto al exe para no depender de qué cuenta aceptó el UAC; el kiosko lo lee ya
-        /// ejecutándose como el usuario interactivo correcto. Un KioskSettings existente nunca se modifica.
+        /// Aplica la URL y la clave sembradas por el instalador si el perfil aún no tiene servidor.
+        /// El Setup deja el fichero junto al exe para no depender de qué cuenta aceptó el UAC;
+        /// el kiosko lo lee como el usuario interactivo correcto. Conserva los demás ajustes.
         /// </summary>
-        public bool ApplyProvisioningIfNew(string settingsPath, string provisioningPath)
+        public bool ApplyProvisioningIfMissingServer(string provisioningPath)
         {
-            if (File.Exists(settingsPath) || !File.Exists(provisioningPath)) return false;
+            if (!string.IsNullOrWhiteSpace(ServerUrl) || !string.IsNullOrWhiteSpace(ServerApiKey) ||
+                !File.Exists(provisioningPath)) return false;
 
             try
             {
