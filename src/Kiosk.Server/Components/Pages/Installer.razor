@@ -1,134 +1,61 @@
 @page "/instalador"
 @attribute [Authorize]
 @rendermode InteractiveServer
-@implements IDisposable
 @using KioskClinicaPC.Core.Sync
 @inject InitialSetupBundleStore Bundles
-@inject InitialSetupSessionStore Sessions
-@inject InstallerCatalog Catalog
+@inject PackCatalogStore Catalog
 
-<div class="setup-page">
 <section class="card setup-hero">
-    <div class="setup-hero-heading">
-        <div>
-            <span class="mono-label">Instalación inicial</span>
-            <h2>Instalador de equipos</h2>
-            <p class="muted">Prepara un ordenador con Kiosk, el pack de aplicaciones o ambos desde un único asistente.</p>
-        </div>
-        @if (_bundle is not null)
-        {
-            <span class="badge ok">Disponible para descargar</span>
-        }
-    </div>
-
-    @if (_bundle is null)
+    <h2>Preparar un ordenador</h2>
+    <p>Descarga y ejecuta el instalador en el ordenador que vas a preparar. No necesita pertenecer a la flota. El pack está seleccionado por defecto; Kiosk es opcional.</p>
+    @if (_bundle is not null)
     {
-        <div class="alert error" role="alert">
-            <span class="dot offline"></span>
-            @(_bundleError ?? $"No hay un instalador válido en {Bundles.Root}.")
-        </div>
-        <p class="mono-note">Copia el .exe y su archivo .bundle.json generado por build-installer.ps1.</p>
+        <a class="btn primary button-link" href="/panel/setup/download" data-setup-download><span data-setup-download-label>Descargar instalador @_bundle.Manifest.Version</span></a>
+        <p data-setup-download-status hidden role="status"></p>
     }
-    else
+    else { <p class="alert error">@(_bundleError ?? "Todavía no se ha publicado el instalador interno.")</p> }
+    <p class="muted">Windows 10 22H2 / Windows 11 x64 · Internet · Administrador. El progreso y el resultado se muestran solo en ese ordenador. Nunca reinicia automáticamente.</p>
+</section>
+<section class="card">
+    <h2>Añadir aplicaciones</h2>
+    <p>Busca, pulsa Añadir y listo. No necesitas subir instaladores ni escribir parámetros.</p>
+    <p class="muted">Índice oficial WinGet: @(Catalog.IndexUpdatedAtUtc == DateTime.MinValue ? "pendiente de primera importación" : Catalog.IndexUpdatedAtUtc.ToLocalTime().ToString("dd/MM/yyyy HH:mm"))</p>
+    <input aria-label="Buscar aplicación" placeholder="Nombre o identificador, por ejemplo Google.Chrome" @bind="_query" @bind:event="oninput" />
+    @foreach (var app in Catalog.Search(_query))
     {
-        <div class="setup-download-row">
-            <div class="setup-file">
-                <span class="setup-file-icon" aria-hidden="true">
-                    <svg width="25" height="25" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M7 3.5h7l4 4V20H7a2 2 0 0 1-2-2V5.5a2 2 0 0 1 2-2Z" /><path d="M14 3.5V8h4M9 13h6M9 16h6" /></svg>
-                </span>
-                <div>
-                    <strong>@_bundle.Manifest.FileName</strong>
-                    <span>Versión @_bundle.Manifest.Version · @Size(_bundle.Manifest.SizeBytes)</span>
-                </div>
-            </div>
-            <div class="setup-download-action">
-                <a class="btn primary button-link setup-download-button" href="/panel/setup/download" data-setup-download>
-                    <span class="setup-spinner" aria-hidden="true"></span>
-                    <svg class="setup-download-icon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M4 20h16" /></svg>
-                    <span data-setup-download-label>Descargar instalador</span>
-                </a>
-                <p class="setup-download-status" data-setup-download-status role="status" aria-live="polite" hidden></p>
-            </div>
-        </div>
-        <div class="setup-details">
-            <div><span>Servidor incluido</span><strong>@_bundle.Manifest.ServerUrl</strong></div>
-            <div><span>Integridad SHA-256</span><code>@_bundle.Manifest.Sha256[..12]…</code></div>
+        <div class="job-row">
+            <div class="job-title"><b>@app.Name</b><span>@app.Publisher · @app.Id · @app.Version</span></div>
+            @if (app.Eligible)
+            { <button disabled="@Catalog.Snapshot().Applications.Any(x => x.WingetId == app.Id)" @onclick="() => Change(() => Catalog.Add(app.Id))">Añadir</button> }
+            else { <span class="muted">@app.Reason</span> }
         </div>
     }
 </section>
-
-<section class="card setup-section">
-    <div class="card-head">
-        <div><span class="mono-label">Aplicaciones</span><h2>Pack predeterminado</h2><p class="muted section-copy">Aplicaciones que el asistente puede instalar junto a Kiosk.</p></div>
-        <span class="setup-count">@Catalog.InitialSetupList().Count disponibles</span>
-    </div>
-    @if (Catalog.InitialSetupList().Count == 0)
+<section class="card">
+    <div class="card-head"><h2>Pack de aplicaciones</h2><button @onclick="Update">Actualizar todas las versiones</button></div>
+    <p class="muted">Las versiones quedan fijadas hasta que pulses Actualizar. El instalador comprobará la compatibilidad real antes de empezar.</p>
+    @if (_message is not null) { <p role="status">@_message</p> }
+    @if (Catalog.Snapshot().Applications.Count == 0) { <p>Pack vacío. Busca una aplicación arriba para empezar.</p> }
+    @foreach (var app in Catalog.Snapshot().Applications)
     {
-        <div class="empty-state compact"><div class="empty-icon" aria-hidden="true">+</div><div><b>Pack vacío</b><p>Configura las aplicaciones desde la página Aplicaciones.</p></div></div>
-    }
-    else
-    {
-        <div class="catalog-list">
-            @foreach (var package in Catalog.InitialSetupList())
-            {
-                <div class="job-row">
-                    <div class="job-title"><b>@package.DisplayName</b><span>@Size(package.SizeBytes)</span></div>
-                    <span class="badge @(package.SelectedByDefault ? "ok" : "accent")">@(package.SelectedByDefault ? "Preseleccionada" : "Opcional")</span>
-                    <code>@package.Sha256[..12]…</code>
-                    <span class="mono-note">#@package.InitialSetupOrder</span>
-                </div>
-            }
+        <div class="job-row" @key="app.Id">
+            <div class="job-title"><b>@app.DisplayName</b><span>@app.WingetId · @app.PinnedVersion</span></div>
+            <label><input type="checkbox" checked="@app.SelectedByDefault" @onchange="e => Change(() => Catalog.Configure(app.Id, (bool)(e.Value ?? false), app.Order))" /> Preseleccionada</label>
+            <label>Orden <input aria-label="@($"Orden de {app.DisplayName}")" type="number" min="0" max="10000" value="@app.Order" @onchange="e => SetOrder(app, e.Value)" /></label>
+            <button class="danger" @onclick="() => Change(() => Catalog.Remove(app.Id))">Retirar</button>
         </div>
     }
 </section>
-
-<section class="card setup-section">
-    <div class="card-head"><div><span class="mono-label">Seguimiento</span><h2>Instalaciones recientes</h2><p class="muted section-copy">Resultados enviados por los equipos durante la instalación inicial.</p></div></div>
-    @if (Sessions.Recent().Count == 0)
-    {
-        <div class="empty-state compact"><div class="empty-icon" aria-hidden="true">↗</div><div><b>Sin actividad todavía</b><p>Las ejecuciones del Setup aparecerán aquí.</p></div></div>
-    }
-    else
-    {
-        <div class="job-list">
-            @foreach (var session in Sessions.Recent())
-            {
-                <div class="job-row">
-                    <div class="job-title"><b>@session.MachineName</b><span>Setup @session.SetupVersion · @session.Packages.Count aplicación(es)</span></div>
-                    <span class="badge @SessionCss(session)">@SessionLabel(session)</span>
-                    <div class="job-progress"><small>@string.Join(" · ", session.Packages.Select(p => $"{p.PackageName}: {PackageLabel(p.State)}"))</small></div>
-                    <time>@session.UpdatedAtUtc.ToLocalTime().ToString("dd/MM HH:mm")</time>
-                </div>
-            }
-        </div>
-    }
-</section>
-</div>
-
 @code {
+    private string _query = "";
+    private string? _message, _bundleError;
     private ValidatedInitialSetupBundle? _bundle;
-    private string? _bundleError;
-
-    protected override void OnInitialized()
+    protected override void OnInitialized() => _bundle = Bundles.Latest(out _bundleError);
+    private void Change(Action action) { try { action(); _message = "Pack guardado."; } catch (Exception ex) { _message = ex.Message; } }
+    private void SetOrder(PackApplication app, object? value) => Change(() => Catalog.Configure(app.Id, app.SelectedByDefault, int.TryParse(value?.ToString(), out int order) ? order : app.Order));
+    private void Update()
     {
-        _bundle = Bundles.Latest(out _bundleError);
-        Sessions.Changed += Changed;
+        try { var failed = Catalog.UpdateVersions(); _message = failed.Count == 0 ? "Versiones actualizadas." : "Se conserva la versión anterior de: " + string.Join(", ", failed); }
+        catch (Exception ex) { _message = ex.Message; }
     }
-
-    private void Changed() => InvokeAsync(StateHasChanged);
-    public void Dispose() => Sessions.Changed -= Changed;
-    private static string Size(long bytes) => bytes >= 1024 * 1024 ? $"{bytes / 1024d / 1024d:N1} MB" : $"{bytes / 1024d:N0} KB";
-    private static string SessionLabel(InitialSetupSession s) => s.IsTerminal
-        ? (s.Packages.Any(p => p.State == InstallationJobState.Failed) ? "Con errores" : "Completada") : "En curso";
-    private static string SessionCss(InitialSetupSession s) => !s.IsTerminal ? "accent" : s.Packages.Any(p => p.State == InstallationJobState.Failed) ? "warn" : "ok";
-    private static string PackageLabel(InstallationJobState state) => state switch
-    {
-        InstallationJobState.Succeeded => "instalada",
-        InstallationJobState.RebootRequired => "requiere reinicio",
-        InstallationJobState.Failed => "error",
-        InstallationJobState.Downloading => "descargando",
-        InstallationJobState.Verifying => "verificando",
-        InstallationJobState.Installing => "instalando",
-        _ => "pendiente"
-    };
 }

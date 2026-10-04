@@ -28,6 +28,45 @@ public sealed class InitialSetupBundleStore
 
     public string Root => _root;
 
+    private readonly SemaphoreSlim _importGate = new(1, 1);
+    public async Task ImportAsync(InitialSetupBundleManifest manifest, string uploadedName, Stream input, CancellationToken ct)
+    {
+        if (!Version.TryParse(manifest.Version, out _) || manifest.FileName != Path.GetFileName(manifest.FileName) ||
+            manifest.FileName != uploadedName || !manifest.FileName.StartsWith("Setup-EquipoClinicaPC-", StringComparison.Ordinal) ||
+            !manifest.FileName.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) || manifest.SizeBytes is <= 0 or > 1024L * 1024 * 1024)
+            throw new InvalidDataException("Manifiesto del instalador interno no válido.");
+        await _importGate.WaitAsync(ct);
+        string staging = Path.Combine(_root, Guid.NewGuid().ToString("N") + ".tmp");
+        try
+        {
+            string target = Path.Combine(_root, manifest.FileName);
+            string manifestPath = Path.ChangeExtension(target, ".bundle.json");
+            if (File.Exists(target) || File.Exists(manifestPath)) throw new InvalidDataException("Esta versión ya existe; publica una nueva versión.");
+            await using (var file = File.Create(staging))
+            {
+                byte[] buffer = new byte[81920]; long total = 0; int read;
+                while ((read = await input.ReadAsync(buffer, ct)) > 0)
+                {
+                    total += read;
+                    if (total > manifest.SizeBytes) throw new InvalidDataException("El tamaño excede el manifiesto.");
+                    await file.WriteAsync(buffer.AsMemory(0, read), ct);
+                }
+                if (total != manifest.SizeBytes) throw new InvalidDataException("Tamaño incorrecto.");
+            }
+            await using (var file = File.OpenRead(staging))
+                if (!Convert.ToHexString(await SHA256.HashDataAsync(file, ct)).Equals(manifest.Sha256, StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidDataException("SHA-256 incorrecto.");
+            File.Move(staging, target);
+            try
+            {
+                await File.WriteAllTextAsync(staging, JsonConvert.SerializeObject(manifest), ct);
+                File.Move(staging, manifestPath);
+            }
+            catch { File.Delete(target); throw; }
+        }
+        finally { if (File.Exists(staging)) File.Delete(staging); _importGate.Release(); }
+    }
+
     public ValidatedInitialSetupBundle? Latest(out string? error)
     {
         error = null;

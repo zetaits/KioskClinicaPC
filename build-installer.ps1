@@ -67,11 +67,18 @@ if ([string]::IsNullOrWhiteSpace($ServerApiKey)) {
 if ($Publish -and ([string]::IsNullOrWhiteSpace($ServerUrl) -or [string]::IsNullOrWhiteSpace($ServerApiKey))) {
     throw "Para publicar una release que conecte los kioscos se requieren ServerUrl y KIOSK_SERVER_API_KEY."
 }
+if ($Publish -and [string]::IsNullOrWhiteSpace($InitialSetupKey)) {
+    throw "KIOSK_INITIAL_SETUP_KEY es obligatoria para publicar también el instalador interno del panel."
+}
 if ([string]::IsNullOrWhiteSpace($InitialSetupKey)) {
     Write-Warning "No se indicó InitialSetupKey: no se generará el instalador interno con pack."
 }
 
-# 1. Limpia el publish anterior (evita arrastrar archivos viejos borrados del proyecto).
+# 1. Valida las rutas antes de limpiar salidas generadas.
+foreach ($generatedPath in @($publishDir, $agentPublishDir, $maintenancePublishDir, $setupHelperPublishDir, $updateRunnerPublishDir)) {
+    $resolvedPath = [IO.Path]::GetFullPath($generatedPath)
+    if ([IO.Path]::GetDirectoryName($resolvedPath) -ne [IO.Path]::GetFullPath($root)) { throw "Salida fuera del workspace: $resolvedPath" }
+}
 if (Test-Path $publishDir) { Remove-Item $publishDir -Recurse -Force }
 if (Test-Path $agentPublishDir) { Remove-Item $agentPublishDir -Recurse -Force }
 if (Test-Path $maintenancePublishDir) { Remove-Item $maintenancePublishDir -Recurse -Force }
@@ -200,6 +207,11 @@ if ($Publish) {
     $headers = @{ "X-Release-Publish-Key" = $ReleasePublishKey }
     $form = @{ manifest = Get-Item $manifestPath; signature = Get-Content $signaturePath -Raw; setup = Get-Item $setup }
     Invoke-RestMethod -Method Post -Uri "$($ServerUrl.TrimEnd('/'))/api/releases" -Headers $headers -Form $form | Out-Null
+    # Private provisioning key must never be uploaded to a public GitHub release.
+    if ($internalSetup) {
+        $internalForm = @{ manifest = Get-Item $bundlePath; setup = Get-Item $internalSetup }
+        Invoke-RestMethod -Method Post -Uri "$($ServerUrl.TrimEnd('/'))/api/releases/setup" -Headers $headers -Form $internalForm | Out-Null
+    }
     Write-Host "Release v$Version publicado." -ForegroundColor Green
 }
 

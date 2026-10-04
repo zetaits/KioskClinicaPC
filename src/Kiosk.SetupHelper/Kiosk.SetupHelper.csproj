@@ -1,14 +1,26 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net10.0-windows</TargetFramework>
+    <TargetFramework>net10.0-windows10.0.26100.0</TargetFramework>
+    <SupportedOSPlatformVersion>10.0.19041.0</SupportedOSPlatformVersion>
+    <UseWPF>true</UseWPF>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>KioskSetupHelper</AssemblyName>
     <Version>1.2.0</Version>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <!-- WinRT metadata/activation needs physical files, including the SDK's .winmd. -->
+    <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
+    <WinGetInteropVersion>1.29.380</WinGetInteropVersion>
+    <MicrosoftManagementDeployment-OutputWinMD>false</MicrosoftManagementDeployment-OutputWinMD>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="Microsoft.WindowsPackageManager.ComInterop" Version="$(WinGetInteropVersion)" />
+    <!-- Windows' COM marshaler searches beside the process EXE, not .NET's extraction directory. -->
+    <Content Include="$(NuGetPackageRoot)microsoft.windowspackagemanager.cominterop/$(WinGetInteropVersion)/lib/uap10.0/Microsoft.Management.Deployment.winmd"
+             Link="Microsoft.Management.Deployment.winmd" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
+    <PackageReference Include="YamlDotNet" Version="16.3.0" />
     <ProjectReference Include="..\Kiosk.Shared\Kiosk.Shared.csproj" />
     <ProjectReference Include="..\Kiosk.InstallerCore\Kiosk.InstallerCore.csproj" />
   </ItemGroup>

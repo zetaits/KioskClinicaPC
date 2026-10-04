@@ -105,6 +105,7 @@ builder.Services.AddSingleton(new InstallerCatalog(dataDir, installersDir, maxIn
 builder.Services.AddSingleton(new InstallationJobStore(dataDir));
 builder.Services.AddSingleton(new InitialSetupSessionStore(dataDir));
 builder.Services.AddSingleton(new InitialSetupBundleStore(setupDir));
+builder.Services.AddSingleton(new PackCatalogStore(dataDir));
 builder.Services.AddSingleton(new MaintenanceJobStore(dataDir));
 builder.Services.AddSingleton(new KioskUpdateStore(dataDir, updatesDir, maxInstallerBytes, storeTz,
     updateTokenKey, updateSigningKeys));
@@ -289,6 +290,55 @@ app.MapGet("/api/config/version", (ContentResolver content, AssetLibrary assets)
 app.MapGet("/api/assets/manifest", (AssetLibrary assets) => Results.Ok(assets.Manifest()));
 
 static string? UpdateToken(HttpContext ctx) => ctx.Request.Headers["X-Update-Token"].FirstOrDefault();
+
+app.MapGet("/api/setup/v2/catalog", (PackCatalogStore catalog) => Results.Ok(catalog.Snapshot()))
+    .RequireRateLimiting("initial-setup");
+
+app.MapPost("/api/releases/winget-index", async (HttpContext ctx, PackCatalogStore catalog) =>
+{
+    if (!SecretEquals(releasePublishKey, ctx.Request.Headers["X-Release-Publish-Key"].FirstOrDefault()))
+        return string.IsNullOrWhiteSpace(releasePublishKey) ? Results.StatusCode(503) : Results.Unauthorized();
+    const int maxIndexBytes = 32 * 1024 * 1024;
+    if (ctx.Request.ContentLength > maxIndexBytes) return Results.BadRequest();
+    try
+    {
+        using var body = new MemoryStream();
+        var buffer = new byte[81920]; int read;
+        while ((read = await ctx.Request.Body.ReadAsync(buffer, ctx.RequestAborted)) > 0)
+        {
+            if (body.Length + read > maxIndexBytes) throw new InvalidDataException("Índice demasiado grande.");
+            await body.WriteAsync(buffer.AsMemory(0, read), ctx.RequestAborted);
+        }
+        body.Position = 0;
+        var index = await System.Text.Json.JsonSerializer.DeserializeAsync<WingetIndex>(body,
+            new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web), ctx.RequestAborted);
+        catalog.Import(index ?? throw new InvalidDataException("Falta el índice."));
+        return Results.Ok(new { index.GeneratedAtUtc, count = index.Applications.Count });
+    }
+    catch (Exception ex) when (ex is InvalidDataException or System.Text.Json.JsonException)
+    { return Results.BadRequest(new { error = ex.Message }); }
+});
+
+app.MapPost("/api/releases/setup", async (HttpContext ctx, InitialSetupBundleStore bundles) =>
+{
+    if (!SecretEquals(releasePublishKey, ctx.Request.Headers["X-Release-Publish-Key"].FirstOrDefault()))
+        return string.IsNullOrWhiteSpace(releasePublishKey) ? Results.StatusCode(503) : Results.Unauthorized();
+    try
+    {
+        var form = await ctx.Request.ReadFormAsync(ctx.RequestAborted);
+        var manifest = form.Files.GetFile("manifest") ?? throw new InvalidDataException("Falta el manifiesto.");
+        var setup = form.Files.GetFile("setup") ?? throw new InvalidDataException("Falta el Setup.");
+        if (manifest.Length is <= 0 or > 128 * 1024) throw new InvalidDataException("Manifiesto demasiado grande.");
+        using var reader = new StreamReader(manifest.OpenReadStream());
+        var parsed = Newtonsoft.Json.JsonConvert.DeserializeObject<InitialSetupBundleManifest>(await reader.ReadToEndAsync(ctx.RequestAborted))
+            ?? throw new InvalidDataException("Manifiesto vacío.");
+        await using var stream = setup.OpenReadStream();
+        await bundles.ImportAsync(parsed, setup.FileName, stream, ctx.RequestAborted);
+        return Results.Ok(new { parsed.Version });
+    }
+    catch (Exception ex) when (ex is InvalidDataException or IOException or Newtonsoft.Json.JsonException)
+    { return Results.BadRequest(new { error = ex.Message }); }
+}).DisableAntiforgery();
 
 app.MapPost("/api/releases", async (HttpContext ctx, KioskUpdateStore updates) =>
 {

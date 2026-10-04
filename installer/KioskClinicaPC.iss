@@ -58,6 +58,14 @@ WizardStyle=modern
 ; usuario en %LOCALAPPDATA% se conserva (UninstallDelete solo corre en desinstalacion real).
 CloseApplications=yes
 RestartApplications=yes
+RestartIfNeededByRun=no
+#if InternalSetup == "1"
+AllowCancelDuringInstall=no
+UsePreviousSetupType=no
+UsePreviousTasks=no
+CreateAppDir=no
+MinVersion=10.0.19045
+#endif
 ; Cierra tambien procesos que no respondan al mensaje de cierre (kiosko fullscreen).
 CloseApplicationsFilter=*.exe
 ; Solo PCs x64.
@@ -70,6 +78,7 @@ Name: "spanish"; MessagesFile: "compiler:Languages\Spanish.isl"
 
 [Types]
 #if InternalSetup == "1"
+Name: "packonly"; Description: "Solo pack de aplicaciones (sin Kiosk)"
 Name: "full"; Description: "Kiosk y pack de aplicaciones"
 Name: "kioskonly"; Description: "Solo Kiosk"
 Name: "custom"; Description: "Personalizada"; Flags: iscustom
@@ -80,7 +89,7 @@ Name: "kioskonly"; Description: "Kiosk"
 [Components]
 #if InternalSetup == "1"
 Name: "kiosk"; Description: "Instalar Kiosko Clínica PC"; Types: full kioskonly
-Name: "pack"; Description: "Instalar pack de aplicaciones del servidor"; Types: full
+Name: "pack"; Description: "Instalar pack de aplicaciones del servidor"; Types: packonly full
 #else
 Name: "kiosk"; Description: "Instalar Kiosko Clínica PC"; Types: kioskonly; Flags: fixed
 #endif
@@ -104,6 +113,7 @@ Source: "{#UpdateRunnerPublishDir}\KioskUpdateRunner.exe"; DestDir: "{app}\Agent
 Source: "updater.cmd"; DestDir: "{commonappdata}\KioskClinicaPC"; Flags: onlyifdoesntexist uninsremovereadonly; Components: kiosk
 #if InternalSetup == "1"
 Source: "{#SetupHelperPublishDir}\KioskSetupHelper.exe"; Flags: dontcopy noencryption
+Source: "{#SetupHelperPublishDir}\Microsoft.Management.Deployment.winmd"; Flags: dontcopy noencryption
 #endif
 
 [Icons]
@@ -132,7 +142,6 @@ Filename: "{sys}\sc.exe"; Parameters: "start KioskClinicaPCInstallerAgent"; Flag
 ; skipifsilent: en un upgrade silencioso (tarea SYSTEM) NO se relanza aqui (seria sesion 0); el
 ; reinicio del updater.cmd + autostart lo trae de vuelta en la sesion del usuario.
 Filename: "{app}\{#MyAppExeName}"; Parameters: "--register-autostart-only"; Flags: runhidden runasoriginaluser; Components: kiosk; Check: ShouldRegisterOnly
-Filename: "{sys}\shutdown.exe"; Parameters: "/r /t 60 /c ""Las aplicaciones se han instalado. El equipo se reiniciará en 60 segundos."""; Flags: runhidden; Check: ShouldScheduleRestart
 Filename: "{app}\{#MyAppExeName}"; Description: "Ejecutar {#MyAppName} ahora"; Flags: nowait postinstall skipifsilent runasoriginaluser; Components: kiosk; Check: ShouldLaunchKiosk
 
 [UninstallRun]
@@ -162,12 +171,12 @@ var
   ServerProvisioningWritten: Boolean;
   PackNeedsRestart: Boolean;
   PackSummary: String;
-  RestartCancelled: Boolean;
 #if InternalSetup == "1"
   AppsPage: TInputOptionWizardPage;
   PackageIds: array of String;
   CatalogLoaded: Boolean;
-  CancelRestartButton: TNewButton;
+  PackFailed: Boolean;
+  ResumePack: Boolean;
 #endif
 
 function ShouldInstallKiosk(): Boolean;
@@ -186,17 +195,19 @@ end;
 
 function ShouldRegisterOnly(): Boolean;
 begin
+#if InternalSetup == "1"
+  Result := ShouldInstallKiosk() and (not WizardSilent);
+#else
   Result := ShouldInstallKiosk() and PackNeedsRestart and (not WizardSilent);
-end;
-
-function ShouldScheduleRestart(): Boolean;
-begin
-  Result := PackNeedsRestart and (not WizardSilent);
+#endif
 end;
 
 function ShouldLaunchKiosk(): Boolean;
 begin
   Result := ShouldInstallKiosk() and (not PackNeedsRestart);
+#if InternalSetup == "1"
+  Result := Result and (not PackFailed);
+#endif
 end;
 
 function JsonEscape(const Value: String): String;
@@ -212,16 +223,20 @@ function NormalizedServerUrl(): String; forward;
 
 #if InternalSetup == "1"
 function SetupRequestText(): String;
+var ResumeValue: String;
 begin
+  if ResumePack then ResumeValue := '1' else ResumeValue := '0';
   Result := '[Setup]' + #13#10 +
     'ServerUrl=' + NormalizedServerUrl() + #13#10 +
     'SetupKey=' + ProvisionedInitialSetupKey + #13#10 +
-    'Version={#MyAppVersion}' + #13#10;
+    'Version={#MyAppVersion}' + #13#10 +
+    'Resume=' + ResumeValue + #13#10 +
+    'Snapshot=' + ExpandConstant('{tmp}\pack-snapshot.json') + #13#10;
 end;
 
 function LoadSetupCatalog(var Detail: String): Boolean;
 var
-  RequestPath, ResultPath, HelperPath, Name, LabelText: String;
+  RequestPath, ResultPath, HelperPath, Name, LabelText, Mode: String;
   ResultCode, Count, I: Integer;
   SizeBytes: Int64;
   IsDefault, WasApplied: Boolean;
@@ -236,13 +251,27 @@ begin
 
   try
     ExtractTemporaryFile('KioskSetupHelper.exe');
+    ExtractTemporaryFile('Microsoft.Management.Deployment.winmd');
     RequestPath := ExpandConstant('{tmp}\setup-catalog-request.ini');
     ResultPath := ExpandConstant('{tmp}\setup-catalog-result.ini');
     HelperPath := ExpandConstant('{tmp}\KioskSetupHelper.exe');
+    Mode := 'catalog';
     DeleteFile(ResultPath);
-    if not SaveStringToFile(RequestPath, SetupRequestText(), False) then
+    if not SaveStringToFile(RequestPath, UTF8Encode(SetupRequestText()), False) then
       RaiseException('No se pudo preparar la consulta del catálogo.');
-    if not Exec(HelperPath, 'catalog "' + RequestPath + '" "' + ResultPath + '"', ExpandConstant('{tmp}'),
+    if not WizardSilent then
+    begin
+      if Exec(HelperPath, 'pending-catalog "' + RequestPath + '" "' + ResultPath + '"', ExpandConstant('{tmp}'),
+        SW_HIDE, ewWaitUntilTerminated, ResultCode) then
+        if GetIniString('Result', 'Ok', '0', ResultPath) = '1' then
+          if MsgBox('Hay una instalación pendiente en este ordenador. ¿Quieres reanudar su selección y versiones originales?', mbConfirmation, MB_YESNO) = IDYES then
+          begin
+            ResumePack := True;
+            Mode := 'pending-catalog';
+          end;
+      DeleteFile(ResultPath);
+    end;
+    if not Exec(HelperPath, Mode + ' "' + RequestPath + '" "' + ResultPath + '"', ExpandConstant('{tmp}'),
       SW_HIDE, ewWaitUntilTerminated, ResultCode) then
       RaiseException('No se pudo ejecutar el asistente del pack.');
     if GetIniString('Result', 'Ok', '0', ResultPath) <> '1' then
@@ -259,7 +288,7 @@ begin
       SizeBytes := StrToInt64Def(GetIniString('Package' + IntToStr(I), 'SizeBytes', '0', ResultPath), 0);
       IsDefault := GetIniString('Package' + IntToStr(I), 'Default', '0', ResultPath) = '1';
       WasApplied := GetIniString('Package' + IntToStr(I), 'Applied', '0', ResultPath) = '1';
-      LabelText := Name + '  (' + IntToStr(SizeBytes div 1024 div 1024) + ' MB)';
+      LabelText := Name;
       if WasApplied then LabelText := LabelText + '  — aplicada anteriormente';
       AppsPage.Add(LabelText);
       AppsPage.Values[I] := IsDefault and (not WasApplied);
@@ -279,11 +308,12 @@ begin
     if AppsPage.Values[I] then Result := Result + 1;
 end;
 
-procedure InstallSelectedPackages();
+function RunSelectedPackages(const Mode: String): Boolean;
 var
   RequestPath, ResultPath, HelperPath, RequestText: String;
   ResultCode, I, SelectedIndex: Integer;
 begin
+  Result := False;
   if (not ShouldInstallPack()) or (SelectedPackageCount() = 0) then exit;
   RequestText := SetupRequestText() + #13#10 + '[Selection]' + #13#10 +
     'Count=' + IntToStr(SelectedPackageCount()) + #13#10;
@@ -299,9 +329,9 @@ begin
   ResultPath := ExpandConstant('{tmp}\setup-install-result.ini');
   HelperPath := ExpandConstant('{tmp}\KioskSetupHelper.exe');
   DeleteFile(ResultPath);
-  SaveStringToFile(RequestPath, RequestText, False);
+  SaveStringToFile(RequestPath, UTF8Encode(RequestText), False);
   WizardForm.StatusLabel.Caption := 'Descargando e instalando las aplicaciones seleccionadas…';
-  if not Exec(HelperPath, 'install "' + RequestPath + '" "' + ResultPath + '"', ExpandConstant('{tmp}'),
+  if not Exec(HelperPath, Mode + ' "' + RequestPath + '" "' + ResultPath + '"', ExpandConstant('{tmp}'),
     SW_HIDE, ewWaitUntilTerminated, ResultCode) then
   begin
     PackSummary := 'No se pudo ejecutar el instalador de aplicaciones.';
@@ -312,39 +342,38 @@ begin
   StringChangeEx(PackSummary, '\n', #13#10, True);
   if PackSummary = '' then
     PackSummary := GetIniString('Result', 'Error', 'No se recibió un resultado del pack.', ResultPath);
+  Result := (ResultCode = 0) and (GetIniString('Result', 'Ok', '0', ResultPath) = '1');
 end;
 
-procedure CancelScheduledRestart(Sender: TObject);
-var ResultCode: Integer;
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+var Detail: String;
 begin
-  if Exec(ExpandConstant('{sys}\shutdown.exe'), '/a', '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
-  begin
-    RestartCancelled := True;
-    CancelRestartButton.Visible := False;
-    WizardForm.FinishedLabel.Caption := 'El reinicio automático se ha cancelado.' + #13#10 + PackSummary;
-    if ShouldInstallKiosk() then
-      ExecAsOriginalUser(ExpandConstant('{app}\{#MyAppExeName}'), '', '', SW_SHOWNORMAL, ewNoWait, ResultCode);
-  end;
+  Result := '';
+  if not ShouldInstallPack() then exit;
+  { Silent mode bypasses NextButtonClick: load defaults explicitly. }
+  if (not CatalogLoaded) and (not LoadSetupCatalog(Detail)) then
+  begin Result := Detail; exit; end;
+  if SelectedPackageCount() = 0 then
+  begin Result := 'Selecciona al menos una aplicación o desmarca el pack.'; exit; end;
+  if not RunSelectedPackages('preflight') then Result := PackSummary;
+end;
+
+function GetCustomSetupExitCode(): Integer;
+begin
+  if PackFailed then Result := 2 else Result := 0;
 end;
 
 procedure InitializeWizard();
 begin
   AppsPage := CreateInputOptionPage(wpSelectComponents,
     'Aplicaciones del pack', 'Selecciona las aplicaciones que quieres instalar',
-    'Las aplicaciones se descargarán del servidor, se verificarán y se instalarán sin más intervención.', True, False);
-  CancelRestartButton := TNewButton.Create(WizardForm);
-  CancelRestartButton.Parent := WizardForm.FinishedPage;
-  CancelRestartButton.Caption := 'Cancelar reinicio automático';
-  CancelRestartButton.Left := WizardForm.FinishedLabel.Left;
-  CancelRestartButton.Top := WizardForm.FinishedLabel.Top + WizardForm.FinishedLabel.Height + ScaleY(24);
-  CancelRestartButton.Width := ScaleX(210);
-  CancelRestartButton.OnClick := @CancelScheduledRestart;
-  CancelRestartButton.Visible := False;
+    'Las aplicaciones se descargarán de WinGet, se verificarán y se instalarán sin más intervención.', False, False);
 end;
 
 function ShouldSkipPage(PageID: Integer): Boolean;
 begin
-  Result := (PageID = AppsPage.ID) and (not ShouldInstallPack());
+  Result := ((PageID = AppsPage.ID) and (not ShouldInstallPack())) or
+    (((PageID = wpSelectDir) or (PageID = wpSelectProgramGroup) or (PageID = wpSelectTasks)) and (not ShouldInstallKiosk()));
 end;
 
 function NextButtonClick(CurPageID: Integer): Boolean;
@@ -379,13 +408,13 @@ procedure CurPageChanged(CurPageID: Integer);
 begin
   if CurPageID = wpFinished then
   begin
+    WizardForm.NoRadio.Checked := True;
     if PackSummary <> '' then
       WizardForm.FinishedLabel.Caption := WizardForm.FinishedLabel.Caption + #13#10#13#10 + PackSummary;
     if PackNeedsRestart then
     begin
       WizardForm.FinishedLabel.Caption := WizardForm.FinishedLabel.Caption + #13#10#13#10 +
-        'El equipo se reiniciará automáticamente en 60 segundos.';
-      CancelRestartButton.Visible := True;
+        'Windows solicita un reinicio. Reinicia manualmente cuando hayas revisado el resultado.';
     end;
   end;
 end;
@@ -417,58 +446,6 @@ begin
   Result := SaveStringToFile(ProvisioningPath, Json, False);
 end;
 
-function TestProvisionedServer(var Detail: String): Boolean;
-var
-  Http: Variant;
-  StatusCode: Integer;
-begin
-  Result := False;
-  Detail := '';
-  try
-    Http := CreateOleObject('WinHttp.WinHttpRequest.5.1');
-    Http.SetTimeouts(5000, 5000, 5000, 10000);
-    Http.Open('GET', NormalizedServerUrl() + '/api/config/version', False);
-    Http.SetRequestHeader('X-Api-Key', ProvisionedServerApiKey);
-    Http.Send('');
-    StatusCode := Http.Status;
-    Result := StatusCode = 200;
-    if not Result then
-    begin
-      if StatusCode = 401 then
-        Detail := 'La clave de conexión fue rechazada por el servidor.'
-      else
-        Detail := Format('El servidor respondió con el código HTTP %d.', [StatusCode]);
-    end;
-  except
-    Detail := 'No se pudo contactar con el servidor. Comprueba la conexión a Internet e inténtalo de nuevo.';
-  end;
-end;
-
-procedure NotifyServerConnection();
-var
-  Detail: String;
-begin
-  if WizardSilent or (NormalizedServerUrl() = '') or (ProvisionedServerApiKey = '') then
-    exit;
-
-  if not ServerProvisioningWritten then
-  begin
-    MsgBox('No se pudo guardar la configuración automática del servidor.' + #13#10#13#10 +
-      'La instalación continuará, pero será necesario configurar la conexión desde Ajustes.',
-      mbError, MB_OK);
-    exit;
-  end;
-
-  if TestProvisionedServer(Detail) then
-    MsgBox('El servidor responde. El kiosco aplicará estos datos al iniciarse si aún no tiene servidor configurado.' + #13#10 +
-      NormalizedServerUrl(), mbInformation, MB_OK)
-  else
-    MsgBox('El instalador incluye los datos del servidor, pero no ha podido verificar la conexión.' + #13#10#13#10 +
-      Detail + #13#10#13#10 +
-      'La instalación continuará y el kiosco volverá a intentarlo automáticamente al iniciarse.',
-      mbError, MB_OK);
-end;
-
 procedure CurStepChanged(CurStep: TSetupStep);
 var
   ResultCode: Integer;
@@ -483,12 +460,20 @@ begin
     if ShouldInstallKiosk() then
     begin
       ServerProvisioningWritten := WriteServerProvisioning();
-      NotifyServerConnection();
+      if (ProvisionedServerApiKey <> '') and (not ServerProvisioningWritten) then
+        Log('No se pudo guardar el aprovisionamiento de Kiosk; configura la conexión desde Ajustes.');
+      { No blocking network dialogs after installation has started. }
     end;
-#if InternalSetup == "1"
-    InstallSelectedPackages();
-#endif
   end;
+#if InternalSetup == "1"
+  { ssDone runs after non-postinstall [Run] entries: optional Kiosk services/tasks/autostart
+    are fully configured before the local results window awaits the user's return. }
+  if (CurStep = ssDone) and ShouldInstallPack() then
+  begin
+    if WizardSilent then PackFailed := not RunSelectedPackages('install-silent')
+    else PackFailed := not RunSelectedPackages('install');
+  end;
+#endif
 end;
 
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);

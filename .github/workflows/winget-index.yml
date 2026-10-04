@@ -1,0 +1,49 @@
+name: Official WinGet catalogue
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 4 * * *'
+permissions:
+  contents: read
+concurrency:
+  group: winget-index-production
+  cancel-in-progress: false
+jobs:
+  export-import:
+    runs-on: windows-latest
+    environment: production
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: microsoft/winget-pkgs
+          path: winget-manifests
+          fetch-depth: 1
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Prepare official WinGet
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Install-Module Microsoft.WinGet.Client -RequiredVersion 1.12.440 -Scope CurrentUser -Force -Repository PSGallery
+          Import-Module Microsoft.WinGet.Client -RequiredVersion 1.12.440
+          Repair-WinGetPackageManager -Version 1.29.380 -Force
+      - name: Export structured catalogue
+        shell: pwsh
+        run: |
+          dotnet publish src/Kiosk.SetupHelper -c Release -r win-x64 --self-contained true -o index-tool
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot build exporter' }
+          ./index-tool/KioskSetupHelper.exe export-index winget-index.json winget-manifests
+          if ($LASTEXITCODE -ne 0) { throw 'Incomplete index: keeping last good server catalogue' }
+      - name: Import atomically
+        shell: pwsh
+        env:
+          PUBLISH_KEY: ${{ secrets.KIOSK_RELEASE_PUBLISH_KEY }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if (-not $env:PUBLISH_KEY) { throw 'Missing release publish key' }
+          Invoke-RestMethod -Method Post -Uri 'https://panel.clinicapc.es/api/releases/winget-index' -Headers @{ 'X-Release-Publish-Key' = $env:PUBLISH_KEY } -ContentType 'application/json' -InFile winget-index.json | Out-Null

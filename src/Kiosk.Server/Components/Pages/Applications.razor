@@ -93,20 +93,6 @@
                             @(package.HasEmbeddedSignature ? "Firma incluida" : "Sin firma")
                         </span>
                         <time>@package.UploadedAtUtc.ToLocalTime().ToString("dd/MM/yyyy")</time>
-                        <label class="check-row">
-                            <input type="checkbox" checked="@package.AvailableInInitialSetup"
-                                   @onchange="e => ConfigureSetup(package, available: (bool)(e.Value ?? false), selected: package.SelectedByDefault, order: package.InitialSetupOrder)" />
-                            <span>Mostrar en Setup</span>
-                        </label>
-                        <label class="check-row">
-                            <input type="checkbox" disabled="@(!package.AvailableInInitialSetup)" checked="@package.SelectedByDefault"
-                                   @onchange="e => ConfigureSetup(package, available: package.AvailableInInitialSetup, selected: (bool)(e.Value ?? false), order: package.InitialSetupOrder)" />
-                            <span>Preseleccionada</span>
-                        </label>
-                        <label class="setup-order">Orden
-                            <input type="number" min="0" max="10000" value="@package.InitialSetupOrder"
-                                   @onchange="e => ConfigureSetup(package, package.AvailableInInitialSetup, package.SelectedByDefault, ParseOrder(e.Value))" />
-                        </label>
                     </div>
                     <div class="catalog-actions">
                         <button type="button" @onclick="() => BeginRename(package)">Renombrar</button>
@@ -331,19 +317,6 @@
         _toastError = errors.Count > 0;
         _toast = errors.Count == 0 ? $"Instalación enviada a {sent} equipo(s)." : $"Enviadas: {sent}. Errores: {string.Join("; ", errors)}";
     }
-
-    private void ConfigureSetup(InstallerPackage package, bool available, bool selected, int order)
-    {
-        try
-        {
-            Catalog.ConfigureInitialSetup(package.Id, available, selected, order);
-            _toast = "Configuración del pack actualizada.";
-            _toastError = false;
-        }
-        catch (Exception ex) { _toast = ex.Message; _toastError = true; }
-    }
-
-    private static int ParseOrder(object? value) => int.TryParse(value?.ToString(), out int order) ? order : 0;
 
     private string DeviceReason(FleetDevice d) =>
         JobsReason(d) ?? (d.CanInstall ? $"Agente {d.InstallerAgentVersion}" : "Actualiza el kiosko para habilitar instalaciones");
