@@ -6,7 +6,15 @@ namespace Kiosk.SetupHelper;
 
 internal sealed class WinGetEngine : IPackBackend
 {
-    private readonly PackageManager _manager = WinGetActivation.Create<PackageManager>();
+    private readonly PackageManager _manager;
+    private readonly Action<string>? _phase, _info;
+    public WinGetEngine(Action<string>? phase = null, Action<string>? info = null)
+    {
+        (_phase, _info) = (phase, info);
+        _phase?.Invoke("Activating WinGet PackageManager COM API");
+        _manager = WinGetActivation.Create<PackageManager>();
+        _info?.Invoke("WinGet COM activation completed.");
+    }
     public void RequireSupportedRuntime()
     {
         // The version property is available in supported recent clients; older COM interfaces trigger bootstrap.
@@ -15,6 +23,7 @@ internal sealed class WinGetEngine : IPackBackend
     }
     private async Task<PackageCatalog> Connect(bool installed)
     {
+        _phase?.Invoke("Locating and validating official winget source");
         var source = _manager.GetPackageCatalogByName("winget") ?? throw new InvalidOperationException("Falta el origen oficial winget.");
         // Do not trust a source merely because it was named winget.
         if (!source.Info.Argument.Equals("https://cdn.winget.microsoft.com/cache", StringComparison.OrdinalIgnoreCase))
@@ -27,7 +36,9 @@ internal sealed class WinGetEngine : IPackBackend
             options.CompositeSearchBehavior = CompositeSearchBehavior.RemotePackagesFromAllCatalogs;
             source = _manager.CreateCompositePackageCatalog(options);
         }
+        _phase?.Invoke("Connecting to official winget source");
         var result = await source.ConnectAsync();
+        _info?.Invoke($"Source connection status: {result.Status}.");
         if (result.Status != ConnectResultStatus.Ok) throw new IOException($"WinGet: conexión fallida ({result.Status}).");
         return result.PackageCatalog;
     }
@@ -136,16 +147,21 @@ internal sealed class WinGetEngine : IPackBackend
     public async Task<WingetIndex> Export(string manifestRepository)
     {
         var catalog = await Connect(false);
+        _phase?.Invoke("Creating catalogue search options");
         var options = WinGetActivation.Create<FindPackagesOptions>();
+        _phase?.Invoke("Enumerating official catalogue packages");
         var result = await catalog.FindPackagesAsync(options);
+        _info?.Invoke($"Search status: {result.Status}; matches: {result.Matches.Count}; limit exceeded: {result.WasLimitExceeded}.");
         if (result.Status != FindPackagesResultStatus.Ok || result.WasLimitExceeded || result.Matches.Count < 1000)
-            throw new InvalidDataException("Exportación incompleta; no se publicará el índice.");
+            throw new InvalidDataException($"Exportación incompleta: status={result.Status}, matches={result.Matches.Count}, limitExceeded={result.WasLimitExceeded}; no se publicará el índice.");
         var entries = new List<WingetIndexEntry>();
         for (int i = 0; i < result.Matches.Count; i++)
         {
+            _phase?.Invoke($"Reading catalogue package {i + 1}/{result.Matches.Count}");
             var match = result.Matches[i];
             var package = match.CatalogPackage; var version = package.DefaultInstallVersion;
             if (version == null) continue;
+            _phase?.Invoke($"Validating {package.Id} {version.Version}");
             bool eligible = true; string? reason = null;
             try
             {
@@ -153,11 +169,17 @@ internal sealed class WinGetEngine : IPackBackend
                 if (!ManifestPolicy.ValidateLocal(manifestRepository, package.Id, version.Version))
                     throw new InvalidDataException("No declara instalación silenciosa para todo el equipo.");
             }
-            catch (Exception ex) { eligible = false; reason = ex.Message; }
+            catch (Exception ex) { eligible = false; reason = ExportDiagnostics.Describe(ex); }
+            _phase?.Invoke($"Reading publisher metadata for {package.Id} {version.Version}");
             entries.Add(new(package.Id, package.Name, version.GetCatalogPackageMetadata().Publisher, version.Version, eligible, reason));
+            if ((i + 1) % 100 == 0) _info?.Invoke($"Progress: {i + 1}/{result.Matches.Count}; entries: {entries.Count}; eligible: {entries.Count(x => x.Eligible)}.");
         }
+        _phase?.Invoke("Checking catalogue completeness");
+        _info?.Invoke($"Catalogue totals: {entries.Count} entries; {entries.Count(x => x.Eligible)} eligible.");
+        foreach (var rejection in entries.Where(x => !x.Eligible).GroupBy(x => x.Reason).OrderByDescending(x => x.Count()).Take(10))
+            _info?.Invoke($"Rejected packages: {rejection.Count()}; reason: {rejection.Key}");
         if (entries.Count < 1000 || entries.Count(x => x.Eligible) < 100)
-            throw new InvalidDataException("Índice incompleto o sin suficientes manifiestos válidos. Se conserva el índice anterior.");
+            throw new InvalidDataException($"Índice incompleto: {entries.Count} entradas, {entries.Count(x => x.Eligible)} elegibles (mínimos: 1000/100). Se conserva el índice anterior.");
         return new(DateTime.UtcNow, entries);
     }
 }

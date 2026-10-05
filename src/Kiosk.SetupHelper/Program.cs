@@ -28,8 +28,29 @@ internal static class Program
         if (args[0] == "export-index")
         {
             if (args.Length != 3) return 64;
-            try { var index = Task.Run(() => new WinGetEngine().Export(args[2])).GetAwaiter().GetResult(); File.WriteAllText(args[1], JsonSerializer.Serialize(index, Json)); return 0; }
-            catch (Exception ex) { Console.Error.WriteLine(ex.Message); return 1; }
+            ExportDiagnostics? diagnostics = null;
+            try
+            {
+                diagnostics = new ExportDiagnostics(args[1]);
+                diagnostics.Info($"Runtime: {System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription}; " +
+                    $"OS: {System.Runtime.InteropServices.RuntimeInformation.OSDescription}; " +
+                    $"architecture: {System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture}");
+                diagnostics.Phase("Checking official manifest repository");
+                if (!Directory.Exists(Path.Combine(args[2], "manifests")))
+                    throw new DirectoryNotFoundException("The official manifest repository has no manifests directory.");
+                var index = Task.Run(() => new WinGetEngine(diagnostics.Phase, diagnostics.Info).Export(args[2])).GetAwaiter().GetResult();
+                diagnostics.Phase("Writing catalogue JSON");
+                File.WriteAllText(args[1], JsonSerializer.Serialize(index, Json));
+                diagnostics.Info($"Export complete: {index.Applications.Count} applications; {index.Applications.Count(x => x.Eligible)} eligible.");
+                return 0;
+            }
+            catch (Exception ex)
+            {
+                if (diagnostics != null) diagnostics.Failure(ex);
+                else Console.Error.WriteLine($"Export diagnostics initialization failed: {ExportDiagnostics.Describe(ex)}\n{ex}");
+                return 1;
+            }
+            finally { diagnostics?.Dispose(); }
         }
         if (args.Length != 3 || args[0] is not ("catalog" or "pending-catalog" or "preflight" or "install" or "install-silent")) return 64;
         try

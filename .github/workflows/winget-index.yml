@@ -32,13 +32,35 @@ jobs:
           Install-Module Microsoft.WinGet.Client -RequiredVersion 1.12.440 -Scope CurrentUser -Force -Repository PSGallery
           Import-Module Microsoft.WinGet.Client -RequiredVersion 1.12.440
           Repair-WinGetPackageManager -Version 1.29.380 -Force
-      - name: Export structured catalogue
+      - name: Build catalogue exporter
         shell: pwsh
         run: |
           dotnet publish src/Kiosk.SetupHelper -c Release -r win-x64 --self-contained true -o index-tool
           if ($LASTEXITCODE -ne 0) { throw 'Cannot build exporter' }
-          ./index-tool/KioskSetupHelper.exe export-index winget-index.json winget-manifests
-          if ($LASTEXITCODE -ne 0) { throw 'Incomplete index: keeping last good server catalogue' }
+      - name: Export structured catalogue
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $exporter = Start-Process -FilePath './index-tool/KioskSetupHelper.exe' -ArgumentList @('export-index', 'winget-index.json', 'winget-manifests') -Wait -PassThru -NoNewWindow -RedirectStandardOutput 'winget-export.stdout.log' -RedirectStandardError 'winget-export.stderr.log'
+          $exportExitCode = $exporter.ExitCode
+          $exportExitHex = '0x{0:X8}' -f ([BitConverter]::ToUInt32([BitConverter]::GetBytes([int]$exportExitCode), 0))
+          Write-Output "Exporter exit code: $exportExitCode ($exportExitHex)"
+          foreach ($log in @('winget-export.stdout.log', 'winget-export.stderr.log')) {
+            if (Test-Path -LiteralPath $log) { Get-Content -LiteralPath $log }
+          }
+          if ($exportExitCode -ne 0) { throw "Exporter failed (exit $exportExitCode, $exportExitHex). See winget-index-diagnostics artifact; keeping last good server catalogue." }
+          if (-not (Test-Path -LiteralPath 'winget-index.json')) { throw 'Exporter returned success but no catalogue; keeping last good server catalogue.' }
+      - name: Preserve export diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: winget-index-diagnostics
+          path: |
+            winget-export.stdout.log
+            winget-export.stderr.log
+            winget-index.json.diagnostics.log
+          if-no-files-found: warn
+          retention-days: 7
       - name: Import atomically
         shell: pwsh
         env:
