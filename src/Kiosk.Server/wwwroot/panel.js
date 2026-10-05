@@ -1,4 +1,51 @@
 (() => {
+  // El layout es SSR estático; el menú móvil no depende de un circuito Blazor.
+  const mobileNav = window.matchMedia("(max-width: 900px)");
+  const navLinks = () => [...document.querySelectorAll("#panel-navigation a[href], #panel-navigation button:not(:disabled)")];
+  const setNavOpen = (open, restoreFocus = true) => {
+    const sidebar = document.getElementById("panel-navigation");
+    const toggle = document.querySelector("[data-panel-nav-toggle]");
+    const scrim = document.querySelector("[data-panel-nav-close]");
+    if (!sidebar || !toggle || !scrim) return;
+    open = open && mobileNav.matches;
+    sidebar.classList.toggle("open", open);
+    toggle.setAttribute("aria-expanded", String(open));
+    scrim.hidden = !open;
+    const main = document.querySelector(".main");
+    if (main) main.inert = open;
+    if (open) navLinks()[0]?.focus();
+    else if (restoreFocus) toggle.focus();
+  };
+
+  document.addEventListener("click", event => {
+    if (event.target.closest("[data-panel-nav-toggle]")) {
+      setNavOpen(!document.getElementById("panel-navigation")?.classList.contains("open"));
+    } else if (event.target.closest("[data-panel-nav-close]")) {
+      setNavOpen(false);
+    } else if (event.target.closest("#panel-navigation a[href]")) {
+      setNavOpen(false, false);
+    }
+  });
+  document.addEventListener("keydown", event => {
+    if (!document.getElementById("panel-navigation")?.classList.contains("open")) return;
+    if (event.key === "Escape") {
+      event.preventDefault();
+      setNavOpen(false);
+    } else if (event.key === "Tab") {
+      const links = navLinks();
+      const first = links[0];
+      const last = links[links.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last?.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first?.focus();
+      }
+    }
+  });
+  mobileNav.addEventListener("change", () => setNavOpen(false, false));
+
   document.addEventListener("click", event => {
     const link = event.target.closest("[data-setup-download]");
     if (!link) return;

@@ -32,7 +32,7 @@
 <div class="split events">
     <div>
         <div class="card-head" style="margin-bottom:14px;">
-            <h2 class="mono">// Programados</h2>
+            <h2>Programados</h2>
             <button class="primary" style="font-size:12.5px;padding:9px 14px;" @onclick="NewEvent">+ Nuevo evento</button>
         </div>
 
@@ -89,7 +89,7 @@
                 <div style="flex:1;"><label>Fin · exclusivo</label><input type="datetime-local" @bind="_editing.End" @bind:format="yyyy-MM-ddTHH:mm" /></div>
             </div>
 
-            <div class="mono-label event-section-label">// Apariencia de la campaña</div>
+            <div class="mono-label event-section-label">Apariencia de la campaña</div>
             <div class="toggle-box @(_themeOn ? "on" : "")">
                 <div class="head">
                     <div class="toggle"><input type="checkbox" @bind="_themeOn" @bind:after="ThemeToggleChanged" /><span class="track"></span></div>
@@ -123,7 +123,7 @@
                 }
             </div>
 
-            <div class="mono-label event-section-label">// Contenido temporal · activa solo lo necesario</div>
+            <div class="mono-label event-section-label">Contenido temporal · activa solo lo necesario</div>
             <div class="event-overrides">
                 <div class="toggle-box @(_slidesOn ? "on" : "")"><div class="head"><div class="toggle"><input type="checkbox" @bind="_slidesOn" /><span class="track"></span></div><div class="txt"><div class="t">Slides · De ocasión</div><div class="s">Sustituyen el mazo base de equipos de ocasión</div></div></div>@if (_slidesOn) { <div class="body"><SlideListEditor Slides="_editing.AttractSlides" /></div> }</div>
                 <div class="toggle-box @(_slidesNewOn ? "on" : "")"><div class="head"><div class="toggle"><input type="checkbox" @bind="_slidesNewOn" /><span class="track"></span></div><div class="txt"><div class="t">Slides · Nuevo</div><div class="s">Sustituyen el mazo base de equipos nuevos</div></div></div>@if (_slidesNewOn) { <div class="body"><SlideListEditor Slides="_editing.AttractSlidesNew" /></div> }</div>

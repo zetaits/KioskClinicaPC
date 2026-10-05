@@ -14,7 +14,7 @@
 
 <div class="fleet-toolbar">
     <div class="search">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6f6890" stroke-width="2"><circle cx="11" cy="11" r="7" /><path d="M21 21l-4-4" /></svg>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7" /><path d="M21 21l-4-4" /></svg>
         <input type="text" placeholder="Buscar equipo, IP o hardware…" @bind="_search" @bind:event="oninput" />
     </div>
 
@@ -25,7 +25,7 @@
     </div>
 
     <div style="display:flex;align-items:center;gap:8px;margin-left:auto;">
-        <span class="mono-label" style="font-size:10px;letter-spacing:.14em;color:var(--dim);">Vista</span>
+        <span class="mono-label">Vista</span>
         <div class="viewtoggle">
             <button class="@(_cards ? "on" : "")" @onclick="() => _cards = true">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5" /><rect x="14" y="3" width="7" height="7" rx="1.5" /><rect x="3" y="14" width="7" height="7" rx="1.5" /><rect x="14" y="14" width="7" height="7" rx="1.5" /></svg>Tarjetas
@@ -153,7 +153,7 @@ else
 {
     <div class="modal-backdrop" @onclick="() => _price = null">
         <div class="modal" style="width:400px;" @onclick:stopPropagation="true">
-            <div class="eyebrow">// Precio expuesto</div>
+            <div class="eyebrow">Precio expuesto</div>
             <h2>@_price.Device.Name</h2>
             <p>@_price.Device.Equipment</p>
             <div class="row" style="margin-bottom:22px;flex-wrap:nowrap;">
@@ -179,7 +179,7 @@ else
 {
     <div class="modal-backdrop" @onclick="() => _rename = null">
         <div class="modal" style="width:400px;" @onclick:stopPropagation="true">
-            <div class="eyebrow">// Renombrar equipo</div>
+            <div class="eyebrow">Renombrar equipo</div>
             <h2>@_rename.Device.Name</h2>
             <p>El nombre identifica el equipo en el panel y en los avisos. No afecta al hostname del sistema.</p>
             <label>Nuevo nombre</label>
@@ -196,7 +196,7 @@ else
 {
     <div class="modal-backdrop" @onclick="() => _uninstall = null">
         <div class="modal danger" style="width:440px;" @onclick:stopPropagation="true">
-            <div class="eyebrow">// Operación irreversible</div>
+            <div class="eyebrow">Operación irreversible</div>
             <h2>Desinstalar Kiosk de @_uninstall.Device.Name</h2>
             <p>El equipo dejará de estar gestionado y desaparecerá de la aplicación instalada de Windows. Escribe <b>@_uninstall.Device.Name</b> para confirmar.</p>
             <input type="text" autocomplete="off" @bind="_uninstall.Confirmation" @bind:event="oninput" />

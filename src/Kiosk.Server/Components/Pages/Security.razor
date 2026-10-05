@@ -46,11 +46,11 @@
 
     <div style="display:flex;flex-direction:column;gap:20px;">
         <div class="card" style="padding:22px;">
-            <h2 class="mono" style="margin:0 0 15px;">// Estado del sistema</h2>
+            <h2 style="margin:0 0 15px;">Estado del sistema</h2>
             <div class="kv">
                 <div class="r">
                     <span class="k">Versión de contenido</span>
-                    <span class="v"><span class="dot sm online"></span>@Content.Version()</span>
+                    <span class="v">@Content.Version()</span>
                 </div>
                 <div class="r">
                     <span class="k">Hora de la tienda</span>
@@ -68,7 +68,7 @@
         </div>
 
         <div class="card sunken" style="padding:22px;">
-            <h2 class="mono" style="margin:0 0 14px;">// Accesos recientes al panel</h2>
+            <h2 style="margin:0 0 14px;">Accesos recientes al panel</h2>
             @if (_recent.Count == 0)
             {
                 <p class="muted" style="margin:0;font-size:13px;">Todavía no hay accesos registrados.</p>
