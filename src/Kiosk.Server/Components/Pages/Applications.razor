@@ -9,6 +9,12 @@
 @inject FleetRegistry Fleet
 @inject IHubContext<FleetHub> Hub
 
+<PackCatalogEditor />
+
+<details class="remote-applications" open="@(!string.IsNullOrWhiteSpace(InitialDevice) || !string.IsNullOrWhiteSpace(Error) || !string.IsNullOrWhiteSpace(Ok))">
+    <summary>Instalación remota en kioskos</summary>
+    <p class="muted">Esta sección gestiona los instaladores privados y trabajos de la flota. No modifica el pack de aplicaciones para ordenadores independientes.</p>
+
 @if (!string.IsNullOrWhiteSpace(Error))
 {
     <div class="alert error" role="alert"><span class="dot offline"></span>@Error</div>
@@ -215,6 +221,7 @@
 
 <ConfirmDialog Model="_confirm" OnClose="() => _confirm = null" />
 <Toast Message="@_toast" IsError="@_toastError" />
+</details>
 
 @code {
     [SupplyParameterFromQuery] public string? Error { get; set; }

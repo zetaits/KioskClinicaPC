@@ -3,59 +3,52 @@
 @rendermode InteractiveServer
 @using KioskClinicaPC.Core.Sync
 @inject InitialSetupBundleStore Bundles
-@inject PackCatalogStore Catalog
+@inject KioskUpdateStore Updates
 
-<section class="card setup-hero">
-    <h2>Preparar un ordenador</h2>
-    <p>Descarga y ejecuta el instalador en el ordenador que vas a preparar. No necesita pertenecer a la flota. El pack está seleccionado por defecto; Kiosk es opcional.</p>
-    @if (_bundle is not null)
-    {
-        <a class="btn primary button-link" href="/panel/setup/download" data-setup-download><span data-setup-download-label>Descargar instalador @_bundle.Manifest.Version</span></a>
-        <p data-setup-download-status hidden role="status"></p>
-    }
-    else { <p class="alert error">@(_bundleError ?? "Todavía no se ha publicado el instalador interno.")</p> }
-    <p class="muted">Windows 10 22H2 / Windows 11 x64 · Internet · Administrador. El progreso y el resultado se muestran solo en ese ordenador. Nunca reinicia automáticamente.</p>
-</section>
-<section class="card">
-    <h2>Añadir aplicaciones</h2>
-    <p>Busca, pulsa Añadir y listo. No necesitas subir instaladores ni escribir parámetros.</p>
-    <p class="muted">Índice oficial WinGet: @(Catalog.IndexUpdatedAtUtc == DateTime.MinValue ? "pendiente de primera importación" : Catalog.IndexUpdatedAtUtc.ToLocalTime().ToString("dd/MM/yyyy HH:mm"))</p>
-    <input aria-label="Buscar aplicación" placeholder="Nombre o identificador, por ejemplo Google.Chrome" @bind="_query" @bind:event="oninput" />
-    @foreach (var app in Catalog.Search(_query))
-    {
-        <div class="job-row">
-            <div class="job-title"><b>@app.Name</b><span>@app.Publisher · @app.Id · @app.Version</span></div>
-            @if (app.Eligible)
-            { <button disabled="@Catalog.Snapshot().Applications.Any(x => x.WingetId == app.Id)" @onclick="() => Change(() => Catalog.Add(app.Id))">Añadir</button> }
-            else { <span class="muted">@app.Reason</span> }
+<div class="setup-page">
+    <section class="card setup-hero">
+        <div class="setup-hero-heading">
+            <div><h2>Instalador del pack de aplicaciones</h2><p class="muted">Descárgalo en el ordenador que vas a preparar. No necesita pertenecer a la flota.</p></div>
+            <span class="badge accent">Windows x64</span>
         </div>
-    }
-</section>
-<section class="card">
-    <div class="card-head"><h2>Pack de aplicaciones</h2><button @onclick="Update">Actualizar todas las versiones</button></div>
-    <p class="muted">Las versiones quedan fijadas hasta que pulses Actualizar. El instalador comprobará la compatibilidad real antes de empezar.</p>
-    @if (_message is not null) { <p role="status">@_message</p> }
-    @if (Catalog.Snapshot().Applications.Count == 0) { <p>Pack vacío. Busca una aplicación arriba para empezar.</p> }
-    @foreach (var app in Catalog.Snapshot().Applications)
-    {
-        <div class="job-row" @key="app.Id">
-            <div class="job-title"><b>@app.DisplayName</b><span>@app.WingetId · @app.PinnedVersion</span></div>
-            <label><input type="checkbox" checked="@app.SelectedByDefault" @onchange="e => Change(() => Catalog.Configure(app.Id, (bool)(e.Value ?? false), app.Order))" /> Preseleccionada</label>
-            <label>Orden <input aria-label="@($"Orden de {app.DisplayName}")" type="number" min="0" max="10000" value="@app.Order" @onchange="e => SetOrder(app, e.Value)" /></label>
-            <button class="danger" @onclick="() => Change(() => Catalog.Remove(app.Id))">Retirar</button>
-        </div>
-    }
-</section>
+        <p>El pack está seleccionado por defecto; puedes marcar o desmarcar aplicaciones y añadir Kiosk opcionalmente. Configura la lista en <a href="/aplicaciones">Aplicaciones</a>.</p>
+        @if (_bundle is not null)
+        {
+            <div class="setup-download-row">
+                <div class="setup-file"><div><strong>@_bundle.Manifest.FileName</strong><span>Pack personalizable · Kiosk opcional</span></div></div>
+                <div class="setup-download-action">
+                    <a class="btn primary button-link setup-download-button" href="/panel/setup/download" data-setup-download>
+                        <span class="setup-spinner" aria-hidden="true"></span><span data-setup-download-label>Descargar instalador @_bundle.Manifest.Version</span>
+                    </a>
+                    <p class="setup-download-status" data-setup-download-status hidden role="status"></p>
+                </div>
+            </div>
+        }
+        else { <p class="alert error">@(_bundleError ?? "Todavía no se ha publicado el instalador interno.")</p> }
+        <p class="muted">Windows 10 22H2 / Windows 11 x64 · Internet · Administrador. El progreso y el resultado se muestran solo en ese ordenador. Nunca reinicia automáticamente.</p>
+    </section>
+
+    <section class="card">
+        <div class="card-head"><div><h2>Instalador de Kiosk</h2><p class="muted section-copy">Solo Kiosk Clínica PC, sin el pack de aplicaciones.</p></div></div>
+        @if (_kioskRelease is not null)
+        {
+            <a class="btn button-link" href="@_kioskRelease.GitHubFallbackUrl">Descargar Kiosk @_kioskRelease.Version</a>
+        }
+        else
+        {
+            <a class="btn button-link" href="https://github.com/zetaits/KioskClinicaPC/releases/latest" target="_blank" rel="noopener noreferrer">Ver descargas de Kiosk en GitHub</a>
+        }
+        <p class="muted">Descargar un instalador no activa actualizaciones en la flota.</p>
+    </section>
+</div>
+
 @code {
-    private string _query = "";
-    private string? _message, _bundleError;
+    private string? _bundleError;
     private ValidatedInitialSetupBundle? _bundle;
-    protected override void OnInitialized() => _bundle = Bundles.Latest(out _bundleError);
-    private void Change(Action action) { try { action(); _message = "Pack guardado."; } catch (Exception ex) { _message = ex.Message; } }
-    private void SetOrder(PackApplication app, object? value) => Change(() => Catalog.Configure(app.Id, app.SelectedByDefault, int.TryParse(value?.ToString(), out int order) ? order : app.Order));
-    private void Update()
+    private KioskReleaseRecord? _kioskRelease;
+    protected override void OnInitialized()
     {
-        try { var failed = Catalog.UpdateVersions(); _message = failed.Count == 0 ? "Versiones actualizadas." : "Se conserva la versión anterior de: " + string.Join(", ", failed); }
-        catch (Exception ex) { _message = ex.Message; }
+        _bundle = Bundles.Latest(out _bundleError);
+        _kioskRelease = Updates.Releases().FirstOrDefault(x => x.State != KioskReleaseState.Withdrawn && !string.IsNullOrWhiteSpace(x.GitHubFallbackUrl));
     }
 }

@@ -1,0 +1,97 @@
+@using KioskClinicaPC.Core.Sync
+@inject PackCatalogStore Catalog
+
+@{
+    var pack = Catalog.Snapshot();
+    var results = Catalog.Search(_query);
+}
+
+<section class="card setup-section">
+    <div class="card-head">
+        <div>
+            <h2>Añadir aplicaciones al pack</h2>
+            <p class="muted section-copy">Busca y pulsa Añadir. No necesitas subir instaladores ni escribir parámetros.</p>
+        </div>
+        <a class="btn button-link" href="/instalador">Descargar instalador</a>
+    </div>
+    <div class="field">
+        <label for="pack-search">Buscar aplicación</label>
+        <input type="text" id="pack-search" placeholder="Nombre o identificador, por ejemplo Google.Chrome"
+               autocomplete="off" @bind="_query" @bind:event="oninput" aria-describedby="pack-index-status" />
+    </div>
+    <p id="pack-index-status" class="muted">Índice oficial WinGet: @(Catalog.IndexUpdatedAtUtc == DateTime.MinValue ? "pendiente de primera importación" : Catalog.IndexUpdatedAtUtc.ToLocalTime().ToString("dd/MM/yyyy HH:mm"))</p>
+    @if (_query.Trim().Length >= 2 && results.Count == 0)
+    {
+        <p class="muted" role="status">No hay resultados. Prueba otro nombre o identificador.</p>
+    }
+    <div class="catalog-list">
+        @foreach (var app in results)
+        {
+            bool added = pack.Applications.Any(x => x.WingetId.Equals(app.Id, StringComparison.OrdinalIgnoreCase));
+            <article class="catalog-item" @key="app.Id">
+                <div class="app-mark" aria-hidden="true">APP</div>
+                <div class="catalog-main"><strong>@app.Name</strong><span>@app.Publisher · @app.Version</span><code>@app.Id</code></div>
+                <div class="catalog-meta">
+                    <span class="badge @(app.Eligible ? "ok" : "warn")">@(app.Eligible ? "Silenciosa · Todo el equipo" : "No compatible")</span>
+                    @if (!app.Eligible) { <span class="muted">@app.Reason</span> }
+                </div>
+                <div class="catalog-actions">
+                    @if (app.Eligible)
+                    { <button type="button" disabled="@added" @onclick="() => Change(() => Catalog.Add(app.Id))">@(added ? "Añadida" : "Añadir")</button> }
+                </div>
+            </article>
+        }
+    </div>
+</section>
+
+<section class="card setup-section">
+    <div class="card-head">
+        <div><h2>Pack de aplicaciones</h2><p class="muted section-copy">Se instala en el ordenador donde ejecutes el instalador, aunque no pertenezca a la flota.</p></div>
+        <button type="button" disabled="@(pack.Applications.Count == 0)" @onclick="Update">Actualizar todas las versiones</button>
+    </div>
+    <p class="muted">Las versiones quedan fijadas hasta que pulses Actualizar. Puedes cambiar la selección en cada ordenador antes de instalar.</p>
+    @if (_message is not null) { <p class="alert @(_error ? "error" : "success")" role="status">@_message</p> }
+    @if (pack.Applications.Count == 0)
+    {
+        <div class="empty-state compact"><div class="empty-icon">▣</div><div><b>Pack vacío</b><p>Busca una aplicación arriba para empezar.</p></div></div>
+    }
+    <div class="catalog-list">
+        @foreach (var app in pack.Applications)
+        {
+            <article class="catalog-item" @key="app.Id">
+                <div class="app-mark" aria-hidden="true">APP</div>
+                <div class="catalog-main"><strong>@app.DisplayName</strong><span>Versión fijada: @app.PinnedVersion</span><code>@app.WingetId</code></div>
+                <div class="catalog-meta">
+                    <label class="check-row"><input type="checkbox" checked="@app.SelectedByDefault" @onchange="e => Change(() => Catalog.Configure(app.Id, (bool)(e.Value ?? false), app.Order))" /> Preseleccionada</label>
+                    <label class="setup-order">Orden <input aria-label="@($"Orden de {app.DisplayName}")" type="number" min="0" max="10000" value="@app.Order" @onchange="e => SetOrder(app, e.Value)" /></label>
+                </div>
+                <div class="catalog-actions"><button type="button" class="danger" @onclick="() => Change(() => Catalog.Remove(app.Id))">Retirar</button></div>
+            </article>
+        }
+    </div>
+</section>
+
+@code {
+    private string _query = "";
+    private string? _message;
+    private bool _error;
+    private void Change(Action action)
+    {
+        try { action(); _message = "Pack guardado."; _error = false; }
+        catch (Exception ex) { _message = ex.Message; _error = true; }
+    }
+    private void SetOrder(PackApplication app, object? value)
+    {
+        if (!int.TryParse(value?.ToString(), out int order)) { _message = "Introduce un orden entre 0 y 10000."; _error = true; return; }
+        Change(() => Catalog.Configure(app.Id, app.SelectedByDefault, order));
+    }
+    private void Update()
+    {
+        try
+        {
+            var failed = Catalog.UpdateVersions(); _error = failed.Count > 0;
+            _message = failed.Count == 0 ? "Versiones actualizadas." : "Se conserva la versión anterior de: " + string.Join(", ", failed);
+        }
+        catch (Exception ex) { _message = ex.Message; _error = true; }
+    }
+}

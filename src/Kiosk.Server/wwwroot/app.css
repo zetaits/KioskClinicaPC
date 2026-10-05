@@ -729,6 +729,11 @@ label.installer-drop {
 .setup-section .job-row { grid-template-columns: minmax(190px,1.2fr) 130px minmax(180px,1fr) auto; }
 .setup-section .job-row code { color: var(--dim); font-size: 10px; }
 
+.remote-applications { margin-top: 22px; }
+.remote-applications > summary { padding: 16px 18px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel-2); color: var(--text); cursor: pointer; font-weight: 600; }
+.remote-applications > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.remote-applications[open] > summary { margin-bottom: 14px; }
+
 .deploy-toolbar { display: flex; align-items: end; gap: 12px; flex-wrap: wrap; }
 .deploy-toolbar .field { margin: 0; }
 .app-select { min-width: 260px; flex: 1; }
