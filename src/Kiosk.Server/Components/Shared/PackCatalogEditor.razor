@@ -4,71 +4,89 @@
 @{
     var pack = Catalog.Snapshot();
     var results = Catalog.Search(_query);
+    int selectedCount = pack.Applications.Count(x => x.SelectedByDefault);
+    bool indexReady = Catalog.IndexUpdatedAtUtc != DateTime.MinValue;
 }
 
-<section class="card setup-section">
+<section class="card setup-section pack-editor" id="pack-applications" data-pack-count="@pack.Applications.Count" data-preselected-count="@selectedCount">
     <div class="card-head">
-        <div>
-            <h2>Añadir aplicaciones al pack</h2>
-            <p class="muted section-copy">Busca y pulsa Añadir. No necesitas subir instaladores ni escribir parámetros.</p>
+        <div><h2>Aplicaciones del pack</h2><p class="muted section-copy">Esta es la lista que aparecerá en el instalador de equipos.</p></div>
+        <div class="catalog-actions pack-header-actions">
+            <button type="button" disabled="@(pack.Applications.Count == 0)" @onclick="Update">Actualizar versiones del pack</button>
+            <a class="btn primary button-link" href="/instalador">Ir al instalador</a>
         </div>
-        <a class="btn button-link" href="/instalador">Descargar instalador</a>
     </div>
-    <div class="field">
-        <label for="pack-search">Buscar aplicación</label>
-        <input type="text" id="pack-search" placeholder="Nombre o identificador, por ejemplo Google.Chrome"
-               autocomplete="off" @bind="_query" @bind:event="oninput" aria-describedby="pack-index-status" />
-    </div>
-    <p id="pack-index-status" class="muted">Índice oficial WinGet: @(Catalog.IndexUpdatedAtUtc == DateTime.MinValue ? "pendiente de primera importación" : Catalog.IndexUpdatedAtUtc.ToLocalTime().ToString("dd/MM/yyyy HH:mm"))</p>
-    @if (_query.Trim().Length >= 2 && results.Count == 0)
+    <span class="setup-count">@(pack.Applications.Count == 1 ? "1 aplicación" : $"{pack.Applications.Count} aplicaciones") · @(selectedCount == 1 ? "1 seleccionada por defecto" : $"{selectedCount} seleccionadas por defecto")</span>
+    <p class="muted">Los cambios se guardan automáticamente. Se aplican al cargar el pack en el ordenador que vayas a preparar, sin necesidad de registrarlo en la flota.</p>
+    @if (_message is not null) { <p class="alert @(_error ? "error" : "success")" role="status">@_message</p> }
+    @if (pack.Applications.Count == 0)
     {
-        <p class="muted" role="status">No hay resultados. Prueba otro nombre o identificador.</p>
+        <div class="empty-state compact"><div class="empty-icon">▣</div><div><b>Todavía no hay aplicaciones en el pack</b><p>Usa el buscador de abajo y pulsa Añadir al pack.</p></div></div>
     }
-    <div class="catalog-list">
-        @foreach (var app in results)
-        {
-            bool added = pack.Applications.Any(x => x.WingetId.Equals(app.Id, StringComparison.OrdinalIgnoreCase));
-            <article class="catalog-item" @key="app.Id">
-                <div class="app-mark" aria-hidden="true">APP</div>
-                <div class="catalog-main"><strong>@app.Name</strong><span>@app.Publisher · @app.Version</span><code>@app.Id</code></div>
-                <div class="catalog-meta">
-                    <span class="badge @(app.Eligible ? "ok" : "warn")">@(app.Eligible ? "Silenciosa · Todo el equipo" : "No compatible")</span>
-                    @if (!app.Eligible) { <span class="muted">@app.Reason</span> }
-                </div>
-                <div class="catalog-actions">
-                    @if (app.Eligible)
-                    { <button type="button" disabled="@added" @onclick="() => Change(() => Catalog.Add(app.Id))">@(added ? "Añadida" : "Añadir")</button> }
-                </div>
-            </article>
-        }
-    </div>
+    else
+    {
+        <div class="catalog-list">
+            @foreach (var app in pack.Applications)
+            {
+                <article class="catalog-item" @key="app.Id" data-pack-application="@app.WingetId">
+                    <div class="app-mark" aria-hidden="true">APP</div>
+                    <div class="catalog-main"><strong>@app.DisplayName</strong><span>Versión del pack: @app.PinnedVersion</span><code>@app.WingetId</code></div>
+                    <div class="catalog-meta">
+                        <label class="check-row"><input type="checkbox" checked="@app.SelectedByDefault" @onchange="e => Change(() => Catalog.Configure(app.Id, (bool)(e.Value ?? false), app.Order))" /> Seleccionada por defecto</label>
+                        <label class="setup-order">Orden de instalación <input aria-label="@($"Orden de instalación de {app.DisplayName}")" type="number" min="0" max="10000" value="@app.Order" @onchange="e => SetOrder(app, e.Value)" /></label>
+                    </div>
+                    <div class="catalog-actions"><button type="button" class="danger" @onclick="() => Change(() => Catalog.Remove(app.Id))">Quitar del pack</button></div>
+                </article>
+            }
+        </div>
+        <p class="muted">Puedes cambiar la selección en cada ordenador antes de instalar. Los números de orden menores se instalan primero. Quitar una app del pack no la desinstala de ningún equipo.</p>
+    }
+    <p class="muted">Las versiones quedan fijadas hasta que pulses Actualizar versiones del pack. Renovar el catálogo de WinGet no cambia tu pack automáticamente.</p>
 </section>
 
 <section class="card setup-section">
     <div class="card-head">
-        <div><h2>Pack de aplicaciones</h2><p class="muted section-copy">Se instala en el ordenador donde ejecutes el instalador, aunque no pertenezca a la flota.</p></div>
-        <button type="button" disabled="@(pack.Applications.Count == 0)" @onclick="Update">Actualizar todas las versiones</button>
+        <div><h2>Añadir aplicaciones al pack</h2><p class="muted section-copy">Busca en el catálogo oficial de WinGet. Al añadir una aplicación, aparecerá en la lista de arriba.</p></div>
+        <span class="badge accent">WinGet</span>
     </div>
-    <p class="muted">Las versiones quedan fijadas hasta que pulses Actualizar. Puedes cambiar la selección en cada ordenador antes de instalar.</p>
-    @if (_message is not null) { <p class="alert @(_error ? "error" : "success")" role="status">@_message</p> }
-    @if (pack.Applications.Count == 0)
+    <div class="field">
+        <label for="pack-search">Buscar aplicación</label>
+        <input type="text" id="pack-search" placeholder="Nombre o identificador, por ejemplo Google.Chrome"
+               autocomplete="off" disabled="@(!indexReady)" @bind="_query" @bind:event="oninput" aria-describedby="pack-index-status" />
+    </div>
+    @if (!indexReady)
     {
-        <div class="empty-state compact"><div class="empty-icon">▣</div><div><b>Pack vacío</b><p>Busca una aplicación arriba para empezar.</p></div></div>
+        <p id="pack-index-status" class="alert warning" role="status">El catálogo de WinGet está pendiente de su primera importación. Las aplicaciones que ya tenga tu pack se conservan.</p>
     }
-    <div class="catalog-list">
-        @foreach (var app in pack.Applications)
-        {
-            <article class="catalog-item" @key="app.Id">
-                <div class="app-mark" aria-hidden="true">APP</div>
-                <div class="catalog-main"><strong>@app.DisplayName</strong><span>Versión fijada: @app.PinnedVersion</span><code>@app.WingetId</code></div>
-                <div class="catalog-meta">
-                    <label class="check-row"><input type="checkbox" checked="@app.SelectedByDefault" @onchange="e => Change(() => Catalog.Configure(app.Id, (bool)(e.Value ?? false), app.Order))" /> Preseleccionada</label>
-                    <label class="setup-order">Orden <input aria-label="@($"Orden de {app.DisplayName}")" type="number" min="0" max="10000" value="@app.Order" @onchange="e => SetOrder(app, e.Value)" /></label>
-                </div>
-                <div class="catalog-actions"><button type="button" class="danger" @onclick="() => Change(() => Catalog.Remove(app.Id))">Retirar</button></div>
-            </article>
-        }
-    </div>
+    else
+    {
+        <p id="pack-index-status" class="muted">Catálogo WinGet actualizado: @Catalog.IndexUpdatedAtUtc.ToLocalTime().ToString("dd/MM/yyyy HH:mm"). Escribe al menos dos caracteres para buscar.</p>
+    }
+    @if (indexReady && _query.Trim().Length >= 2 && results.Count == 0)
+    {
+        <p class="muted" role="status">No hay resultados para esta búsqueda. Prueba otro nombre o identificador.</p>
+    }
+    @if (results.Count > 0)
+    {
+        <div class="catalog-list" aria-label="Resultados del catálogo WinGet">
+            @foreach (var app in results)
+            {
+                bool added = pack.Applications.Any(x => x.WingetId.Equals(app.Id, StringComparison.OrdinalIgnoreCase));
+                <article class="catalog-item" @key="app.Id">
+                    <div class="app-mark" aria-hidden="true">APP</div>
+                    <div class="catalog-main"><strong>@app.Name</strong><span>@app.Publisher · Versión disponible: @app.Version</span><code>@app.Id</code></div>
+                    <div class="catalog-meta">
+                        <span class="badge @(app.Eligible ? "ok" : "warn")">@(app.Eligible ? "Instalación desatendida" : "No compatible con el pack")</span>
+                        @if (!app.Eligible) { <span class="muted">@app.Reason</span> }
+                    </div>
+                    <div class="catalog-actions">
+                        @if (added) { <span class="badge ok">En el pack</span> }
+                        else if (app.Eligible) { <button type="button" @onclick="() => Change(() => Catalog.Add(app.Id))">Añadir al pack</button> }
+                    </div>
+                </article>
+            }
+        </div>
+    }
 </section>
 
 @code {
@@ -90,7 +108,7 @@
         try
         {
             var failed = Catalog.UpdateVersions(); _error = failed.Count > 0;
-            _message = failed.Count == 0 ? "Versiones actualizadas." : "Se conserva la versión anterior de: " + string.Join(", ", failed);
+            _message = failed.Count == 0 ? "Versiones del pack actualizadas." : "Se conserva la versión anterior de: " + string.Join(", ", failed);
         }
         catch (Exception ex) { _message = ex.Message; _error = true; }
     }

@@ -38,9 +38,9 @@ public sealed class PanelApplicationPagesTests : IDisposable
         });
     }
 
-    private HttpClient PanelClient()
+    private HttpClient PanelClient(bool autoRedirect = true)
     {
-        var client = _factory.CreateClient();
+        var client = _factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = autoRedirect });
         client.DefaultRequestHeaders.Add("X-Test-Panel-User", "manager");
         return client;
     }
@@ -71,8 +71,16 @@ public sealed class PanelApplicationPagesTests : IDisposable
         Assert.Contains("Pack test application", html);
         Assert.Matches("<input[^>]*type=\"text\"[^>]*id=\"pack-search\"", html);
         Assert.Contains("href=\"/instalador\"", html);
-        Assert.Contains("Instalación remota en kioskos", html);
-        Assert.DoesNotMatch("<details[^>]*\\sopen(?:[\\s=>])", html);
+        Assert.Contains("data-pack-count=\"1\"", html);
+        Assert.Contains("data-preselected-count=\"1\"", html);
+        Assert.Contains("data-pack-application=\"Vendor.App\"", html);
+        Assert.Contains("1 aplicación · 1 seleccionada por defecto", html);
+        Assert.DoesNotContain("Instalación remota", html);
+        Assert.DoesNotContain("/panel/installers/upload", html);
+        Assert.DoesNotContain("allowUnsigned", html);
+        Assert.DoesNotContain("El catálogo está vacío", html);
+        Assert.DoesNotContain("Todavía no hay aplicaciones en el pack", html);
+        Assert.DoesNotContain("Historial", html);
 
         Assert.Equal(before.Revision, catalog.Snapshot().Revision);
         Assert.Equal(before.Applications.Single(), catalog.Snapshot().Applications.Single());
@@ -85,12 +93,79 @@ public sealed class PanelApplicationPagesTests : IDisposable
     [InlineData("device=11111111111111111111111111111111")]
     [InlineData("ok=Uploaded")]
     [InlineData("error=UploadFailed")]
-    public async Task Remote_device_and_upload_links_automatically_expand_the_remote_section(string query)
+    public async Task Remote_device_and_upload_links_use_a_separate_fleet_page(string query)
     {
         using var client = PanelClient();
-        string html = await client.GetStringAsync("/aplicaciones?" + query);
-        Assert.Matches("<details[^>]*\\sopen(?:[\\s=>])", html);
+        string html = WebUtility.HtmlDecode(await client.GetStringAsync("/ordenadores/instalaciones?" + query));
+        Assert.Contains("Instalación remota en la flota", html);
         Assert.Contains("action=\"/panel/installers/upload\"", html);
+        Assert.Contains("Instaladores privados de la flota", html);
+        Assert.DoesNotContain("pack-search", html);
+        Assert.DoesNotContain("data-pack-count", html);
+        using var oldLink = await client.GetAsync("/aplicaciones?" + query);
+        Assert.Equal("/ordenadores/instalaciones", oldLink.RequestMessage!.RequestUri!.AbsolutePath);
+    }
+
+    [Fact]
+    public async Task Pack_counts_and_list_follow_saved_add_selection_and_remove_changes()
+    {
+        using var client = PanelClient();
+        var catalog = _factory.Services.GetRequiredService<PackCatalogStore>();
+        catalog.Import(new(DateTime.UtcNow, [new("Vendor.Alpha", "Alpha app", "Vendor", "1", true), new("Vendor.Beta", "Beta app", "Vendor", "2", true)]));
+        catalog.Add("Vendor.Alpha"); catalog.Add("Vendor.Beta");
+        string html = await client.GetStringAsync("/aplicaciones");
+        Assert.Contains("data-pack-count=\"2\"", html);
+        Assert.Contains("data-preselected-count=\"2\"", html);
+        var alpha = catalog.Snapshot().Applications.Single(x => x.WingetId == "Vendor.Alpha");
+        catalog.Configure(alpha.Id, false, 42);
+        html = await client.GetStringAsync("/aplicaciones");
+        Assert.Contains("data-pack-count=\"2\"", html);
+        Assert.Contains("data-preselected-count=\"1\"", html);
+        Assert.Contains("data-pack-application=\"Vendor.Alpha\"", html);
+        Assert.Contains("value=\"42\"", html);
+        catalog.Remove(alpha.Id);
+        html = await client.GetStringAsync("/aplicaciones");
+        Assert.Contains("data-pack-count=\"1\"", html);
+        Assert.Contains("data-preselected-count=\"1\"", html);
+        Assert.DoesNotContain("data-pack-application=\"Vendor.Alpha\"", html);
+        Assert.Contains("data-pack-application=\"Vendor.Beta\"", html);
+    }
+
+    [Fact]
+    public async Task Private_executables_never_appear_in_the_pack_and_fleet_keeps_its_management_link()
+    {
+        using var client = PanelClient();
+        byte[] msi = [0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1];
+        using var input = new MemoryStream(msi);
+        await _factory.Services.GetRequiredService<InstallerCatalog>().AddAsync("Private fleet installer", "fleet.msi", input, true);
+        string pack = WebUtility.HtmlDecode(await client.GetStringAsync("/aplicaciones"));
+        Assert.Contains("data-pack-count=\"0\"", pack);
+        Assert.Contains("Todavía no hay aplicaciones en el pack", pack);
+        Assert.DoesNotContain("Private fleet installer", pack);
+        Assert.DoesNotContain("/panel/installers/upload", pack);
+        string remote = await client.GetStringAsync("/ordenadores/instalaciones");
+        Assert.Contains("Private fleet installer", remote);
+        string fleet = await client.GetStringAsync("/ordenadores");
+        Assert.Contains("href=\"/ordenadores/instalaciones\"", fleet);
+    }
+
+    [Fact]
+    public async Task Private_upload_redirects_to_fleet_installer_page_without_changing_pack()
+    {
+        using var client = PanelClient(autoRedirect: false);
+        string html = await client.GetStringAsync("/ordenadores/instalaciones");
+        var token = System.Text.RegularExpressions.Regex.Match(html, "<input[^>]*name=\"__RequestVerificationToken\"[^>]*value=\"([^\"]+)\"");
+        Assert.True(token.Success);
+        using var form = new MultipartFormDataContent();
+        form.Add(new StringContent(WebUtility.HtmlDecode(token.Groups[1].Value)), "__RequestVerificationToken");
+        form.Add(new StringContent("Private uploaded MSI"), "displayName");
+        form.Add(new StringContent("on"), "allowUnsigned");
+        form.Add(new ByteArrayContent([0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1]), "installer", "private.msi");
+        using var response = await client.PostAsync("/panel/installers/upload", form);
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.StartsWith("/ordenadores/instalaciones?ok=", response.Headers.Location!.OriginalString);
+        Assert.Single(_factory.Services.GetRequiredService<InstallerCatalog>().List());
+        Assert.Empty(_factory.Services.GetRequiredService<PackCatalogStore>().Snapshot().Applications);
     }
 
     [Fact]
@@ -107,7 +182,7 @@ public sealed class PanelApplicationPagesTests : IDisposable
         Assert.Contains("data-setup-download-status", html);
         Assert.Contains("href=\"/aplicaciones\"", html);
         Assert.DoesNotContain("pack-search", html);
-        Assert.DoesNotContain("Actualizar todas las versiones", html);
+        Assert.DoesNotContain("Actualizar versiones del pack", html);
         Assert.DoesNotContain("Preseleccionada", html);
         Assert.DoesNotContain("github.com", html);
     }
@@ -144,7 +219,8 @@ public sealed class PanelApplicationPagesTests : IDisposable
     [Theory]
     [InlineData("/aplicaciones")]
     [InlineData("/instalador")]
-    public async Task Both_pages_still_require_panel_authentication(string route)
+    [InlineData("/ordenadores/instalaciones")]
+    public async Task Pages_still_require_panel_authentication(string route)
     {
         using var anonymous = _factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
         Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.GetAsync(route)).StatusCode);

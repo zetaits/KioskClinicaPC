@@ -25,6 +25,7 @@
     </div>
 
     <div style="display:flex;align-items:center;gap:8px;margin-left:auto;">
+        <a class="btn button-link" href="/ordenadores/instalaciones">Instaladores de la flota</a>
         <span class="mono-label">Vista</span>
         <div class="viewtoggle">
             <button class="@(_cards ? "on" : "")" @onclick="() => _cards = true">
@@ -356,7 +357,7 @@ else
         Send(d, FleetCommand.RestartApp(), $"Reinicio de la app enviado a «{d.Name}».");
 
     private void NavigateInstall(FleetDevice d) =>
-        Nav.NavigateTo("/aplicaciones?device=" + Uri.EscapeDataString(d.Id));
+        Nav.NavigateTo("/ordenadores/instalaciones?device=" + Uri.EscapeDataString(d.Id));
 
     private void OpenUninstall(FleetDevice d) => _uninstall = new UninstallEdit { Device = d };
 

@@ -612,16 +612,16 @@ app.MapPost("/panel/installers/upload", async (HttpContext ctx, InstallerCatalog
         bool allowUnsigned = form["allowUnsigned"] == "on";
         await using var stream = file.OpenReadStream();
         await catalog.AddAsync(name, file.FileName, stream, allowUnsigned, ctx.RequestAborted);
-        const string message = "Aplicación añadida al catálogo.";
+        const string message = "Instalador privado añadido a la flota. No modifica el pack de aplicaciones.";
         return wantsJson
             ? Results.Ok(new { ok = true, message })
-            : Results.LocalRedirect("/aplicaciones?ok=" + Uri.EscapeDataString(message));
+            : Results.LocalRedirect("/ordenadores/instalaciones?ok=" + Uri.EscapeDataString(message));
     }
     catch (Exception ex) when (ex is ArgumentException or IOException or InvalidDataException)
     {
         return wantsJson
             ? Results.Json(new { ok = false, message = ex.Message }, statusCode: StatusCodes.Status400BadRequest)
-            : Results.LocalRedirect("/aplicaciones?error=" + Uri.EscapeDataString(ex.Message));
+            : Results.LocalRedirect("/ordenadores/instalaciones?error=" + Uri.EscapeDataString(ex.Message));
     }
 }).RequireAuthorization();
 
