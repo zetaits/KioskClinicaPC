@@ -45,6 +45,18 @@ public sealed class PanelApplicationPagesTests : IDisposable
         return client;
     }
 
+    private async Task ImportInternalSetup()
+    {
+        byte[] bytes = [0x4d, 0x5a, 1, 2];
+        var manifest = new InitialSetupBundleManifest
+        {
+            Version = "1.2.0", FileName = "Setup-EquipoClinicaPC-1.2.0.exe", SizeBytes = bytes.Length,
+            Sha256 = Convert.ToHexString(SHA256.HashData(bytes)), ServerUrl = "https://panel.clinicapc.es"
+        };
+        using var input = new MemoryStream(bytes);
+        await _factory.Services.GetRequiredService<InitialSetupBundleStore>().ImportAsync(manifest, manifest.FileName, input, CancellationToken.None);
+    }
+
     [Fact]
     public async Task Applications_contains_pack_editor_with_styled_explicit_text_input_and_preserves_pack()
     {
@@ -85,18 +97,11 @@ public sealed class PanelApplicationPagesTests : IDisposable
     public async Task Installer_only_shows_downloads_and_link_back_to_applications()
     {
         using var client = PanelClient();
-        byte[] bytes = [0x4d, 0x5a, 1, 2];
-        var manifest = new InitialSetupBundleManifest
-        {
-            Version = "1.2.0", FileName = "Setup-EquipoClinicaPC-1.2.0.exe", SizeBytes = bytes.Length,
-            Sha256 = Convert.ToHexString(SHA256.HashData(bytes)), ServerUrl = "https://panel.clinicapc.es"
-        };
-        using var input = new MemoryStream(bytes);
-        await _factory.Services.GetRequiredService<InitialSetupBundleStore>().ImportAsync(manifest, manifest.FileName, input, CancellationToken.None);
+        await ImportInternalSetup();
 
         string html = WebUtility.HtmlDecode(await client.GetStringAsync("/instalador"));
-        Assert.Contains("Instalador del pack de aplicaciones", html);
-        Assert.Contains("Instalador de Kiosk", html);
+        Assert.Contains("Instalador de equipos", html);
+        Assert.Contains("solo pack, solo Kiosk o ambos", html);
         Assert.Contains("href=\"/panel/setup/download\"", html);
         Assert.Contains("data-setup-download-label", html);
         Assert.Contains("data-setup-download-status", html);
@@ -104,10 +109,11 @@ public sealed class PanelApplicationPagesTests : IDisposable
         Assert.DoesNotContain("pack-search", html);
         Assert.DoesNotContain("Actualizar todas las versiones", html);
         Assert.DoesNotContain("Preseleccionada", html);
+        Assert.DoesNotContain("github.com", html);
     }
 
     [Fact]
-    public async Task Kiosk_download_link_ignores_withdrawn_releases_and_does_not_activate_updates()
+    public async Task Installer_keeps_single_internal_download_even_when_public_kiosk_releases_exist()
     {
         using var client = PanelClient();
         var updates = _factory.Services.GetRequiredService<KioskUpdateStore>();
@@ -125,10 +131,12 @@ public sealed class PanelApplicationPagesTests : IDisposable
             await updates.ImportAsync(bytes, Convert.ToBase64String(_signer.SignData(bytes, HashAlgorithmName.SHA256)), manifest.FileName, input);
         }
         await Import("1.2.0"); await Import("2.0.0"); updates.Withdraw("2.0.0");
+        await ImportInternalSetup();
 
         string html = await client.GetStringAsync("/instalador");
-        Assert.Contains("/releases/download/v1.2.0/Setup-KioskClinicaPC-1.2.0.exe", html);
-        Assert.DoesNotContain("/releases/download/v2.0.0/", html);
+        Assert.Single(System.Text.RegularExpressions.Regex.Matches(html, "href=\"/panel/setup/download\""));
+        Assert.DoesNotContain("github.com", html);
+        Assert.DoesNotContain("Descargar Kiosk", html);
         Assert.Null(updates.ActiveVersion);
         Assert.Empty(updates.RecentJobs());
     }

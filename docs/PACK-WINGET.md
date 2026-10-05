@@ -4,7 +4,7 @@
 
 1. En `/aplicaciones`, buscar una aplicación y pulsar **Añadir**. Su versión queda fijada automáticamente y se preselecciona. Se pueden retirar aplicaciones, cambiar orden y desmarcar su selección inicial. La sección desplegable **Instalación remota en kioskos** conserva el catálogo privado y los trabajos de la flota, separados del pack.
 2. **Actualizar todas las versiones** fija las versiones del último índice oficial; las aplicaciones no elegibles conservan su versión anterior y muestran un aviso. No se cambia el pack automáticamente al renovar el índice.
-3. En el PC de destino, abrir `/instalador` (solo descargas), descargar y ejecutar el instalador interno, aceptar UAC, dejar **solo pack** o marcar también Kiosk, elegir aplicaciones e iniciar. El progreso, resultado y botón de reintento se muestran localmente. La página también enlaza el instalador público Kiosk-only, sin activar actualizaciones en la flota.
+3. En el PC de destino, abrir `/instalador`, descargar y ejecutar el único instalador de equipos, aceptar UAC y elegir **solo pack**, **solo Kiosk** o **ambos**. Elegir las aplicaciones e iniciar. El progreso, resultado y botón de reintento se muestran localmente. Kiosk ya está incluido en el EXE y solo se instala si se selecciona; las aplicaciones del pack se descargan al instalar. La página no enlaza descargas separadas de GitHub ni activa actualizaciones en la flota.
 
 No se registran equipos independientes en la flota, ni se envían nombres, estados o logs al panel. El cliente solo lee `/api/setup/v2/catalog` con la clave limitada del Setup. El snapshot de esa lectura se conserva durante la ejecución. La aplicación necesita Internet para WinGet y los manifiestos oficiales, no para informar al panel.
 

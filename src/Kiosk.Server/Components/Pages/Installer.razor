@@ -1,21 +1,19 @@
 @page "/instalador"
 @attribute [Authorize]
 @rendermode InteractiveServer
-@using KioskClinicaPC.Core.Sync
 @inject InitialSetupBundleStore Bundles
-@inject KioskUpdateStore Updates
 
 <div class="setup-page">
     <section class="card setup-hero">
         <div class="setup-hero-heading">
-            <div><h2>Instalador del pack de aplicaciones</h2><p class="muted">Descárgalo en el ordenador que vas a preparar. No necesita pertenecer a la flota.</p></div>
+            <div><h2>Instalador de equipos</h2><p class="muted">Descárgalo en el ordenador que vas a preparar. No necesita pertenecer a la flota.</p></div>
             <span class="badge accent">Windows x64</span>
         </div>
-        <p>El pack está seleccionado por defecto; puedes marcar o desmarcar aplicaciones y añadir Kiosk opcionalmente. Configura la lista en <a href="/aplicaciones">Aplicaciones</a>.</p>
+        <p>Un único instalador: solo pack, solo Kiosk o ambos. El pack está seleccionado por defecto; puedes marcar o desmarcar aplicaciones. Configura la lista en <a href="/aplicaciones">Aplicaciones</a>.</p>
         @if (_bundle is not null)
         {
             <div class="setup-download-row">
-                <div class="setup-file"><div><strong>@_bundle.Manifest.FileName</strong><span>Pack personalizable · Kiosk opcional</span></div></div>
+                <div class="setup-file"><div><strong>@_bundle.Manifest.FileName</strong><span>Pack, Kiosk o ambos</span></div></div>
                 <div class="setup-download-action">
                     <a class="btn primary button-link setup-download-button" href="/panel/setup/download" data-setup-download>
                         <span class="setup-spinner" aria-hidden="true"></span><span data-setup-download-label>Descargar instalador @_bundle.Manifest.Version</span>
@@ -26,18 +24,6 @@
         }
         else { <p class="alert error">@(_bundleError ?? "Todavía no se ha publicado el instalador interno.")</p> }
         <p class="muted">Windows 10 22H2 / Windows 11 x64 · Internet · Administrador. El progreso y el resultado se muestran solo en ese ordenador. Nunca reinicia automáticamente.</p>
-    </section>
-
-    <section class="card">
-        <div class="card-head"><div><h2>Instalador de Kiosk</h2><p class="muted section-copy">Solo Kiosk Clínica PC, sin el pack de aplicaciones.</p></div></div>
-        @if (_kioskRelease is not null)
-        {
-            <a class="btn button-link" href="@_kioskRelease.GitHubFallbackUrl">Descargar Kiosk @_kioskRelease.Version</a>
-        }
-        else
-        {
-            <a class="btn button-link" href="https://github.com/zetaits/KioskClinicaPC/releases/latest" target="_blank" rel="noopener noreferrer">Ver descargas de Kiosk en GitHub</a>
-        }
         <p class="muted">Descargar un instalador no activa actualizaciones en la flota.</p>
     </section>
 </div>
@@ -45,10 +31,5 @@
 @code {
     private string? _bundleError;
     private ValidatedInitialSetupBundle? _bundle;
-    private KioskReleaseRecord? _kioskRelease;
-    protected override void OnInitialized()
-    {
-        _bundle = Bundles.Latest(out _bundleError);
-        _kioskRelease = Updates.Releases().FirstOrDefault(x => x.State != KioskReleaseState.Withdrawn && !string.IsNullOrWhiteSpace(x.GitHubFallbackUrl));
-    }
+    protected override void OnInitialized() => _bundle = Bundles.Latest(out _bundleError);
 }
