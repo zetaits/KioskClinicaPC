@@ -744,6 +744,86 @@ label.device-choice {
     color: var(--text); font-family: var(--font-body); font-size: 12px; letter-spacing: 0; text-transform: none; cursor: pointer;
 }
 
+/* Instalación de sistemas: controles y superficies compartidos con el panel. */
+.deployment-intro { margin-bottom: 24px; }
+.deployment-page .card-head > div, .deployment-row-head > div { min-width: 0; }
+.deployment-page .card-head > button { flex: none; }
+.deployment-page .alert.warning { border-color: rgba(240,210,107,.3); background: rgba(240,210,107,.045); color: var(--gold); }
+.deployment-station-list, .deployment-batch-list { display: grid; gap: 16px; }
+.deployment-station, .deployment-batch { min-width: 0; padding: 20px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel-2); }
+.deployment-row-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.deployment-row-head h3 { margin: 0; font-family: var(--font-display); font-size: 15px; color: var(--text); overflow-wrap: anywhere; }
+.deployment-row-head > strong { min-width: 0; color: var(--text); overflow-wrap: anywhere; }
+.deployment-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.deployment-row-head > .deployment-actions { justify-content: flex-end; }
+.deployment-meta { display: flex; flex-wrap: wrap; gap: 5px 16px; margin-top: 7px; font-size: 11.5px; color: var(--muted); }
+.deployment-meta span { overflow-wrap: anywhere; }
+.deployment-enrollment { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; padding: 16px 18px; margin-bottom: 18px; border: 1px solid rgba(243,122,74,.3); border-radius: 10px; background: rgba(243,122,74,.06); }
+.deployment-enrollment strong { font-size: 13px; color: var(--text); }
+.deployment-enrollment p { margin: 5px 0 0; font-size: 12px; line-height: 1.5; }
+.deployment-enrollment code { flex: none; min-width: 0; max-width: 100%; overflow-wrap: anywhere; color: var(--accent-2); font-family: var(--font-mono); font-size: 22px; font-weight: 600; letter-spacing: 2px; }
+.deployment-revoke { display: block; margin: 16px 0 0; }
+.deployment-revoke p { margin: 0 0 12px; }
+.deployment-subsection { margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--line); }
+.deployment-subsection h4 { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; font-size: 12px; font-weight: 600; color: var(--text); }
+.deployment-subsection > p { font-size: 12px; }
+.deployment-image { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 11px 0; }
+.deployment-image + .deployment-image { border-top: 1px solid var(--line); }
+.deployment-image > div { min-width: 0; }
+.deployment-image strong { font-size: 13px; overflow-wrap: anywhere; }
+.deployment-image p { margin: 4px 0 0; font-size: 12px; overflow-wrap: anywhere; }
+.deployment-image > .mono-note { flex: none; }
+.deployment-device-grid, .deployment-profile-list { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,300px),1fr)); gap: 12px; }
+.deployment-device, .deployment-profile { min-width: 0; padding: 16px; border: 1px solid var(--line); border-radius: 10px; background: rgba(255,255,255,.025); }
+.deployment-device-model { margin: 12px 0 4px; font-size: 13px; overflow-wrap: anywhere; }
+.deployment-device > .mono-note { margin: 0; overflow-wrap: anywhere; }
+.deployment-username { display: flex; align-items: flex-end; gap: 10px; flex-wrap: wrap; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); }
+.deployment-username .field { flex: 1 1 180px; min-width: 0; margin: 0; }
+.deployment-username button { min-height: 42px; }
+.deployment-profile.selected { border-color: rgba(243,122,74,.5); background: rgba(243,122,74,.05); }
+.deployment-profile > p { margin: 10px 0; font-size: 12px; overflow-wrap: anywhere; }
+.deployment-profile-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.deployment-profile-footer .deployment-meta { margin: 0; }
+.deployment-profile-editor { margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--line); }
+.deployment-profile-editor > .deployment-row-head { margin-bottom: 18px; align-items: center; }
+.deployment-fields { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 16px; }
+.deployment-fields .field { margin: 0; min-width: 0; }
+.deployment-field-help { margin: 12px 0 0; font-size: 12px; line-height: 1.6; }
+.deployment-applications { min-width: 0; margin: 24px 0 18px; padding: 0; border: 0; }
+.deployment-applications legend { padding: 0; font-size: 13px; font-weight: 600; color: var(--text); }
+.deployment-applications > p { font-size: 12px; }
+.deployment-app-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; margin-top: 14px; }
+label.deployment-app { padding: 14px; transition: border-color .15s, background .15s; }
+.deployment-app input { flex: none; margin: 0; color-scheme: dark; }
+label.deployment-app:hover { border-color: var(--line-strong); background: rgba(255,255,255,.045); }
+label.deployment-app.selected { border-color: rgba(243,122,74,.45); background: rgba(243,122,74,.06); }
+label.deployment-app:has(input:focus-visible) { outline: 2px solid var(--accent-2); outline-offset: 2px; }
+label.deployment-kiosk { display: block; margin: 0; cursor: pointer; }
+.deployment-kiosk .t, .deployment-kiosk .s { display: block; }
+.deployment-kiosk .s { line-height: 1.5; }
+.deployment-editor-actions { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--line); }
+.deployment-editor-actions p { max-width: 440px; margin: 0; font-size: 12px; line-height: 1.6; }
+.deployment-editor-actions button { flex: none; min-height: 44px; }
+.deployment-batch > .deployment-row-head { margin-bottom: 12px; }
+.deployment-batch time { flex: none; font-size: 12px; }
+.deployment-job { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 16px; padding: 16px 0; border-top: 1px solid var(--line); }
+.deployment-job .job-title { gap: 5px; overflow-wrap: anywhere; }
+.deployment-job-status { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; min-width: 0; }
+.deployment-job-status .deployment-actions { justify-content: flex-end; }
+.deployment-job-status p { display: flex; align-items: baseline; justify-content: flex-end; flex-wrap: wrap; gap: 6px; margin: 0; font-size: 12px; text-align: right; overflow-wrap: anywhere; }
+.deployment-job-status strong { color: var(--accent-2); }
+@media (max-width:640px) {
+    .deployment-station, .deployment-batch { padding: 15px; }
+    .deployment-fields, .deployment-app-grid, .deployment-job { grid-template-columns: 1fr; }
+    .deployment-row-head, .deployment-enrollment, .deployment-image, .deployment-editor-actions { flex-direction: column; align-items: flex-start; }
+    .deployment-profile-editor > .deployment-row-head { align-items: flex-start; }
+    .deployment-row-head > .deployment-actions, .deployment-job-status .deployment-actions { justify-content: flex-start; }
+    .deployment-profile > .deployment-row-head, .deployment-device > .deployment-row-head { flex-direction: row; flex-wrap: wrap; }
+    .deployment-editor-actions button { width: 100%; }
+    .deployment-job-status { align-items: flex-start; }
+    .deployment-job-status p { justify-content: flex-start; text-align: left; }
+}
+
 /* Guided event editor: one task at a time, with a live preview beside it. */
 .event-list-head { margin-bottom:18px; }
 .event-list { display:grid; gap:12px; }

@@ -7,88 +7,261 @@
 @inject PackCatalogStore Catalog
 @inject Microsoft.AspNetCore.SignalR.IHubContext<Kiosk.Server.Hubs.DeploymentHub> Hub
 
-<h2>Instalación de sistemas</h2>
-<p class="muted">Perfiles y seguimiento de Windows 11. La revisión del disco y el inicio de cada instalación se realizan en la aplicación del encargado.</p>
-@if (_message is not null) { <p class="alert" role="status">@_message</p> }
-<section class="card">
-    <h3>Estaciones de preparación</h3>
-    <button class="btn primary" @onclick="CreateCode">Vincular una estación</button>
-    @if (_code is not null)
-    { <p role="status">Código de un solo uso: <strong>@_code.Code</strong> · Caduca a las @_code.ExpiresAtUtc.ToLocalTime().ToString("HH:mm"). Introduce el código en la aplicación local.</p> }
-    @if (_snapshot.Stations.Count == 0) { <p class="muted">No hay estaciones vinculadas. Descarga la aplicación desde <a href="/instalador">Instalador</a>.</p> }
-    @foreach (var station in _snapshot.Stations)
+<div class="setup-page deployment-page">
+    <div class="deployment-intro">
+        <p class="muted section-copy">Perfiles y seguimiento de Windows 11. La revisión del disco y el inicio de cada instalación se realizan en la aplicación del encargado.</p>
+    </div>
+    @if (_message is not null)
     {
-        <div class="card">
-            <strong>@station.Name</strong> · @(station.Revoked ? "Revocada" : station.LastSeenUtc is { } seen && DateTimeOffset.UtcNow - seen < TimeSpan.FromMinutes(2) ? "Conectada" : "Sin conexión reciente")
-            <p class="muted">Última conexión: @(station.LastSeenUtc?.ToLocalTime().ToString("g") ?? "Todavía no ha sincronizado") · Capacidad: @station.Capacity</p>
-            @if (!station.Revoked)
+        <p class="alert @(_messageError ? "error" : "success")" role="status">@_message</p>
+    }
+    <section class="card setup-section">
+        <div class="card-head">
+            <div>
+                <h2>Estaciones de preparación</h2>
+                <p class="muted section-copy">Ordenadores vinculados, imágenes disponibles y equipos pendientes.</p>
+            </div>
+            <button type="button" class="btn primary" @onclick="CreateCode">Vincular una estación</button>
+        </div>
+        @if (_code is not null)
+        {
+            <div class="deployment-enrollment" role="status">
+                <div><strong>Código de un solo uso</strong><p class="muted">Introdúcelo en la aplicación local. Caduca a las @_code.ExpiresAtUtc.ToLocalTime().ToString("HH:mm").</p></div>
+                <code>@_code.Code</code>
+            </div>
+        }
+        @if (_snapshot.Stations.Count == 0)
+        {
+            <div class="empty-state compact">
+                <div class="empty-icon" aria-hidden="true">▣</div>
+                <div><b>No hay estaciones vinculadas</b><p>Descarga la aplicación desde <a href="/instalador">Instalador</a> y vincula el PC del encargado.</p></div>
+            </div>
+        }
+        <div class="deployment-station-list">
+            @foreach (var station in _snapshot.Stations)
             {
-                @if (_revokeId == station.Id)
-                {
-                    <p>La estación dejará de recibir perfiles y de confirmar lotes nuevos. Los trabajos locales ya autorizados continuarán.</p>
-                    <button class="btn danger" @onclick="() => Revoke(station.Id)">Confirmar revocación</button>
-                    <button class="btn" @onclick="() => _revokeId = null">Volver</button>
-                }
-                else { <button class="btn" @onclick="() => _revokeId = station.Id">Revocar vínculo</button> }
-            }
-            <h4>Sistemas disponibles</h4>
-            @if (station.Images.Count == 0) { <p class="muted">Importa una ISO oficial en esta estación para habilitar un perfil.</p> }
-            @foreach (var image in station.Images)
-            { <p>@image.Name · Windows build @image.Build · @image.Language · @string.Join(", ", image.Editions.Select(e => e.Name))</p> }
-            <h4>Equipos preparados</h4>
-            @foreach (var session in station.Sessions)
-            {
-                <div class="card">
-                    <strong>@session.DisplayId · @session.Hardware.Manufacturer @session.Hardware.Model</strong>
-                    <p>Serie: @session.Hardware.Serial · @State(session.State)</p>
-                    @if (!station.Revoked && session.State == DeploymentState.Ready && !_snapshot.Jobs[station.Id].Any(j => j.SessionId == session.Id))
+                var connected = !station.Revoked && station.LastSeenUtc is { } seen && DateTimeOffset.UtcNow - seen < TimeSpan.FromMinutes(2);
+                <article class="deployment-station" @key="station.Id">
+                    <div class="deployment-row-head">
+                        <div>
+                            <h3>@station.Name</h3>
+                            <div class="deployment-meta">
+                                <span>Última conexión: @(station.LastSeenUtc?.ToLocalTime().ToString("g") ?? "Todavía no ha sincronizado")</span>
+                                <span>Capacidad: @station.Capacity instalaciones</span>
+                            </div>
+                        </div>
+                        <div class="deployment-actions">
+                            <span class="badge @(connected ? "ok" : "off")">@(station.Revoked ? "Revocada" : connected ? "Conectada" : "Sin conexión reciente")</span>
+                            @if (!station.Revoked && _revokeId != station.Id)
+                            {
+                                <button type="button" class="btn" @onclick="() => _revokeId = station.Id">Revocar vínculo</button>
+                            }
+                        </div>
+                    </div>
+                    @if (!station.Revoked && _revokeId == station.Id)
                     {
-                        <label>Usuario pendiente <input aria-label="Usuario para @session.DisplayId" value="@(session.PendingUsername ?? "Usuario")"
-                            @onchange="e => _usernames[session.Id] = e.Value?.ToString() ?? string.Empty" maxlength="20" /></label>
-                        <button class="btn" @onclick="() => Username(station.Id, session)">Guardar usuario</button>
+                        <div class="alert warning deployment-revoke">
+                            <p>La estación dejará de recibir perfiles y de confirmar lotes nuevos. Los trabajos locales ya autorizados continuarán.</p>
+                            <div class="deployment-actions">
+                                <button type="button" class="btn danger" @onclick="() => Revoke(station.Id)">Confirmar revocación</button>
+                                <button type="button" class="btn" @onclick="() => _revokeId = null">Volver</button>
+                            </div>
+                        </div>
                     }
-                </div>
+                    <div class="deployment-subsection">
+                        <h4>Sistemas disponibles <span class="badge off">@station.Images.Count</span></h4>
+                        @if (station.Images.Count == 0)
+                        {
+                            <p class="muted section-copy">Importa una ISO oficial en esta estación para habilitar un perfil.</p>
+                        }
+                        <div class="deployment-image-list">
+                            @foreach (var image in station.Images)
+                            {
+                                <div class="deployment-image" @key="image.Id">
+                                    <div><strong>@image.Name</strong><p class="muted">@string.Join(", ", image.Editions.Select(e => e.Name))</p></div>
+                                    <span class="mono-note">Build @image.Build · @image.Language</span>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                    <div class="deployment-subsection">
+                        <h4>Equipos preparados <span class="badge off">@station.Sessions.Count</span></h4>
+                        @if (station.Sessions.Count == 0)
+                        {
+                            <p class="muted section-copy">Los equipos aparecerán aquí cuando arranquen por red y comuniquen su inventario.</p>
+                        }
+                        <div class="deployment-device-grid">
+                            @foreach (var session in station.Sessions)
+                            {
+                                <article class="deployment-device" @key="session.Id">
+                                    <div class="deployment-row-head">
+                                        <strong>@session.DisplayId</strong>
+                                        <span class="badge @StateClass(session.State)">@State(session.State)</span>
+                                    </div>
+                                    <p class="deployment-device-model">@session.Hardware.Manufacturer @session.Hardware.Model</p>
+                                    <p class="mono-note">Serie: @session.Hardware.Serial</p>
+                                    @if (!station.Revoked && session.State == DeploymentState.Ready && !_snapshot.Jobs[station.Id].Any(j => j.SessionId == session.Id))
+                                    {
+                                        <div class="deployment-username">
+                                            <div class="field">
+                                                <label for="deployment-user-@station.Id-@session.Id">Usuario pendiente · @session.DisplayId</label>
+                                                <input type="text" id="deployment-user-@station.Id-@session.Id" value="@(session.PendingUsername ?? "Usuario")"
+                                                    @onchange="e => _usernames[session.Id] = e.Value?.ToString() ?? string.Empty" maxlength="20" />
+                                            </div>
+                                            <button type="button" class="btn" @onclick="() => Username(station.Id, session)">Guardar usuario</button>
+                                        </div>
+                                    }
+                                </article>
+                            }
+                        </div>
+                    </div>
+                </article>
             }
         </div>
-    }
-</section>
-<section class="card">
-    <h3>Perfiles de instalación</h3>
-    @foreach (var profile in _snapshot.Profiles)
-    { <p><strong>@profile.Name</strong> · Revisión @profile.Revision · Usuario @profile.Username · @(profile.Kiosk ? "Con Kiosk" : "Sin Kiosk") · @profile.Applications.Applications.Count aplicaciones <button class="btn" @onclick="() => Edit(profile)">Editar</button></p> }
-    <button class="btn" @onclick="New">Nuevo perfil</button>
-    <div class="card">
-        <label>Nombre <input @bind="_name" maxlength="100" /></label>
-        <label>Imagen <select @bind="_imageId" @bind:after="() => _edition = null">
-            <option value="">Selecciona una imagen</option>
-            @foreach (var image in Images) { <option value="@image.Id">@image.Name (build @image.Build)</option> }
-        </select></label>
-        <label>Edición <select @bind="_edition"><option value="">Selecciona una edición</option>
-            @foreach (var edition in Images.FirstOrDefault(i => i.Id == _imageId)?.Editions ?? []) { <option value="@edition.Index">@edition.Name</option> }
-        </select></label>
-        <label>Usuario predeterminado <input @bind="_username" maxlength="20" /></label>
-        <p class="muted">Idioma y región: España. La contraseña se configura únicamente en el PC del encargado.</p>
-        @foreach (var app in Catalog.Snapshot().Applications)
+    </section>
+    <section class="card setup-section">
+        <div class="card-head">
+            <div>
+                <h2>Perfiles de instalación</h2>
+                <p class="muted section-copy">Define Windows, el usuario y los componentes de cada instalación.</p>
+            </div>
+            <button type="button" class="btn" @onclick="New">Nuevo perfil</button>
+        </div>
+        <div class="deployment-profile-list">
+            @foreach (var profile in _snapshot.Profiles)
+            {
+                <article class="deployment-profile @(_id == profile.Id ? "selected" : "")" @key="profile.Id">
+                    <div class="deployment-row-head">
+                        <strong>@profile.Name</strong>
+                        <span class="badge off">Revisión @profile.Revision</span>
+                    </div>
+                    <p class="muted">Usuario: @profile.Username</p>
+                    <div class="deployment-profile-footer">
+                        <div class="deployment-meta">
+                            <span>@profile.Applications.Applications.Count aplicaciones</span>
+                            <span>@(profile.Kiosk ? "Con Kiosk" : "Sin Kiosk")</span>
+                        </div>
+                        <button type="button" class="btn" aria-label="Editar perfil @profile.Name" @onclick="() => Edit(profile)">Editar</button>
+                    </div>
+                </article>
+            }
+        </div>
+        <div class="deployment-profile-editor">
+            <div class="deployment-row-head">
+                <h3>@(_id is null ? "Nuevo perfil" : "Editar perfil")</h3>
+                @if (_id is not null) { <span class="badge accent">Revisión actual @_revision</span> }
+            </div>
+            <div class="deployment-fields">
+                <div class="field">
+                    <label for="deployment-name">Nombre</label>
+                    <input type="text" id="deployment-name" @bind="_name" maxlength="100" placeholder="Nombre del perfil" />
+                </div>
+                <div class="field">
+                    <label for="deployment-default-user">Usuario predeterminado</label>
+                    <input type="text" id="deployment-default-user" @bind="_username" maxlength="20" aria-describedby="deployment-user-help" />
+                </div>
+                <div class="field">
+                    <label for="deployment-image">Imagen</label>
+                    <select id="deployment-image" @bind="_imageId" @bind:after="() => _edition = null" aria-describedby="deployment-image-help">
+                        <option value="">Selecciona una imagen</option>
+                        @foreach (var image in Images) { <option value="@image.Id">@image.Name (build @image.Build)</option> }
+                    </select>
+                </div>
+                <div class="field">
+                    <label for="deployment-edition">Edición</label>
+                    <select id="deployment-edition" @bind="_edition">
+                        <option value="">Selecciona una edición</option>
+                        @foreach (var edition in Images.FirstOrDefault(i => i.Id == _imageId)?.Editions ?? []) { <option value="@edition.Index">@edition.Name</option> }
+                    </select>
+                </div>
+            </div>
+            <p class="muted deployment-field-help" id="deployment-user-help">Idioma y región: España. La contraseña se configura únicamente en el PC del encargado.</p>
+            @if (!Images.Any())
+            {
+                <p class="alert warning" id="deployment-image-help">No hay imágenes disponibles. Vincula una estación e importa una ISO oficial desde la aplicación local.</p>
+            }
+            else
+            {
+                <p class="muted deployment-field-help" id="deployment-image-help">Imágenes importadas en las estaciones vinculadas. Selecciona una imagen para elegir su edición.</p>
+            }
+            <fieldset class="deployment-applications">
+                <legend>Aplicaciones</legend>
+                <p class="muted section-copy">Selecciona las aplicaciones del <a href="/aplicaciones">catálogo</a>. Sus versiones quedarán fijadas al confirmar la instalación.</p>
+                @{ var applications = Catalog.Snapshot().Applications; }
+                @if (applications.Count == 0)
+                {
+                    <div class="empty-state compact">
+                        <div class="empty-icon" aria-hidden="true">▣</div>
+                        <div><b>Catálogo sin aplicaciones</b><p>Añade aplicaciones desde <a href="/aplicaciones">Aplicaciones</a> o guarda un perfil solo con Windows.</p></div>
+                    </div>
+                }
+                <div class="deployment-app-grid">
+                    @foreach (var app in applications)
+                    {
+                        <label class="device-choice deployment-app @(_apps.Contains(app.Id) ? "selected" : "")" @key="app.Id">
+                            <input type="checkbox" checked="@_apps.Contains(app.Id)" @onchange="e => SelectApp(app.Id, e.Value is true)" />
+                            <span><b>@app.DisplayName</b><small>Versión @app.PinnedVersion</small></span>
+                        </label>
+                    }
+                </div>
+            </fieldset>
+            <label class="toggle-box deployment-kiosk @(_kiosk ? "on" : "")">
+                <span class="head">
+                    <span class="txt"><span class="t" id="deployment-kiosk-title">Instalar Kiosk</span><span class="s" id="deployment-kiosk-help">Se iniciará en el siguiente inicio de sesión. El equipo quedará en el escritorio al finalizar.</span></span>
+                    <span class="toggle"><input type="checkbox" @bind="_kiosk" aria-labelledby="deployment-kiosk-title" aria-describedby="deployment-kiosk-help" /><span class="track" aria-hidden="true"></span></span>
+                </span>
+            </label>
+            <div class="deployment-editor-actions">
+                <p class="muted">Guardar el perfil crea una nueva revisión. Los trabajos ya confirmados conservan sus opciones.</p>
+                <button type="button" class="btn primary" @onclick="Save">Guardar nueva revisión</button>
+            </div>
+        </div>
+    </section>
+    <section class="card setup-section">
+        <div class="card-head">
+            <div><h2>Lotes, trabajos e historial</h2><p class="muted section-copy">Progreso y resultados de las instalaciones confirmadas desde la aplicación local.</p></div>
+            <span class="setup-count">@_snapshot.Jobs.Values.Sum(j => j.Count) trabajos</span>
+        </div>
+        @if (!_snapshot.Jobs.Values.Any(j => j.Count > 0))
         {
-            <label><input type="checkbox" checked="@_apps.Contains(app.Id)" @onchange="e => SelectApp(app.Id, e.Value is true)" /> @app.DisplayName · @app.PinnedVersion</label>
+            <div class="empty-state compact">
+                <div class="empty-icon" aria-hidden="true">▣</div>
+                <div><b>No hay instalaciones confirmadas</b><p>Cuando confirmes un lote en la aplicación del encargado, podrás seguir cada equipo aquí.</p></div>
+            </div>
         }
-        <label><input type="checkbox" @bind="_kiosk" /> Instalar Kiosk (se iniciará en el siguiente inicio de sesión)</label>
-        <button class="btn primary" @onclick="Save">Guardar nueva revisión</button>
-    </div>
-</section>
-<section class="card">
-    <h3>Lotes, trabajos e historial</h3>
-    @if (!_snapshot.Jobs.Values.Any(j => j.Count > 0)) { <p class="muted">No hay instalaciones confirmadas.</p> }
-    @foreach (var station in _snapshot.Stations)
-    {
-        @foreach (var batch in _snapshot.Batches[station.Id].OrderByDescending(b => b.ConfirmedAtUtc))
-        {
-            <h4>@station.Name · Lote @batch.Id[..8] · @batch.ConfirmedAtUtc.ToLocalTime().ToString("g")</h4>
-            @foreach (var job in _snapshot.Jobs[station.Id].Where(j => j.BatchId == batch.Id))
-            { <p>@job.Profile.Name · @job.Username · Disco @job.Disk.Number (@job.Disk.Model, @job.Disk.Serial) · @State(job.State) · @job.Phase @(job.Percent is { } percent ? $"{percent}%" : "") @(job.RebootRequired ? "· Reinicio necesario" : "")</p> }
-        }
-    }
-</section>
+        <div class="deployment-batch-list">
+            @foreach (var station in _snapshot.Stations)
+            {
+                @foreach (var batch in _snapshot.Batches[station.Id].OrderByDescending(b => b.ConfirmedAtUtc))
+                {
+                    <article class="deployment-batch" @key="batch.Id">
+                        <div class="deployment-row-head">
+                            <div><h3>@station.Name</h3><span class="mono-note">Lote @batch.Id[..8]</span></div>
+                            <time class="muted" datetime="@batch.ConfirmedAtUtc.ToString("O")">@batch.ConfirmedAtUtc.ToLocalTime().ToString("g")</time>
+                        </div>
+                        @foreach (var job in _snapshot.Jobs[station.Id].Where(j => j.BatchId == batch.Id))
+                        {
+                            <div class="deployment-job" @key="job.Id">
+                                <div class="job-title">
+                                    <b>@job.Profile.Name</b>
+                                    <span>Usuario: @job.Username · Disco @job.Disk.Number: @job.Disk.Model</span>
+                                    <span class="mono-note">Serie del disco: @job.Disk.Serial</span>
+                                </div>
+                                <div class="deployment-job-status">
+                                    <div class="deployment-actions">
+                                        <span class="badge @StateClass(job.State)">@State(job.State)</span>
+                                        @if (job.RebootRequired) { <span class="badge warn">Reinicio necesario</span> }
+                                    </div>
+                                    <p class="muted"><span>@job.Phase</span>@if (job.Percent is { } percent) { <strong>@percent%</strong> }</p>
+                                </div>
+                            </div>
+                        }
+                    </article>
+                }
+            }
+        </div>
+    </section>
+</div>
 
 @code {
     private DeploymentPanelSnapshot _snapshot = new([], [], [], []);
@@ -97,7 +270,7 @@
     private string _name = "Solo Windows", _username = "Usuario";
     private long _revision;
     private int? _edition;
-    private bool _kiosk;
+    private bool _kiosk, _messageError;
     private HashSet<string> _apps = [];
     private Dictionary<string, string> _usernames = [];
     private readonly CancellationTokenSource _stop = new();
@@ -111,8 +284,8 @@
     }
     private async Task Run(Action action)
     {
-        try { action(); Refresh(); _message = "Cambios guardados. La estación los recibirá al sincronizar."; await Hub.Clients.Group("deployment-stations").SendAsync("Changed"); }
-        catch (Exception ex) when (ex is InvalidDataException or InvalidOperationException) { _message = ex is InvalidDataException ? ex.Message : "El estado cambió. Recarga y revisa las opciones."; }
+        try { action(); Refresh(); _messageError = false; _message = "Cambios guardados. La estación los recibirá al sincronizar."; await Hub.Clients.Group("deployment-stations").SendAsync("Changed"); }
+        catch (Exception ex) when (ex is InvalidDataException or InvalidOperationException) { _messageError = true; _message = ex is InvalidDataException ? ex.Message : "El estado cambió. Recarga y revisa las opciones."; }
     }
     private Task CreateCode() => Run(() => _code = Store.CreateCode());
     private Task Revoke(string id) => Run(() => { Store.Revoke(id); _revokeId = null; });
@@ -126,5 +299,8 @@
         DeploymentState.Detected => "Detectado en red", DeploymentState.Booting => "Preparando arranque", DeploymentState.Ready => "Listo para instalar",
         DeploymentState.Queued => "En cola", DeploymentState.Installing => "Instalando", DeploymentState.PostInstall => "Preparando escritorio",
         DeploymentState.Completed => "Finalizado", DeploymentState.Attention => "Requiere atención", _ => "Cancelado" };
+    private static string StateClass(DeploymentState state) => state switch {
+        DeploymentState.Ready or DeploymentState.Completed => "ok", DeploymentState.Attention => "warn",
+        DeploymentState.Booting or DeploymentState.Queued or DeploymentState.Installing or DeploymentState.PostInstall => "accent", _ => "off" };
     public void Dispose() { _stop.Cancel(); _stop.Dispose(); }
 }
