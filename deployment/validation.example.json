@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "sourceCommit": "REQUIRED_TESTED_COMMIT",
+  "validatedAtUtc": null,
+  "operator": "",
+  "evidence": "",
+  "bootHashes": {},
+  "payloadHashes": { "worker.zip": "", "kiosk.exe": "" },
+  "checks": {
+    "pxeRealNetworkSecureBoot": false,
+    "homeUefiSecureBoot": false,
+    "proUefiSecureBoot": false,
+    "threeSimultaneous": false,
+    "twoPhysicalModels": false,
+    "nonSelectedDiskIntact": false,
+    "vpsDisconnect": false,
+    "localNetworkDisconnect": false,
+    "stationRestart": false,
+    "windowsOnly": false,
+    "windowsPack": false,
+    "windowsPackKiosk": false,
+    "desktopAccountCleanupTracking": false
+  }
+}

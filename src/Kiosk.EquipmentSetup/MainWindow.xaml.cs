@@ -25,6 +25,7 @@ public partial class MainWindow : Window
     internal MainWindow(Func<CancellationToken, Task<PackCatalog>> load,
         Func<EquipmentRequest, Action<EquipmentEvent>, CancellationToken, Task<EquipmentEvent>> start, Func<Task> register)
     {
+        Payload.UseAssembly(typeof(MainWindow).Assembly);
         _load = load; _start = start; _register = register;
         InitializeComponent();
         VersionLabel.Text = $"Asistente {Payload.Manifest.AssistantVersion} · Windows x64";

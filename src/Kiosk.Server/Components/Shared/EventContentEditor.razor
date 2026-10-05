@@ -1,0 +1,102 @@
+<p class="muted">Activa solo el contenido que quieras sustituir durante este evento.</p>
+@if (Draft.ThemeEnabled && Preset.CampaignSlides.Count > 0)
+{
+    <button class="accent compact" @onclick="() => OnLoadTemplate.InvokeAsync()">Cargar contenido de esta plantilla</button>
+    <p class="muted section-copy">Cambiar el tema conserva tus textos y slides. Este botón carga la campaña completa de @Preset.DisplayName.</p>
+}
+<div class="preview-tabs event-content-tabs" role="group" aria-label="Contenido a editar">
+    <button class="@(Tab == 0 ? "active" : "")" aria-pressed="@(Tab == 0)" @onclick="() => SelectTab(0)">De ocasión</button>
+    <button class="@(Tab == 1 ? "active" : "")" aria-pressed="@(Tab == 1)" @onclick="() => SelectTab(1)">Nuevo</button>
+    <button class="@(Tab == 2 ? "active" : "")" aria-pressed="@(Tab == 2)" @onclick="() => SelectTab(2)">Textos</button>
+</div>
+<div class="event-content-panel">
+    @if (Tab < 2)
+    {
+        @if (Tab == 0)
+        {
+            <label class="check-row"><input type="checkbox" @bind="Draft.SlidesEnabled" @bind:after="NotifyChanged" /><span>Usar slides del evento · De ocasión</span></label>
+            @if (Draft.SlidesEnabled) { <SlideListEditor @key="Draft.Event.AttractSlides" Slides="Draft.Event.AttractSlides" OnChanged="OnChanged" /> }
+        }
+        else
+        {
+            <label class="check-row"><input type="checkbox" @bind="Draft.NewSlidesEnabled" @bind:after="NotifyChanged" /><span>Usar slides del evento · Nuevo</span></label>
+            @if (Draft.NewSlidesEnabled) { <SlideListEditor @key="Draft.Event.AttractSlidesNew" Slides="Draft.Event.AttractSlidesNew" OnChanged="OnChanged" /> }
+        }
+        @if (Tab == 0 ? Draft.SlidesEnabled && Draft.Event.AttractSlides.Count > 0 : Draft.NewSlidesEnabled && Draft.Event.AttractSlidesNew.Count > 0)
+        { <p class="muted">Estos slides sustituirán el carrusel habitual.</p> }
+        else
+        { <p class="muted">Se mostrará el carrusel habitual de la tienda. Tus cambios se conservan mientras sigas editando.</p> }
+    }
+    else
+    {
+        <label class="check-row"><input type="checkbox" @bind="Draft.TextsEnabled" @bind:after="NotifyChanged" /><span>Personalizar textos del evento</span></label>
+        <p class="muted section-copy">Los textos que no personalices conservarán su contenido habitual.</p>
+        @if (Draft.TextsEnabled)
+        {
+            <div class="text-overrides">
+                @foreach (var text in Draft.Texts.Where(x => TextLabels.ContainsKey(x.Key ?? "")).ToList())
+                {
+                    <div class="event-text-field" @key="text"><label>@TextLabels[text.Key!]<input type="text" @bind="text.Value" @bind:event="oninput" @bind:after="NotifyChanged" /></label><button class="icon danger" aria-label="@($"Restaurar {TextLabels[text.Key!]}")" @onclick="() => RemoveText(text)">×</button></div>
+                }
+                <label for="event-add-text">Añadir un texto</label>
+                <select id="event-add-text" value="" @onchange="AddKnownText">
+                    <option value="">Elige el texto que quieres personalizar…</option>
+                    @foreach (var entry in TextLabels.Where(x => !Draft.Texts.Any(t => t.Key == x.Key))) { <option value="@entry.Key">@entry.Value</option> }
+                </select>
+            </div>
+            <details class="event-advanced">
+                <summary>Claves personalizadas (@Draft.Texts.Count(x => !TextLabels.ContainsKey(x.Key ?? "")))</summary>
+                <p class="muted section-copy">Para textos que usan una clave específica del kiosco.</p>
+                @foreach (var text in Draft.Texts.Where(x => !TextLabels.ContainsKey(x.Key ?? "")).ToList())
+                {
+                    <div class="slide-row" @key="text"><input type="text" aria-label="Clave personalizada" placeholder="Clave" @bind="text.Key" @bind:after="NotifyChanged" /><input type="text" aria-label="Texto personalizado" placeholder="Texto" @bind="text.Value" @bind:event="oninput" @bind:after="NotifyChanged" /><button class="icon danger" aria-label="Quitar texto personalizado" @onclick="() => RemoveText(text)">×</button></div>
+                }
+                <button class="accent compact" @onclick="AddCustomText">+ Añadir clave personalizada</button>
+            </details>
+        }
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public EventEditorDraft Draft { get; set; } = null!;
+    [Parameter, EditorRequired] public AppConfig BaseContent { get; set; } = new();
+    [Parameter] public EventCallback OnChanged { get; set; }
+    [Parameter] public EventCallback<string> OnConditionSelected { get; set; }
+    [Parameter] public EventCallback OnLoadTemplate { get; set; }
+    [Parameter] public int Tab { get; set; }
+    [Parameter] public EventCallback<int> TabChanged { get; set; }
+    private ThemePreset Preset => ThemePresetCatalog.Find(Draft.Event.Theme?.PresetId) ?? ThemePresetCatalog.All[0];
+    private static readonly IReadOnlyDictionary<string, string> TextLabels = new Dictionary<string, string>
+    {
+        ["attract.cta"] = "Espera · botón para descubrir el equipo", ["attract.hint"] = "Espera · indicación del recorrido automático",
+        ["scan.logTitle"] = "Escaneo · título del registro", ["scan.progress"] = "Escaneo · etiqueta de progreso",
+        ["hud.detected"] = "Resumen · equipo detectado", ["hud.productView"] = "Resumen · vista del equipo",
+        ["hud.components"] = "Resumen · componentes", ["hud.tileCta"] = "Resumen · botón de detalle",
+        ["hud.photoHint"] = "Resumen · indicación de foto", ["hud.statScore"] = "Resumen · puntuación global",
+        ["hud.statScoreVal"] = "Resumen · valor de puntuación", ["hud.statScoreMax"] = "Resumen · máximo de puntuación",
+        ["hud.statGen"] = "Resumen · generación de componentes", ["hud.statGenVal"] = "Resumen · año de componentes",
+        ["hud.statCycles"] = "Resumen · ciclos de batería", ["hud.statCyclesVal"] = "Resumen · número de ciclos",
+        ["hud.statCyclesMax"] = "Resumen · máximo de ciclos", ["hud.statTests"] = "Resumen · pruebas pasadas",
+        ["hud.statTestsVal"] = "Resumen · número de pruebas", ["hud.statTestsMax"] = "Resumen · total de pruebas",
+        ["card.systemScan"] = "Detalle · estado del escaneo", ["card.verified"] = "Detalle · verificación",
+        ["price.label"] = "Precio · encabezado", ["price.installments"] = "Precio · financiación",
+        ["price.installmentsPrefix"] = "Precio · prefijo de cuotas", ["price.noInterest"] = "Precio · sin intereses",
+        ["price.scanTitle"] = "Ficha QR · título", ["price.scanText"] = "Ficha QR · descripción"
+    };
+    private Task NotifyChanged() => OnChanged.InvokeAsync();
+    private async Task SelectTab(int tab)
+    {
+        Tab = tab;
+        await TabChanged.InvokeAsync(tab);
+        if (tab < 2) await OnConditionSelected.InvokeAsync(tab == 0 ? "Ocasion" : "Nuevo");
+    }
+    private Task AddKnownText(ChangeEventArgs args)
+    {
+        string key = args.Value?.ToString() ?? "";
+        if (TextLabels.ContainsKey(key) && !Draft.Texts.Any(x => x.Key == key))
+            Draft.Texts.Add(new() { Key = key, Value = KioskContentDefaults.Text(BaseContent.UiTexts, key) });
+        return NotifyChanged();
+    }
+    private Task AddCustomText() { Draft.Texts.Add(new()); return NotifyChanged(); }
+    private Task RemoveText(EventEditorDraft.TextEntry text) { Draft.Texts.Remove(text); return NotifyChanged(); }
+}

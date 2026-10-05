@@ -1,0 +1,130 @@
+@page "/despliegue"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@implements IDisposable
+@using Kiosk.Deployment
+@inject DeploymentStore Store
+@inject PackCatalogStore Catalog
+@inject Microsoft.AspNetCore.SignalR.IHubContext<Kiosk.Server.Hubs.DeploymentHub> Hub
+
+<h2>Instalación de sistemas</h2>
+<p class="muted">Perfiles y seguimiento de Windows 11. La revisión del disco y el inicio de cada instalación se realizan en la aplicación del encargado.</p>
+@if (_message is not null) { <p class="alert" role="status">@_message</p> }
+<section class="card">
+    <h3>Estaciones de preparación</h3>
+    <button class="btn primary" @onclick="CreateCode">Vincular una estación</button>
+    @if (_code is not null)
+    { <p role="status">Código de un solo uso: <strong>@_code.Code</strong> · Caduca a las @_code.ExpiresAtUtc.ToLocalTime().ToString("HH:mm"). Introduce el código en la aplicación local.</p> }
+    @if (_snapshot.Stations.Count == 0) { <p class="muted">No hay estaciones vinculadas. Descarga la aplicación desde <a href="/instalador">Instalador</a>.</p> }
+    @foreach (var station in _snapshot.Stations)
+    {
+        <div class="card">
+            <strong>@station.Name</strong> · @(station.Revoked ? "Revocada" : station.LastSeenUtc is { } seen && DateTimeOffset.UtcNow - seen < TimeSpan.FromMinutes(2) ? "Conectada" : "Sin conexión reciente")
+            <p class="muted">Última conexión: @(station.LastSeenUtc?.ToLocalTime().ToString("g") ?? "Todavía no ha sincronizado") · Capacidad: @station.Capacity</p>
+            @if (!station.Revoked)
+            {
+                @if (_revokeId == station.Id)
+                {
+                    <p>La estación dejará de recibir perfiles y de confirmar lotes nuevos. Los trabajos locales ya autorizados continuarán.</p>
+                    <button class="btn danger" @onclick="() => Revoke(station.Id)">Confirmar revocación</button>
+                    <button class="btn" @onclick="() => _revokeId = null">Volver</button>
+                }
+                else { <button class="btn" @onclick="() => _revokeId = station.Id">Revocar vínculo</button> }
+            }
+            <h4>Sistemas disponibles</h4>
+            @if (station.Images.Count == 0) { <p class="muted">Importa una ISO oficial en esta estación para habilitar un perfil.</p> }
+            @foreach (var image in station.Images)
+            { <p>@image.Name · Windows build @image.Build · @image.Language · @string.Join(", ", image.Editions.Select(e => e.Name))</p> }
+            <h4>Equipos preparados</h4>
+            @foreach (var session in station.Sessions)
+            {
+                <div class="card">
+                    <strong>@session.DisplayId · @session.Hardware.Manufacturer @session.Hardware.Model</strong>
+                    <p>Serie: @session.Hardware.Serial · @State(session.State)</p>
+                    @if (!station.Revoked && session.State == DeploymentState.Ready && !_snapshot.Jobs[station.Id].Any(j => j.SessionId == session.Id))
+                    {
+                        <label>Usuario pendiente <input aria-label="Usuario para @session.DisplayId" value="@(session.PendingUsername ?? "Usuario")"
+                            @onchange="e => _usernames[session.Id] = e.Value?.ToString() ?? string.Empty" maxlength="20" /></label>
+                        <button class="btn" @onclick="() => Username(station.Id, session)">Guardar usuario</button>
+                    }
+                </div>
+            }
+        </div>
+    }
+</section>
+<section class="card">
+    <h3>Perfiles de instalación</h3>
+    @foreach (var profile in _snapshot.Profiles)
+    { <p><strong>@profile.Name</strong> · Revisión @profile.Revision · Usuario @profile.Username · @(profile.Kiosk ? "Con Kiosk" : "Sin Kiosk") · @profile.Applications.Applications.Count aplicaciones <button class="btn" @onclick="() => Edit(profile)">Editar</button></p> }
+    <button class="btn" @onclick="New">Nuevo perfil</button>
+    <div class="card">
+        <label>Nombre <input @bind="_name" maxlength="100" /></label>
+        <label>Imagen <select @bind="_imageId" @bind:after="() => _edition = null">
+            <option value="">Selecciona una imagen</option>
+            @foreach (var image in Images) { <option value="@image.Id">@image.Name (build @image.Build)</option> }
+        </select></label>
+        <label>Edición <select @bind="_edition"><option value="">Selecciona una edición</option>
+            @foreach (var edition in Images.FirstOrDefault(i => i.Id == _imageId)?.Editions ?? []) { <option value="@edition.Index">@edition.Name</option> }
+        </select></label>
+        <label>Usuario predeterminado <input @bind="_username" maxlength="20" /></label>
+        <p class="muted">Idioma y región: España. La contraseña se configura únicamente en el PC del encargado.</p>
+        @foreach (var app in Catalog.Snapshot().Applications)
+        {
+            <label><input type="checkbox" checked="@_apps.Contains(app.Id)" @onchange="e => SelectApp(app.Id, e.Value is true)" /> @app.DisplayName · @app.PinnedVersion</label>
+        }
+        <label><input type="checkbox" @bind="_kiosk" /> Instalar Kiosk (se iniciará en el siguiente inicio de sesión)</label>
+        <button class="btn primary" @onclick="Save">Guardar nueva revisión</button>
+    </div>
+</section>
+<section class="card">
+    <h3>Lotes, trabajos e historial</h3>
+    @if (!_snapshot.Jobs.Values.Any(j => j.Count > 0)) { <p class="muted">No hay instalaciones confirmadas.</p> }
+    @foreach (var station in _snapshot.Stations)
+    {
+        @foreach (var batch in _snapshot.Batches[station.Id].OrderByDescending(b => b.ConfirmedAtUtc))
+        {
+            <h4>@station.Name · Lote @batch.Id[..8] · @batch.ConfirmedAtUtc.ToLocalTime().ToString("g")</h4>
+            @foreach (var job in _snapshot.Jobs[station.Id].Where(j => j.BatchId == batch.Id))
+            { <p>@job.Profile.Name · @job.Username · Disco @job.Disk.Number (@job.Disk.Model, @job.Disk.Serial) · @State(job.State) · @job.Phase @(job.Percent is { } percent ? $"{percent}%" : "") @(job.RebootRequired ? "· Reinicio necesario" : "")</p> }
+        }
+    }
+</section>
+
+@code {
+    private DeploymentPanelSnapshot _snapshot = new([], [], [], []);
+    private EnrollmentCode? _code;
+    private string? _message, _revokeId, _id, _imageId;
+    private string _name = "Solo Windows", _username = "Usuario";
+    private long _revision;
+    private int? _edition;
+    private bool _kiosk;
+    private HashSet<string> _apps = [];
+    private Dictionary<string, string> _usernames = [];
+    private readonly CancellationTokenSource _stop = new();
+    private IEnumerable<DeploymentImage> Images => _snapshot.Stations.Where(s => !s.Revoked).SelectMany(s => s.Images).DistinctBy(i => i.Id);
+    protected override void OnInitialized() { Refresh(); _ = Poll(); }
+    private void Refresh() => _snapshot = Store.Snapshot();
+    private async Task Poll()
+    {
+        try { using var timer = new PeriodicTimer(TimeSpan.FromSeconds(5)); while (await timer.WaitForNextTickAsync(_stop.Token)) await InvokeAsync(() => { Refresh(); StateHasChanged(); }); }
+        catch (OperationCanceledException) { }
+    }
+    private async Task Run(Action action)
+    {
+        try { action(); Refresh(); _message = "Cambios guardados. La estación los recibirá al sincronizar."; await Hub.Clients.Group("deployment-stations").SendAsync("Changed"); }
+        catch (Exception ex) when (ex is InvalidDataException or InvalidOperationException) { _message = ex is InvalidDataException ? ex.Message : "El estado cambió. Recarga y revisa las opciones."; }
+    }
+    private Task CreateCode() => Run(() => _code = Store.CreateCode());
+    private Task Revoke(string id) => Run(() => { Store.Revoke(id); _revokeId = null; });
+    private Task Username(string station, BootSession session) => Run(() => Store.PendingUsername(station, session.Id,
+        new(_usernames.GetValueOrDefault(session.Id, session.PendingUsername ?? "Usuario"), session.OptionsRevision)));
+    private void New() { _id = null; _revision = 0; _name = "Nuevo perfil"; _imageId = null; _edition = null; _username = "Usuario"; _apps = []; _kiosk = false; }
+    private void Edit(DeploymentProfile p) { _id = p.Id; _revision = p.Revision; _name = p.Name; _imageId = p.ImageId; _edition = p.EditionIndex; _username = p.Username; _apps = p.Applications.Applications.Select(a => a.Id).ToHashSet(); _kiosk = p.Kiosk; }
+    private void SelectApp(string id, bool selected) { if (selected) _apps.Add(id); else _apps.Remove(id); }
+    private Task Save() => Run(() => { var p = Store.SaveProfile(new(_id, _revision, _name, string.IsNullOrEmpty(_imageId) ? null : _imageId, _edition, "es-ES", _username, _apps.ToList(), _kiosk), Catalog.Snapshot()); Edit(p); });
+    private static string State(DeploymentState state) => state switch {
+        DeploymentState.Detected => "Detectado en red", DeploymentState.Booting => "Preparando arranque", DeploymentState.Ready => "Listo para instalar",
+        DeploymentState.Queued => "En cola", DeploymentState.Installing => "Instalando", DeploymentState.PostInstall => "Preparando escritorio",
+        DeploymentState.Completed => "Finalizado", DeploymentState.Attention => "Requiere atención", _ => "Cancelado" };
+    public void Dispose() { _stop.Cancel(); _stop.Dispose(); }
+}

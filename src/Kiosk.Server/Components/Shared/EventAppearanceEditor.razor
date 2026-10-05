@@ -1,0 +1,47 @@
+<p class="muted">Elige un tema listo para usar. Puedes ajustar sus detalles si lo necesitas.</p>
+<div class="campaign-grid event-template-grid">
+    <button class="campaign-option plain @(!Draft.ThemeEnabled ? "selected" : "")" aria-pressed="@(!Draft.ThemeEnabled)" @onclick="() => OnPresetSelected.InvokeAsync((string?)null)"><span class="campaign-swatch"></span><strong>Sin tema</strong><small>Conservar la apariencia habitual</small></button>
+    @foreach (ThemePreset preset in ThemePresetCatalog.All)
+    {
+        <button class="campaign-option @(Draft.ThemeEnabled && Draft.Event.Theme?.PresetId == preset.Id ? "selected" : "")" style="@SwatchStyle(preset)" aria-pressed="@(Draft.ThemeEnabled && Draft.Event.Theme?.PresetId == preset.Id)" @onclick="() => OnPresetSelected.InvokeAsync(preset.Id)"><span class="campaign-swatch"></span><strong>@preset.DisplayName</strong><small>@preset.Description</small></button>
+    }
+</div>
+@if (Draft.ThemeEnabled && Draft.Event.Theme is { } theme)
+{
+    <details class="event-advanced">
+        <summary>Personalizar apariencia</summary>
+        <div class="theme-editor">
+            <div class="event-date-fields">
+                <div><label for="event-primary">Acento principal</label><div class="color-field"><input id="event-primary" type="color" value="@PrimaryColor" @oninput="PrimaryChanged" /><code>@PrimaryColor</code></div></div>
+                <div><label for="event-secondary">Acento secundario</label><div class="color-field"><input id="event-secondary" type="color" value="@SecondaryColor" @oninput="SecondaryChanged" /><code>@SecondaryColor</code></div></div>
+            </div>
+            <div class="intensity-row"><label for="event-intensity">Intensidad visual <b>@theme.Intensity%</b></label><input id="event-intensity" type="range" min="0" max="100" step="1" @bind="theme.Intensity" @bind:event="oninput" @bind:after="NotifyChanged" /></div>
+            <label class="check-row"><input type="checkbox" @bind="theme.DecorationsEnabled" @bind:after="NotifyChanged" /><span>Mostrar ilustraciones decorativas</span></label>
+            @if (theme.DecorationsEnabled)
+            {
+                <p class="muted section-copy">Personaliza los adornos de @ScreenLabel. Cambia de pantalla en la vista previa para editar otra.</p>
+                <ThemeSceneEditor @key="Screen" Title="@ScreenLabel" Scene="@Scene" PresetScene="@PresetScene" LibraryAssets="LibraryAssets" OnChanged="OnChanged" />
+            }
+        </div>
+    </details>
+}
+
+@code {
+    [Parameter, EditorRequired] public EventEditorDraft Draft { get; set; } = null!;
+    [Parameter] public string Screen { get; set; } = "Attract";
+    [Parameter] public IReadOnlyList<string> LibraryAssets { get; set; } = Array.Empty<string>();
+    [Parameter] public EventCallback<string?> OnPresetSelected { get; set; }
+    [Parameter] public EventCallback OnChanged { get; set; }
+    private ThemePreset Preset => ThemePresetCatalog.Find(Draft.Event.Theme?.PresetId) ?? ThemePresetCatalog.All[0];
+    private string PrimaryColor => ThemeColor.TryNormalize(Draft.Event.Theme?.PrimaryAccent, out string color) ? color : Preset.Palette.Primary;
+    private string SecondaryColor => ThemeColor.TryNormalize(Draft.Event.Theme?.SecondaryAccent, out string color) ? color : Preset.Palette.Secondary;
+    private string ScreenLabel => Screen switch { "Scan" => "Escaneo", "Overview" => "Resumen", "Detail" => "Detalle", _ => "Espera" };
+    private ThemeSceneOverride Scene => Screen switch
+    { "Scan" => Draft.Event.Theme!.Scenes.Scan, "Overview" => Draft.Event.Theme!.Scenes.Overview, "Detail" => Draft.Event.Theme!.Scenes.Detail, _ => Draft.Event.Theme!.Scenes.Attract };
+    private ResolvedThemeScene PresetScene => Screen switch
+    { "Scan" => Preset.Scenes.Scan, "Overview" => Preset.Scenes.Overview, "Detail" => Preset.Scenes.Detail, _ => Preset.Scenes.Attract };
+    private static string SwatchStyle(ThemePreset p) => $"--campaign-a:{p.Palette.Primary};--campaign-b:{p.Palette.Secondary};--campaign-bg:{p.Palette.Background2}";
+    private Task NotifyChanged() => OnChanged.InvokeAsync();
+    private Task PrimaryChanged(ChangeEventArgs args) { Draft.Event.Theme!.PrimaryAccent = args.Value?.ToString(); return NotifyChanged(); }
+    private Task SecondaryChanged(ChangeEventArgs args) { Draft.Event.Theme!.SecondaryAccent = args.Value?.ToString(); return NotifyChanged(); }
+}

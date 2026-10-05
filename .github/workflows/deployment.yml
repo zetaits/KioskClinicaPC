@@ -1,0 +1,45 @@
+name: Deployment Station (private)
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Versión X.Y.Z de la estación
+        type: string
+        required: true
+      lab_bundle:
+        description: Carpeta local del laboratorio con boot/, validation.json, worker.zip y kiosk.exe
+        type: string
+        required: true
+      kiosk_version:
+        description: Versión fija de Kiosk incluida
+        type: string
+        required: true
+permissions:
+  contents: read
+concurrency:
+  group: deployment-station-production
+  cancel-in-progress: false
+jobs:
+  test-and-publish-private:
+    # Deliberately needs the shop laboratory. Hosted runners cannot attest physical PXE validation.
+    runs-on: [self-hosted, Windows, X64, clinicapc-deployment]
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Test
+        shell: pwsh
+        run: dotnet test -c Release -nologo
+      - name: Check compatible server and publish validated station
+        shell: pwsh
+        env:
+          DEPLOYMENT_VERSION: ${{ inputs.version }}
+          DEPLOYMENT_LAB_BUNDLE: ${{ inputs.lab_bundle }}
+          DEPLOYMENT_KIOSK_VERSION: ${{ inputs.kiosk_version }}
+          KIOSK_RELEASE_PUBLISH_KEY: ${{ secrets.KIOSK_RELEASE_PUBLISH_KEY }}
+        run: |
+          $ready = Invoke-WebRequest 'https://panel.clinicapc.es/health/ready'
+          if (($ready.Content | ConvertFrom-Json).status -ne 'ok' -or $ready.Headers['X-Deployment-Protocol'] -ne '1') { throw 'El servidor compatible debe estar desplegado y listo antes de publicar la estación.' }
+          .\build-deployment.ps1 -Version $env:DEPLOYMENT_VERSION -BootDirectory (Join-Path $env:DEPLOYMENT_LAB_BUNDLE 'boot') -Validation (Join-Path $env:DEPLOYMENT_LAB_BUNDLE 'validation.json') -WorkerZip (Join-Path $env:DEPLOYMENT_LAB_BUNDLE 'worker.zip') -KioskInstaller (Join-Path $env:DEPLOYMENT_LAB_BUNDLE 'kiosk.exe') -KioskVersion $env:DEPLOYMENT_KIOSK_VERSION -Publish

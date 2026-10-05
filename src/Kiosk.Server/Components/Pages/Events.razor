@@ -2,174 +2,154 @@
 @attribute [Authorize]
 @rendermode InteractiveServer
 @inject EventStore Store
+@inject ServerConfigStore BaseContent
 @inject ContentResolver Content
-@inject AssetLibrary Assets
+@inject AssetLibrary Library
 @inject FleetRegistry Fleet
-@using KioskClinicaPC.Core.Config
-@using Newtonsoft.Json
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
 
-@if (_choosingTemplate)
+<NavigationLock ConfirmExternalNavigation="@Dirty" OnBeforeInternalNavigation="BeforeNavigation" />
+
+@if (_draft is null)
 {
-    <section class="card campaign-chooser">
-        <div class="card-head">
-            <div><h2>Elige una campaña</h2><p class="muted section-copy">Crea una propuesta completa que podrás ajustar antes de guardarla.</p></div>
-            <button @onclick="() => _choosingTemplate = false">Cancelar</button>
-        </div>
-        <div class="campaign-grid">
-            <button class="campaign-option plain" @onclick="() => StartNew(null)">
-                <span class="campaign-swatch"></span><strong>Sin tema</strong><small>Evento clásico · contenido manual</small>
-            </button>
-            @foreach (ThemePreset preset in ThemePresetCatalog.All.Where(x => x.Id != ThemePresetCatalog.ClinicPcId))
+    <div class="card-head event-list-head">
+        <div><h2>Eventos</h2><p class="muted section-copy">Programa una campaña y vuelve al contenido habitual cuando termine.</p></div>
+        <button class="primary" @onclick="NewEvent">+ Nuevo evento</button>
+    </div>
+    @if (_events.Count == 0)
+    {
+        <div class="card"><p class="muted">No hay eventos. Crea uno para programar una campaña.</p></div>
+    }
+    else
+    {
+        <div class="event-list">
+            @foreach (KioskEvent ev in _events)
             {
-                <button class="campaign-option" style="@SwatchStyle(preset)" @onclick="() => StartNew(preset.Id)">
-                    <span class="campaign-swatch"></span><strong>@preset.DisplayName</strong><small>@preset.Description</small>
+                bool active = ev.IsActiveAt(_now);
+                bool upcoming = ev.Enabled && ev.Start > _now;
+                <button class="event-card @(active ? "active" : upcoming ? "upcoming" : "")" @onclick="() => Edit(ev)">
+                    <span class="bar"></span><span class="head">
+                        <span class="event-theme-dot" style="@EventDot(ev)"></span>
+                        <span class="n">@(string.IsNullOrWhiteSpace(ev.Name) ? "(sin nombre)" : ev.Name)</span>
+                        <span class="badge @(active ? "ok" : upcoming ? "accent" : "off")">@(active ? "● ACTIVO" : upcoming ? "PROGRAMADO" : ev.Enabled ? "TERMINADO" : "BORRADOR")</span>
+                    </span>
+                    <span class="range">@Range(ev)</span>
+                    <span class="caps">@foreach (string cap in Caps(ev)) { <span class="chip">@cap</span> }</span>
                 </button>
             }
         </div>
+    }
+}
+else
+{
+    KioskEvent editing = _draft.Event;
+    AppConfig preview = _draft.Preview(_baseContent);
+    var slides = _previewCondition == "Nuevo" ? preview.AttractSlidesNew : preview.AttractSlides;
+    <section class="card event-editor-card">
+        <div class="event-editor-head">
+            <div><h2>@(_isNew ? "Nuevo evento" : "Editar evento")</h2><span class="badge @(editing.Enabled ? "ok" : "off")">@(editing.Enabled ? "PUBLICADO" : "BORRADOR")</span></div>
+            <button @onclick="Cancel">Volver a eventos</button>
+        </div>
+        <nav class="event-steps" aria-label="Pasos de configuración">
+            @for (int index = 0; index < StepLabels.Length; index++)
+            {
+                int target = index;
+                <button class="@(_step == target ? "active" : "")" aria-current="@(_step == target ? "step" : null)" disabled="@(_isNew && target > _furthestStep)" @onclick="() => GoToStep(target)"><span>@(target + 1)</span>@StepLabels[target]</button>
+            }
+        </nav>
+        @if (_errors.Count > 0)
+        {
+            <div class="alert error" role="alert"><div><strong>Revisa el evento</strong>@foreach (string error in _errors) { <div>@error</div> }</div></div>
+        }
+        <div class="event-workspace">
+            <div class="event-step-body">
+                <h3 id="event-step-heading" tabindex="-1">@StepLabels[_step]</h3>
+                @if (_step == 0)
+                {
+                    <EventScheduleEditor Event="editing" StoreTimeZone="Content.StoreTz" ShowErrors="_showScheduleErrors" OnChanged="ContentChanged" />
+                }
+                else if (_step == 1)
+                {
+                    <EventAppearanceEditor Draft="_draft" Screen="@_previewScreen" LibraryAssets="_themeAssets" OnPresetSelected="SelectPreset" OnChanged="ContentChanged" />
+                }
+                else if (_step == 2)
+                {
+                    <EventContentEditor Draft="_draft" BaseContent="_baseContent" @bind-Tab="_contentTab" OnChanged="ContentChanged" OnConditionSelected="SelectContentCondition" OnLoadTemplate="LoadTemplateContent" />
+                }
+                else
+                {
+                    KioskEvent candidate = _draft.Candidate();
+                    <p class="muted">Revisa qué se mostrará antes de guardar el evento.</p>
+                    <div class="event-review">
+                        <div><h4>Datos y fechas</h4><strong>@candidate.Name</strong><p>@Range(candidate)</p><button class="compact" @onclick="() => GoToStep(0)">Editar datos y fechas</button></div>
+                        <div><h4>Apariencia</h4><p>@(candidate.Theme is null ? "Apariencia habitual" : CurrentPreset.DisplayName)</p><button class="compact" @onclick="() => GoToStep(1)">Editar apariencia</button></div>
+                        <div><h4>Contenido</h4><p>De ocasión: @(candidate.AttractSlides.Count > 0 ? $"{candidate.AttractSlides.Count} slides del evento" : "carrusel habitual")</p><p>Nuevo: @(candidate.AttractSlidesNew.Count > 0 ? $"{candidate.AttractSlidesNew.Count} slides del evento" : "carrusel habitual")</p><p>Textos: @(candidate.UiTextOverrides.Count > 0 ? $"{candidate.UiTextOverrides.Count} personalizados" : "contenido habitual")</p><button class="compact" @onclick="() => GoToStep(2)">Editar contenido</button></div>
+                    </div>
+                    <p class="muted">@PublicationDescription(candidate)</p>
+                    <p class="muted section-copy">El precio, el estado y el hardware seguirán siendo los de cada equipo.</p>
+                }
+            </div>
+            <aside class="event-preview-panel" aria-label="Vista previa del evento">
+                <h3>Vista previa</h3>
+                <div class="preview-tabs" role="group" aria-label="Pantalla de la vista previa">
+                    @foreach (var tab in PreviewTabs)
+                    {
+                        <button class="@(_previewScreen == tab.Key ? "active" : "")" aria-pressed="@(_previewScreen == tab.Key)" @onclick="() => _previewScreen = tab.Key">@tab.Value</button>
+                    }
+                </div>
+                <label for="event-preview-condition">Tipo de equipo</label>
+                <select id="event-preview-condition" @bind="_previewCondition" @bind:after="ResetSlide"><option value="Ocasion">De ocasión</option><option value="Nuevo">Nuevo</option></select>
+                <ThemePreview Content="preview" Screen="@_previewScreen" Condition="@_previewCondition" SlideIndex="_previewSlide" />
+                @if (_previewScreen == "Attract" && slides.Count > 1)
+                {
+                    <div class="event-slide-navigation"><button aria-label="Slide anterior" @onclick="() => MoveSlide(-1, slides.Count)">←</button><span>Slide @(Math.Clamp(_previewSlide, 0, slides.Count - 1) + 1) de @slides.Count</span><button aria-label="Slide siguiente" @onclick="() => MoveSlide(1, slides.Count)">→</button></div>
+                }
+                <p class="muted section-copy">Vista aproximada del kiosco. Hardware y precio de ejemplo. Los cambios se muestran sin publicar.</p>
+            </aside>
+        </div>
+        <div class="event-actions event-wizard-actions">
+            @if (_step > 0) { <button @onclick="() => GoToStep(_step - 1)">Anterior</button> }
+            @if (_step < 3) { <button class="primary" @onclick="() => GoToStep(_step + 1)">Siguiente →</button> }
+            else { <button class="primary" @onclick="() => Save(true)">@(editing.Enabled ? "Guardar y actualizar" : "Publicar / programar")</button> }
+            <button @onclick="SaveDraft">Guardar @(!editing.Enabled ? "borrador" : "como borrador")</button><button @onclick="Cancel">Cancelar</button>
+        </div>
+        @if (!_isNew)
+        {
+            <div class="event-management"><button class="compact" @onclick="Duplicate">Duplicar +1 año</button><button class="danger compact" @onclick="AskDelete">Eliminar evento</button></div>
+        }
     </section>
 }
-
-<div class="split events">
-    <div>
-        <div class="card-head" style="margin-bottom:14px;">
-            <h2>Programados</h2>
-            <button class="primary" style="font-size:12.5px;padding:9px 14px;" @onclick="NewEvent">+ Nuevo evento</button>
-        </div>
-
-        @if (_events.Count == 0)
-        {
-            <div class="card"><p class="muted" style="margin:0;">No hay eventos. Crea uno para programar una campaña.</p></div>
-        }
-        else
-        {
-            <div style="display:flex;flex-direction:column;gap:12px;">
-                @foreach (KioskEvent ev in _events)
-                {
-                    bool active = ev.IsActiveAt(_now);
-                    bool upcoming = ev.Enabled && ev.Start > _now;
-                    <div class="event-card @(active ? "active" : upcoming ? "upcoming" : "") @(_editing?.Id == ev.Id ? "sel" : "")" @onclick="() => Edit(ev)">
-                        <div class="bar"></div>
-                        <div class="head">
-                            <span class="event-theme-dot" style="@EventDot(ev)"></span>
-                            <span class="n">@(string.IsNullOrWhiteSpace(ev.Name) ? "(sin nombre)" : ev.Name)</span>
-                            <span class="badge @(active ? "ok" : upcoming ? "accent" : "off")">@(active ? "● ACTIVO" : upcoming ? "PROGRAMADO" : ev.Enabled ? "TERMINADO" : "BORRADOR")</span>
-                        </div>
-                        <div class="range">@Range(ev)</div>
-                        <div class="caps">@foreach (string cap in Caps(ev)) { <span class="chip">@cap</span> }</div>
-                    </div>
-                }
-            </div>
-        }
-    </div>
-
-    <div class="card event-editor-card">
-        @if (_editing is null)
-        {
-            <h2>Ningún evento seleccionado</h2>
-            <p class="muted" style="margin:0;">Elige un evento o crea una campaña. Los temas solo modifican las pantallas públicas; el precio y el hardware siguen siendo locales.</p>
-        }
-        else
-        {
-            <div class="event-editor-head">
-                <div><span class="dot @(_editing.IsActiveAt(_now) ? "online" : "accent")"></span><h2>@(_isNew ? "Nuevo evento" : "Editar evento")</h2></div>
-                @if (!_isNew) { <button class="accent compact" @onclick="Duplicate">Duplicar +1 año</button> }
-            </div>
-
-            @if (_errors.Count > 0)
-            {
-                <div class="alert error"><div><strong>Revisa el evento</strong>@foreach (string error in _errors) { <div>@error</div> }</div></div>
-            }
-
-            <div class="row" style="margin-bottom:18px;flex-wrap:nowrap;">
-                <div style="flex:2;"><label>Nombre del evento</label><input type="text" placeholder="Ej. Navidad 2026" @bind="_editing.Name" /></div>
-                <div><label>Estado</label><span class="badge @(_editing.Enabled ? "ok" : "off")">@(_editing.Enabled ? "PUBLICADO" : "BORRADOR")</span></div>
-            </div>
-            <div class="row" style="margin-bottom:20px;flex-wrap:nowrap;">
-                <div style="flex:1;"><label>Inicio · hora de tienda</label><input type="datetime-local" @bind="_editing.Start" @bind:format="yyyy-MM-ddTHH:mm" /></div>
-                <div style="flex:1;"><label>Fin · exclusivo</label><input type="datetime-local" @bind="_editing.End" @bind:format="yyyy-MM-ddTHH:mm" /></div>
-            </div>
-
-            <div class="mono-label event-section-label">Apariencia de la campaña</div>
-            <div class="toggle-box @(_themeOn ? "on" : "")">
-                <div class="head">
-                    <div class="toggle"><input type="checkbox" @bind="_themeOn" @bind:after="ThemeToggleChanged" /><span class="track"></span></div>
-                    <div class="txt"><div class="t">Tema visual completo</div><div class="s">Paleta, ambiente y hasta dos adornos seguros por pantalla</div></div>
-                </div>
-                @if (_themeOn && _editing.Theme is not null)
-                {
-                    ThemePreset preset = CurrentPreset;
-                    <div class="body theme-editor">
-                        <div class="theme-controls">
-                            <div><label>Plantilla</label><select value="@_editing.Theme.PresetId" @onchange="PresetChanged">@foreach (ThemePreset option in ThemePresetCatalog.All) { <option value="@option.Id">@option.DisplayName</option> }</select></div>
-                            <div><label>Acento principal</label><div class="color-field"><input type="color" @bind="_primaryColor" @bind:after="PreviewColorsChanged" /><code>@_primaryColor</code></div></div>
-                            <div><label>Acento secundario</label><div class="color-field"><input type="color" @bind="_secondaryColor" @bind:after="PreviewColorsChanged" /><code>@_secondaryColor</code></div></div>
-                        </div>
-                        <div class="intensity-row"><label>Intensidad visual <b>@_editing.Theme.Intensity%</b></label><input type="range" min="0" max="100" step="1" @bind="_editing.Theme.Intensity" /></div>
-                        <label class="check-row"><input type="checkbox" @bind="_editing.Theme.DecorationsEnabled" /><span>Mostrar ilustraciones decorativas</span></label>
-
-                        @if (_editing.Theme.DecorationsEnabled)
-                        {
-                            <div class="theme-scenes">
-                                <ThemeSceneEditor Title="Espera" Scene="_editing.Theme.Scenes.Attract" PresetScene="preset.Scenes.Attract" Assets="_themeAssets" />
-                                <ThemeSceneEditor Title="Escaneo" Scene="_editing.Theme.Scenes.Scan" PresetScene="preset.Scenes.Scan" Assets="_themeAssets" />
-                                <ThemeSceneEditor Title="Resumen" Scene="_editing.Theme.Scenes.Overview" PresetScene="preset.Scenes.Overview" Assets="_themeAssets" />
-                                <ThemeSceneEditor Title="Detalle" Scene="_editing.Theme.Scenes.Detail" PresetScene="preset.Scenes.Detail" Assets="_themeAssets" />
-                            </div>
-                        }
-
-                        <div class="preview-tabs">@foreach (var tab in PreviewTabs) { <button class="@(_previewScreen == tab.Key ? "active" : "")" @onclick="() => _previewScreen = tab.Key">@tab.Value</button> }</div>
-                        <ThemePreview Event="_editing" Screen="_previewScreen" />
-                    </div>
-                }
-            </div>
-
-            <div class="mono-label event-section-label">Contenido temporal · activa solo lo necesario</div>
-            <div class="event-overrides">
-                <div class="toggle-box @(_slidesOn ? "on" : "")"><div class="head"><div class="toggle"><input type="checkbox" @bind="_slidesOn" /><span class="track"></span></div><div class="txt"><div class="t">Slides · De ocasión</div><div class="s">Sustituyen el mazo base de equipos de ocasión</div></div></div>@if (_slidesOn) { <div class="body"><SlideListEditor Slides="_editing.AttractSlides" /></div> }</div>
-                <div class="toggle-box @(_slidesNewOn ? "on" : "")"><div class="head"><div class="toggle"><input type="checkbox" @bind="_slidesNewOn" /><span class="track"></span></div><div class="txt"><div class="t">Slides · Nuevo</div><div class="s">Sustituyen el mazo base de equipos nuevos</div></div></div>@if (_slidesNewOn) { <div class="body"><SlideListEditor Slides="_editing.AttractSlidesNew" /></div> }</div>
-                <div class="toggle-box @(_textsOn ? "on" : "")"><div class="head"><div class="toggle"><input type="checkbox" @bind="_textsOn" /><span class="track"></span></div><div class="txt"><div class="t">Textos de interfaz</div><div class="s">Sobreponen por clave los textos fijos</div></div></div>@if (_textsOn) { <div class="body text-overrides">@foreach (KeyVal t in _texts) { <div class="slide-row"><input type="text" style="flex:1;" placeholder="Clave" @bind="t.Key" /><input type="text" style="flex:2;" placeholder="Texto" @bind="t.Value" /><button class="icon danger" @onclick="() => _texts.Remove(t)">×</button></div> }<button class="accent compact" @onclick="() => _texts.Add(new KeyVal())">+ Añadir texto</button></div> }</div>
-            </div>
-
-            <div class="event-actions">
-                <button class="primary" @onclick="Publish">@(_editing.Enabled ? "Guardar y actualizar" : "Publicar / programar")</button>
-                <button @onclick="SaveDraft">Guardar borrador</button><button @onclick="Cancel">Cancelar</button>
-                @if (!_isNew) { <button class="danger icon" title="Eliminar evento" @onclick="AskDelete">×</button> }
-            </div>
-        }
-    </div>
-</div>
 
 <ConfirmDialog Model="_confirm" OnClose="() => _confirm = null" />
 <Toast Message="@_message" IsError="@(_errors.Count > 0)" />
 
 @code {
     private static readonly System.Globalization.CultureInfo Es = new("es-ES");
+    private static readonly string[] StepLabels = ["Datos y fechas", "Apariencia", "Contenido", "Revisar y guardar"];
     private static readonly IReadOnlyDictionary<string, string> PreviewTabs = new Dictionary<string, string>
     { ["Attract"] = "Espera", ["Scan"] = "Escaneo", ["Overview"] = "Resumen", ["Detail"] = "Detalle" };
-
     private List<KioskEvent> _events = new();
     private IReadOnlyList<string> _themeAssets = Array.Empty<string>();
     private DateTime _now;
-    private KioskEvent? _editing;
-    private bool _isNew, _choosingTemplate;
-    private List<KeyVal> _texts = new();
-    private bool _slidesOn, _slidesNewOn, _textsOn, _themeOn;
-    private string _primaryColor = "#F37A4A", _secondaryColor = "#FFB069", _previewScreen = "Attract";
+    private EventEditorDraft? _draft;
+    private AppConfig _baseContent = new();
+    private bool _isNew, _templateChosen, _showScheduleErrors, _focusStep, _allowNavigation;
+    private int _step, _furthestStep, _previewSlide, _contentTab;
+    private string _baseline = "", _previewScreen = "Attract", _previewCondition = "Ocasion";
     private List<string> _errors = new();
     private ConfirmDialog.Options? _confirm;
     private string? _message;
+    private bool Dirty => _draft is not null && _draft.Fingerprint() != _baseline;
+    private ThemePreset CurrentPreset => ThemePresetCatalog.Find(_draft?.Event.Theme?.PresetId) ?? ThemePresetCatalog.All[0];
 
-    private ThemePreset CurrentPreset => ThemePresetCatalog.Find(_editing?.Theme?.PresetId) ?? ThemePresetCatalog.All[0];
-
-    protected override void OnInitialized()
+    protected override void OnInitialized() { Refresh(); _themeAssets = Library.List("ThemeAssets"); }
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        Refresh(); _themeAssets = Assets.List("ThemeAssets");
-        KioskEvent? first = _events.FirstOrDefault(e => e.IsActiveAt(_now)) ?? _events.FirstOrDefault();
-        if (first is not null) Edit(first);
+        if (_focusStep) { _focusStep = false; await JS.InvokeVoidAsync("kioskEvents.focusStep"); }
     }
-
     private void Refresh() { _events = Store.All().OrderByDescending(e => e.Start).ToList(); _now = Content.NowLocal; }
-    private string Range(KioskEvent ev) => $"{ev.Start.ToString("d MMM yyyy HH:mm", Es)} → {ev.End.ToString("d MMM yyyy HH:mm", Es)}";
+    private static string Range(KioskEvent ev) => $"{ev.Start.ToString("d MMM yyyy HH:mm", Es)} → {ev.End.ToString("d MMM yyyy HH:mm", Es)}";
     private static IEnumerable<string> Caps(KioskEvent ev)
     {
         if (ev.Theme != null) yield return ThemePresetCatalog.Find(ev.Theme.PresetId)?.DisplayName ?? "Tema desconocido";
@@ -177,97 +157,124 @@
         if (ev.AttractSlidesNew?.Count > 0) yield return $"{ev.AttractSlidesNew.Count} slides nuevo";
         if (ev.UiTextOverrides?.Count > 0) yield return $"{ev.UiTextOverrides.Count} textos";
     }
-    private static string EventDot(KioskEvent ev) { ThemePreset? p = ThemePresetCatalog.Find(ev.Theme?.PresetId); return p == null ? "display:none" : $"background:{p.Palette.Primary};box-shadow:0 0 10px {p.Palette.Primary}"; }
-    private static string SwatchStyle(ThemePreset p) => $"--campaign-a:{p.Palette.Primary};--campaign-b:{p.Palette.Secondary};--campaign-bg:{p.Palette.Background2}";
-
-    private void NewEvent() { _message = null; _errors.Clear(); _choosingTemplate = true; }
-    private void StartNew(string? presetId)
+    private static string EventDot(KioskEvent ev) { ThemePreset? p = ThemePresetCatalog.Find(ev.Theme?.PresetId); return p == null ? "display:none" : $"background:{p.Palette.Primary}"; }
+    private string PublicationDescription(KioskEvent ev)
     {
-        _choosingTemplate = false; _isNew = true; DateTime today = Content.NowLocal.Date;
-        _editing = new KioskEvent { Enabled = false, Start = today, End = today.AddDays(7) };
-        if (presetId != null && ThemePresetCatalog.Find(presetId) is ThemePreset preset)
-        {
-            _editing.Name = $"{preset.DisplayName} {today.Year}"; _editing.Theme = ThemePresetCatalog.CreateSelection(preset.Id);
-            _editing.AttractSlides = CloneSlides(preset.CampaignSlides); _editing.AttractSlidesNew = CloneSlides(preset.CampaignSlides);
-            _editing.UiTextOverrides = new Dictionary<string, string>(preset.UiTexts);
-        }
-        LoadOverrides();
+        DateTime now = Content.NowLocal;
+        return ev.End <= now ? "El periodo ya ha terminado: publicar este evento no lo activará ahora."
+            : ev.Start > now ? "Al publicar, el evento quedará programado para la fecha de inicio."
+            : "Al publicar, el evento se activará ahora y permanecerá hasta la fecha de fin.";
     }
-    private void Edit(KioskEvent ev) { _message = null; _errors.Clear(); _isNew = false; _editing = JsonConvert.DeserializeObject<KioskEvent>(JsonConvert.SerializeObject(ev))!; LoadOverrides(); }
-    private void Duplicate()
+    private void NewEvent() => DiscardThen(() => Open(new KioskEvent { Enabled = false, Start = Content.NowLocal.Date, End = Content.NowLocal.Date.AddDays(7) }, true));
+    private void Edit(KioskEvent ev) => DiscardThen(() => Open(ev, false));
+    private void Open(KioskEvent ev, bool isNew)
     {
-        if (_editing == null) return; _editing.Id = Guid.NewGuid().ToString("N");
-        _editing.Name = $"{_editing.Name} {_editing.Start.Year + 1}"; _editing.Start = _editing.Start.AddYears(1); _editing.End = _editing.End.AddYears(1);
-        _editing.Enabled = false; _isNew = true; _errors.Clear();
+        _draft = new(ev); _isNew = isNew; _templateChosen = !isNew;
+        _baseContent = BaseContent.Read(); _themeAssets = Library.List("ThemeAssets");
+        _step = 0; _furthestStep = isNew ? 0 : 3; _contentTab = 0; _previewScreen = "Attract"; _previewCondition = "Ocasion"; _previewSlide = 0;
+        _showScheduleErrors = false; _errors.Clear(); _message = null; _allowNavigation = false;
+        _baseline = _draft.Fingerprint(); _focusStep = true;
     }
-    private void LoadOverrides()
+    private void SelectPreset(string? id)
     {
-        _editing!.AttractSlides ??= new(); _editing.AttractSlidesNew ??= new(); _editing.UiTextOverrides ??= new();
-        _texts = _editing.UiTextOverrides.Select(kv => new KeyVal { Key = kv.Key, Value = kv.Value }).ToList();
-        _slidesOn = _editing.AttractSlides.Count > 0; _slidesNewOn = _editing.AttractSlidesNew.Count > 0; _textsOn = _texts.Count > 0;
-        _themeOn = _editing.Theme != null; EnsureThemeObjects(); LoadThemeColors();
+        if (_draft is null) return;
+        if (id is null) { _draft.ThemeEnabled = false; return; }
+        ThemePreset? preset = ThemePresetCatalog.Find(id);
+        if (preset is null) return;
+        if (_draft.Event.Theme?.PresetId != id) _draft.Event.Theme = ThemePresetCatalog.CreateSelection(id);
+        _draft.ThemeEnabled = true;
+        if (_isNew && !_templateChosen && _draft.Event.AttractSlides.Count == 0 && _draft.Event.AttractSlidesNew.Count == 0 && _draft.Texts.Count == 0) _draft.LoadCampaign(preset);
+        _templateChosen = true; ResetSlide(); _errors.Clear();
     }
-    private void ThemeToggleChanged() { if (_themeOn && _editing!.Theme == null) _editing.Theme = ThemePresetCatalog.CreateSelection(ThemePresetCatalog.ClinicPcId); LoadThemeColors(); }
-    private void EnsureThemeObjects()
+    private void LoadTemplateContent()
     {
-        if (_editing?.Theme == null) return; _editing.Theme.Scenes ??= new();
-        _editing.Theme.Scenes.Attract ??= new(); _editing.Theme.Scenes.Scan ??= new(); _editing.Theme.Scenes.Overview ??= new(); _editing.Theme.Scenes.Detail ??= new();
+        if (_draft is null) return;
+        ThemePreset preset = CurrentPreset;
+        void Load() { _draft.LoadCampaign(preset); ResetSlide(); _errors.Clear(); }
+        if (_draft.Event.AttractSlides.Count > 0 || _draft.Event.AttractSlidesNew.Count > 0 || _draft.Texts.Count > 0)
+            Confirm("Cargar contenido de la plantilla", $"Los slides de ambos tipos de equipo y los textos del evento se sustituirán por los de {preset.DisplayName}.", "Cargar contenido", Load);
+        else Load();
     }
-    private void LoadThemeColors()
+    private void ContentChanged() { _errors.Clear(); StateHasChanged(); }
+    private void SelectContentCondition(string condition) { _previewCondition = condition; _previewScreen = "Attract"; ResetSlide(); }
+    private void ResetSlide() => _previewSlide = 0;
+    private void MoveSlide(int offset, int count) => _previewSlide = (Math.Clamp(_previewSlide, 0, count - 1) + offset + count) % count;
+    private void GoToStep(int target)
     {
-        if (_editing?.Theme == null) return; ThemePreset preset = CurrentPreset;
-        _primaryColor = ThemeColor.TryNormalize(_editing.Theme.PrimaryAccent, out string p) ? p : preset.Palette.Primary;
-        _secondaryColor = ThemeColor.TryNormalize(_editing.Theme.SecondaryAccent, out string s) ? s : preset.Palette.Secondary;
+        if (_draft is null || target is < 0 or > 3) return;
+        if (target > _step && _isNew && !ValidateStep()) return;
+        _step = target; _furthestStep = Math.Max(_furthestStep, target); _errors.Clear(); _focusStep = true;
+        if (target == 2 && _contentTab < 2) SelectContentCondition(_contentTab == 0 ? "Ocasion" : "Nuevo");
     }
-    private void PreviewColorsChanged()
+    private bool ValidateStep()
     {
-        if (_editing?.Theme == null) return;
-        _editing.Theme.PrimaryAccent = _primaryColor; _editing.Theme.SecondaryAccent = _secondaryColor;
+        if (_draft is null) return false;
+        if (_step == 0) { _showScheduleErrors = true; _errors = EventRules.ValidateSchedule(_draft.Event, Content.StoreTz).ToList(); }
+        else if (_step == 1) { var candidate = _draft.Candidate(); _errors = ThemePresetCatalog.Validate(candidate.Theme).Concat(MissingLibraryAssets(candidate)).ToList(); }
+        else _errors.Clear();
+        return _errors.Count == 0;
     }
-    private void PresetChanged(ChangeEventArgs args)
+    private void SaveDraft()
     {
-        if (_editing?.Theme == null) return; ThemePreset preset = ThemePresetCatalog.Find(args.Value?.ToString()) ?? ThemePresetCatalog.All[0];
-        _editing.Theme.PresetId = preset.Id; _editing.Theme.Intensity = preset.DefaultIntensity; _editing.Theme.Scenes = new();
-        _editing.Theme.PrimaryAccent = null; _editing.Theme.SecondaryAccent = null; LoadThemeColors();
+        if (_draft?.Event.Enabled == true) Confirm("Guardar como borrador", "El evento se despublicará. Si está activo, los kioscos volverán al contenido habitual.", "Guardar como borrador", () => Save(false));
+        else Save(false);
     }
-
-    private void SaveDraft() => Save(false);
-    private void Publish() => Save(true);
     private void Save(bool publish)
     {
-        if (_editing == null) return; PrepareEditing(); _editing.Enabled = publish;
-        _errors = EventRules.Validate(_editing, Store.All(), Content.StoreTz, publish).ToList(); _errors.AddRange(MissingLibraryAssets(_editing));
-        if (_errors.Count > 0) { _message = "No se ha guardado: revisa los errores."; return; }
-        Store.Save(_editing); string action = publish ? "publicado" : "guardado como borrador";
-        Fleet.LogContentPublished($"Evento «{_editing.Name}» {action}"); _message = $"Evento «{_editing.Name}» {action}.";
-        _editing = null; Refresh();
-    }
-    private void PrepareEditing()
-    {
-        if (!_slidesOn) _editing!.AttractSlides.Clear(); if (!_slidesNewOn) _editing!.AttractSlidesNew.Clear();
-        _editing!.UiTextOverrides = !_textsOn ? new() : _texts.Where(t => !string.IsNullOrWhiteSpace(t.Key)).GroupBy(t => t.Key!.Trim()).ToDictionary(g => g.Key, g => g.Last().Value ?? "");
-        if (!_themeOn) _editing.Theme = null; else if (_editing.Theme != null) { _editing.Theme.PrimaryAccent = _primaryColor; _editing.Theme.SecondaryAccent = _secondaryColor; }
+        if (_draft is null) return;
+        KioskEvent candidate = _draft.Candidate(publish);
+        _errors = EventRules.Validate(candidate, Store.All(), Content.StoreTz, publish).Concat(MissingLibraryAssets(candidate)).ToList();
+        if (_errors.Count > 0)
+        {
+            _step = EventRules.ValidateSchedule(candidate, Content.StoreTz).Count > 0 ? 0 : ThemePresetCatalog.Validate(candidate.Theme).Count > 0 || MissingLibraryAssets(candidate).Any() ? 1 : 3;
+            _furthestStep = Math.Max(_furthestStep, _step); _showScheduleErrors = true; _focusStep = true;
+            _message = "No se ha guardado: revisa los errores."; return;
+        }
+        try { Store.Save(candidate); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        { _errors = ["No se pudo guardar el evento. Tus cambios se conservan; vuelve a intentarlo."]; return; }
+        string action = publish ? candidate.Start > Content.NowLocal ? "programado" : "publicado" : "guardado como borrador";
+        Fleet.LogContentPublished($"Evento «{candidate.Name}» {action}");
+        _message = $"Evento «{candidate.Name}» {action}."; _draft = null; Refresh();
     }
     private IEnumerable<string> MissingLibraryAssets(KioskEvent ev)
     {
-        var available = Assets.List("ThemeAssets").ToHashSet(StringComparer.OrdinalIgnoreCase);
-        foreach (ThemeSlotOverride slot in ThemeSlots(ev.Theme)) if (slot.Mode == ThemeSlotMode.Library && !available.Contains(slot.AssetKey ?? "")) yield return $"La imagen «{slot.AssetKey}» ya no está en la biblioteca.";
+        var available = Library.List("ThemeAssets").ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (ev.Theme?.Scenes is not { } scenes) yield break;
+        foreach (ThemeSceneOverride scene in new[] { scenes.Attract, scenes.Scan, scenes.Overview, scenes.Detail })
+        foreach (ThemeSlotOverride slot in new[] { scene.Primary, scene.Secondary })
+            if (slot.Mode == ThemeSlotMode.Library && !available.Contains(slot.AssetKey ?? "")) yield return $"La imagen «{slot.AssetKey}» ya no está en la biblioteca.";
     }
-    private static IEnumerable<ThemeSlotOverride> ThemeSlots(EventThemeSelection? theme)
+    private void Duplicate()
     {
-        if (theme?.Scenes == null) yield break;
-        foreach (ThemeSceneOverride scene in new[] { theme.Scenes.Attract, theme.Scenes.Scan, theme.Scenes.Overview, theme.Scenes.Detail })
-        { if (scene?.Primary != null) yield return scene.Primary; if (scene?.Secondary != null) yield return scene.Secondary; }
+        if (_draft is null) return;
+        _draft.Event.Id = Guid.NewGuid().ToString("N"); _draft.Event.Name = $"{_draft.Event.Name} {_draft.Event.Start.Year + 1}";
+        _draft.Event.Start = _draft.Event.Start.AddYears(1); _draft.Event.End = _draft.Event.End.AddYears(1);
+        _draft.Event.Enabled = false; _isNew = true; _templateChosen = true; _step = 0; _errors.Clear(); _message = null; _focusStep = true;
     }
-
     private void AskDelete()
     {
-        if (_editing == null) return; KioskEvent ev = _editing;
-        _confirm = new() { Title = "Eliminar evento", Body = $"Se borrará «{ev.Name}». Si está activo, los kioscos volverán al contenido base.", Label = "Eliminar",
-            Confirmed = EventCallback.Factory.Create(this, () => { _confirm = null; Delete(ev); }) };
+        if (_draft is null) return;
+        string id = _draft.Event.Id;
+        Confirm("Eliminar evento", $"Se borrará «{_draft.Event.Name}». Si está activo, los kioscos volverán al contenido habitual.", "Eliminar", () => { Store.Delete(id); _draft = null; _errors.Clear(); _message = "Evento eliminado."; Refresh(); });
     }
-    private void Delete(KioskEvent ev) { Store.Delete(ev.Id); _editing = null; _message = $"Evento «{ev.Name}» borrado."; Refresh(); StateHasChanged(); }
-    private void Cancel() { _editing = null; _errors.Clear(); }
-    private static List<AttractSlide> CloneSlides(IEnumerable<AttractSlide> slides) => slides.Select(s => new AttractSlide { Eyebrow = s.Eyebrow, Title1 = s.Title1, Title2 = s.Title2, Subtitle = s.Subtitle }).ToList();
-    private sealed class KeyVal { public string? Key { get; set; } public string? Value { get; set; } }
+    private void Cancel() => DiscardThen(() => { _draft = null; _errors.Clear(); _message = null; Refresh(); });
+    private void DiscardThen(Action action)
+    {
+        if (!Dirty) { action(); return; }
+        Confirm("Descartar cambios", "Hay cambios sin guardar en este evento. Si sales, se perderán.", "Descartar cambios", action);
+    }
+    private void Confirm(string title, string body, string label, Action action) => _confirm = new()
+    {
+        Title = title, Body = body, Label = label,
+        Confirmed = EventCallback.Factory.Create(this, () => { _confirm = null; action(); })
+    };
+    private Task BeforeNavigation(LocationChangingContext context)
+    {
+        if (!Dirty || _allowNavigation) return Task.CompletedTask;
+        context.PreventNavigation();
+        Confirm("Descartar cambios", "Hay cambios sin guardar en este evento. Si sales, se perderán.", "Descartar cambios", () => { _allowNavigation = true; Navigation.NavigateTo(context.TargetLocation); });
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
 }

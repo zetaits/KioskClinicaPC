@@ -1,56 +1,52 @@
-@using KioskClinicaPC.Core.Config
-
-<div class="theme-preview" style="@Style">
+<div class="theme-preview" data-preview-screen="@Screen" style="@Style">
     <div class="theme-preview-grid"></div>
-    @if (_theme.DecorationsEnabled && !string.IsNullOrWhiteSpace(Scene.PrimaryAssetKey))
-    {
-        <img class="theme-decoration primary" src="@AssetUrl(Scene.PrimaryAssetKey)" alt="" />
-    }
-    @if (_theme.DecorationsEnabled && !string.IsNullOrWhiteSpace(Scene.SecondaryAssetKey))
-    {
-        <img class="theme-decoration secondary" src="@AssetUrl(Scene.SecondaryAssetKey)" alt="" />
-    }
+    @if (Theme.DecorationsEnabled && !string.IsNullOrWhiteSpace(Scene.PrimaryAssetKey))
+    { <img class="theme-decoration primary" src="@AssetUrl(Scene.PrimaryAssetKey)" alt="" /> }
+    @if (Theme.DecorationsEnabled && !string.IsNullOrWhiteSpace(Scene.SecondaryAssetKey))
+    { <img class="theme-decoration secondary" src="@AssetUrl(Scene.SecondaryAssetKey)" alt="" /> }
     <div class="preview-chrome"><span>CLÍNICA PC</span><small>@ScreenLabel</small></div>
     <div class="preview-content @Screen.ToLowerInvariant()">
         @if (Screen == "Attract")
         {
-            var slide = Event.AttractSlides.FirstOrDefault() ?? new AttractSlide { Eyebrow = "CLÍNICA PC", Title1 = "ESTE EQUIPO", Title2 = "TE ESTÁ OBSERVANDO", Subtitle = "Toca para descubrir todos sus detalles" };
-            <small>@slide.Eyebrow</small><h3>@slide.Title1<br /><em>@slide.Title2</em></h3><p>@slide.Subtitle</p><button>TOCA PARA DESCUBRIR ESTE EQUIPO</button>
+            <small>@Slide.Eyebrow</small><h3>@Slide.Title1<br /><em>@Slide.Title2</em></h3><p>@Slide.Subtitle</p><span class="preview-cta">@Text("attract.cta")</span><p class="preview-hint">@Text("attract.hint")</p>
         }
         else if (Screen == "Scan")
         {
-            <div class="preview-radar"><b>68</b><span>PROGRESO</span></div><div class="preview-log">// CPU DETECTADA<br />// MEMORIA VERIFICADA<br />// ALMACENAMIENTO LISTO</div>
+            <div class="preview-radar"><b>68</b><span>@Text("scan.progress")</span></div><div class="preview-log"><strong>@Text("scan.logTitle")</strong><br />// CPU DETECTADA<br />// MEMORIA VERIFICADA<br />// ALMACENAMIENTO LISTO</div>
         }
         else if (Screen == "Overview")
         {
-            <small>EQUIPO DETECTADO</small><h3>PORTÁTIL <em>CLÍNICA PC</em></h3><div class="preview-tiles"><i>CPU</i><i>RAM</i><i>SSD</i><i>PANTALLA</i></div>
+            <small>@Text("hud.detected")</small><h3>PORTÁTIL <em>CLÍNICA PC</em></h3><p>@Text("hud.productView")</p>
+            <small>@Text("hud.components")</small><div class="preview-tiles"><i>CPU<br /><span>@Text("hud.tileCta")</span></i><i>RAM<br /><span>@Text("hud.tileCta")</span></i><i>SSD<br /><span>@Text("hud.tileCta")</span></i><i>PANTALLA<br /><span>@Text("hud.tileCta")</span></i></div>
+            <div class="preview-stats"><span>@Text("hud.statScore")<b>@Text("hud.statScoreVal")@Text("hud.statScoreMax")</b></span><span>@Text("hud.statGen")<b>@Text("hud.statGenVal")</b></span><span>@Text("hud.statCycles")<b>@Text("hud.statCyclesVal")@Text("hud.statCyclesMax")</b></span><span>@Text("hud.statTests")<b>@Text("hud.statTestsVal")@Text("hud.statTestsMax")</b></span></div>
+            <div class="preview-price"><span>@Text("price.label")</span><b>499 €</b><small>@Text("price.installments") · @Text("price.installmentsPrefix")124,75 € · @Text("price.noInterest")</small></div>
         }
         else
         {
-            <small>DETALLE DEL COMPONENTE</small><h3>PROCESADOR <em>INTEL CORE</em></h3><p>Rendimiento explicado de forma clara y sin tecnicismos.</p><div class="preview-meter"></div>
+            <small>@Text("card.systemScan")</small><h3>PROCESADOR <em>INTEL CORE</em></h3><p>Rendimiento explicado de forma clara y sin tecnicismos.</p><div class="preview-meter"></div><p>@Text("card.verified")</p><div class="preview-qr"><strong>@Text("price.scanTitle")</strong><p>@Text("price.scanText")</p><small>@Text("price.noInterest")</small></div>
         }
     </div>
 </div>
 
 @code {
-    [Parameter, EditorRequired] public KioskEvent Event { get; set; } = new();
-    [Parameter, EditorRequired] public string Screen { get; set; } = "Attract";
-
-    private ResolvedVisualTheme _theme => ThemePresetCatalog.Resolve(Event.Theme);
+    [Parameter, EditorRequired] public AppConfig Content { get; set; } = new();
+    [Parameter] public string Screen { get; set; } = "Attract";
+    [Parameter] public string Condition { get; set; } = "Ocasion";
+    [Parameter] public int SlideIndex { get; set; }
+    private ResolvedVisualTheme Theme => Content.VisualTheme ?? ThemePresetCatalog.Resolve(null);
     private ResolvedThemeScene Scene => Screen switch
+    { "Scan" => Theme.Scenes.Scan, "Overview" => Theme.Scenes.Overview, "Detail" => Theme.Scenes.Detail, _ => Theme.Scenes.Attract };
+    private string ScreenLabel => Screen switch { "Scan" => "ESCANEO", "Overview" => "RESUMEN", "Detail" => "DETALLE", _ => "ESPERA" };
+    private AttractSlide Slide
     {
-        "Scan" => _theme.Scenes.Scan,
-        "Overview" => _theme.Scenes.Overview,
-        "Detail" => _theme.Scenes.Detail,
-        _ => _theme.Scenes.Attract
-    };
-    private string ScreenLabel => Screen switch
-    {
-        "Scan" => "ESCANEO",
-        "Overview" => "RESUMEN",
-        "Detail" => "DETALLE",
-        _ => "ESPERA"
-    };
-    private string Style => $"--pv-bg0:{_theme.Palette.Background0};--pv-bg1:{_theme.Palette.Background1};--pv-bg2:{_theme.Palette.Background2};--pv-primary:{_theme.Palette.Primary};--pv-secondary:{_theme.Palette.Secondary};--pv-text:{_theme.Palette.Text0};--pv-intensity:{(_theme.Intensity / 100d).ToString(System.Globalization.CultureInfo.InvariantCulture)}";
+        get
+        {
+            var slides = Condition == "Nuevo" ? Content.AttractSlidesNew : Content.AttractSlides;
+            if (slides?.Count is not > 0) slides = Condition == "Nuevo" ? KioskContentDefaults.SlidesNew() : KioskContentDefaults.SlidesUsed();
+            return slides[Math.Clamp(SlideIndex, 0, slides.Count - 1)];
+        }
+    }
+    private string Text(string key) => KioskContentDefaults.Text(Content.UiTexts, key);
+    private string Style => $"--pv-bg0:{Theme.Palette.Background0};--pv-bg1:{Theme.Palette.Background1};--pv-bg2:{Theme.Palette.Background2};--pv-primary:{Theme.Palette.Primary};--pv-secondary:{Theme.Palette.Secondary};--pv-text:{Theme.Palette.Text0};--pv-intensity:{(Theme.Intensity / 100d).ToString(System.Globalization.CultureInfo.InvariantCulture)}";
     private static string AssetUrl(string key) => $"/panel/assets/ThemeAssets/{Uri.EscapeDataString(key)}";
 }

@@ -8,6 +8,7 @@ internal static class Coordinator
     internal static HttpClient CreateHttp() => new(new HttpClientHandler { AllowAutoRedirect = false }) { Timeout = Timeout.InfiniteTimeSpan };
     internal static async Task<EquipmentEvent> Run(EquipmentRequest request, Action<EquipmentEvent> progress, CancellationToken ct)
     {
+        Payload.UseAssembly(typeof(Coordinator).Assembly);
         string work;
         try { work = MachineState.Prepare(); }
         catch { return new("result", "El trabajador necesita un administrador interactivo y carpetas de estado seguras.", ExitCode: 1); }

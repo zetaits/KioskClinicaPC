@@ -1,0 +1,27 @@
+<p class="muted">Ponle un nombre y elige cuándo se mostrará en los kioscos.</p>
+<div class="stack">
+    <div>
+        <label for="event-name">Nombre del evento</label>
+        <input id="event-name" type="text" placeholder="Ej. Navidad 2026" @bind="Event.Name" @bind:event="oninput" @bind:after="NotifyChanged" aria-invalid="@(ShowErrors && string.IsNullOrWhiteSpace(Event.Name))" aria-describedby="event-name-error" />
+        @if (ShowErrors && string.IsNullOrWhiteSpace(Event.Name)) { <p id="event-name-error" class="event-field-error">Indica un nombre para el evento.</p> }
+    </div>
+    <div class="event-date-fields">
+        <div><label for="event-start">Inicio · hora de tienda</label><input id="event-start" type="datetime-local" @bind="Event.Start" @bind:after="NotifyChanged" aria-describedby="event-date-help event-date-errors" /></div>
+        <div><label for="event-end">Fin · hora de tienda</label><input id="event-end" type="datetime-local" @bind="Event.End" @bind:after="NotifyChanged" aria-describedby="event-date-help event-date-errors" /></div>
+    </div>
+    <p id="event-date-help" class="muted section-copy">Hora de tienda: @StoreTimeZone.DisplayName. A la hora de fin el evento deja de mostrarse y se recupera el contenido habitual.</p>
+    @if (ShowErrors)
+    {
+        <div id="event-date-errors" class="event-field-error">@foreach (string error in DateErrors()) { <p>@error</p> }</div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public KioskEvent Event { get; set; } = new();
+    [Parameter, EditorRequired] public TimeZoneInfo StoreTimeZone { get; set; } = TimeZoneInfo.Utc;
+    [Parameter] public bool ShowErrors { get; set; }
+    [Parameter] public EventCallback OnChanged { get; set; }
+    private Task NotifyChanged() => OnChanged.InvokeAsync();
+    private IReadOnlyList<string> DateErrors() => EventRules.ValidateSchedule(new KioskEvent
+    { Name = "Evento", Start = Event.Start, End = Event.End }, StoreTimeZone);
+}

@@ -2,11 +2,13 @@
 @attribute [Authorize]
 @rendermode InteractiveServer
 @inject InitialSetupBundleStore Bundles
+@inject DeploymentReleaseStore DeploymentReleases
 
 <div class="setup-page">
+    <h2>Instalador de equipos</h2>
     <section class="card setup-hero">
         <div class="setup-hero-heading">
-            <div><h2>Instalador de equipos</h2><p class="muted">Descárgalo en el ordenador que vas a preparar. No necesita pertenecer a la flota.</p></div>
+            <div><h2>Preparar este equipo</h2><p class="muted">Descárgalo en el ordenador que vas a preparar. No necesita pertenecer a la flota.</p></div>
             <span class="badge accent">Windows x64</span>
         </div>
         <p>Un único instalador: solo pack, solo Kiosk o ambos. El pack está seleccionado por defecto; puedes marcar o desmarcar aplicaciones. Configura la lista en <a href="/aplicaciones">Aplicaciones</a>.</p>
@@ -26,10 +28,27 @@
         <p class="muted">Windows 10 22H2 / Windows 11 x64 · Internet · Administrador. El progreso y el resultado se muestran solo en ese ordenador. Nunca reinicia automáticamente.</p>
         <p class="muted">Asistente WPF · catálogo v2. Actualizar el servidor no reconstruye esta descarga: publícala con el workflow Equipment Setup. Descargarlo no activa actualizaciones en la flota.</p>
     </section>
+    <section class="card setup-hero">
+        <h2>Instalar sistemas por red</h2>
+        <p>ClínicaPC · Instalación por red. Instálalo en el PC del encargado para preparar otros equipos por Ethernet. Importa una ISO oficial y gestiona los perfiles en <a href="/despliegue">Instalación de sistemas</a>.</p>
+        @if (_deployment is { } release)
+        {
+            <div class="setup-download-action">
+                <a class="btn primary button-link setup-download-button" href="/panel/deployment/download" data-setup-download data-download-cookie="kioskDeploymentDownload">
+                    <span class="setup-spinner" aria-hidden="true"></span><span data-setup-download-label>Descargar instalación por red @release.Release.Version</span>
+                </a>
+                <p class="setup-download-status" data-setup-download-status hidden role="status"></p>
+            </div>
+        }
+        else { <p class="alert" role="status">Todavía no hay una versión publicada y validada para instalación por red.</p> }
+        <p class="muted">Encargado: Windows 11 x64, administrador y Ethernet en la misma red. Destinos: UEFI y arranque PXE por Ethernet. Conectar el cable no basta: hay que encender el equipo y elegir el arranque por red.</p>
+        <a href="/despliegue/guia">Guía inicial y recuperación</a>
+    </section>
 </div>
 
 @code {
     private string? _bundleError;
     private ValidatedInitialSetupBundle? _bundle;
-    protected override void OnInitialized() => _bundle = Bundles.Latest(out _bundleError);
+    private (Kiosk.Deployment.DeploymentRelease Release, string Path)? _deployment;
+    protected override void OnInitialized() { _bundle = Bundles.Latest(out _bundleError); _deployment = DeploymentReleases.Latest(); }
 }

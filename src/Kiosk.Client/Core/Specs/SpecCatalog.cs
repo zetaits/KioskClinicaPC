@@ -28,20 +28,7 @@ namespace KioskClinicaPC.Core.Specs
             new SpecMarketingData { Id = ComponentIds.Os, Family = "OS", Label = "Sistema operativo", Summary = "Sistema operativo con licencia legal incluida y actualizaciones de seguridad al día.", BenchLabel = "", Pros = new List<string> { "Activado de fábrica", "Office compatible", "Soporte oficial Microsoft" }, DefaultValue = "Sistema operativo", DefaultDetail = "" }
         };
 
-        // Textos por defecto del Attract para equipos de ocasión / reacondicionados.
-        public static List<AttractSlide> DefaultSlidesUsed() => new List<AttractSlide>
-        {
-            new AttractSlide { Eyebrow = "CLINICAPC", Title1 = "ESTE EQUIPO", Title2 = "TE ESTÁ OBSERVANDO", Subtitle = "Conéctate · escanea · descubre cada componente en 30 segundos" },
-            new AttractSlide { Eyebrow = "SIN TECNICISMOS", Title1 = "LO ENTIENDES", Title2 = "AUNQUE NO SEAS TÉCNICO", Subtitle = "Te traducimos cada spec a lenguaje de calle" },
-            new AttractSlide { Eyebrow = "REACONDICIONADOS CON CABEZA", Title1 = "HASTA 60% MENOS", Title2 = "QUE COMPRARLO NUEVO", Subtitle = "Probado, limpiado y con 12 meses de garantía" }
-        };
-
-        // Textos por defecto del Attract para equipos nuevos.
-        public static List<AttractSlide> DefaultSlidesNew() => new List<AttractSlide>
-        {
-            new AttractSlide { Eyebrow = "CLINICAPC", Title1 = "ESTE EQUIPO", Title2 = "TE ESTÁ OBSERVANDO", Subtitle = "Conéctate · escanea · descubre cada componente en 30 segundos" },
-            new AttractSlide { Eyebrow = "SIN TECNICISMOS", Title1 = "LO ENTIENDES", Title2 = "AUNQUE NO SEAS TÉCNICO", Subtitle = "Te traducimos cada spec a lenguaje de calle" },
-            new AttractSlide { Eyebrow = "A ESTRENAR", Title1 = "PRECINTADO", Title2 = "Y LISTO PARA TI", Subtitle = "Equipo nuevo con 3 años de garantía y licencia oficial" }
-        };
+        public static List<AttractSlide> DefaultSlidesUsed() => Config.KioskContentDefaults.SlidesUsed();
+        public static List<AttractSlide> DefaultSlidesNew() => Config.KioskContentDefaults.SlidesNew();
     }
 }

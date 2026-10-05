@@ -1,0 +1,105 @@
+<Window x:Class="Kiosk.DeploymentManager.MainWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="ClínicaPC · Instalación por red" Width="1180" Height="820" MinWidth="860" MinHeight="620" WindowStartupLocation="CenterScreen"
+        Background="{DynamicResource PageBrush}" Foreground="{DynamicResource TextBrush}" FontFamily="./Fonts/#Space Grotesk" FontSize="14">
+    <Window.Resources><ResourceDictionary><ResourceDictionary.MergedDictionaries><ResourceDictionary Source="SetupTheme.xaml"/></ResourceDictionary.MergedDictionaries>
+        <Style TargetType="TabItem"><Setter Property="Foreground" Value="{StaticResource TextBrush}"/><Setter Property="Background" Value="{StaticResource PanelBrush}"/><Setter Property="Padding" Value="18,10"/></Style>
+        <Style TargetType="DataGrid"><Setter Property="Background" Value="{StaticResource PanelBrush}"/><Setter Property="Foreground" Value="{StaticResource TextBrush}"/><Setter Property="RowBackground" Value="{StaticResource PanelBrush}"/><Setter Property="AlternatingRowBackground" Value="{StaticResource InsetBrush}"/></Style>
+    </ResourceDictionary></Window.Resources>
+    <DockPanel Margin="24">
+        <StackPanel DockPanel.Dock="Top" Margin="0,0,0,18">
+            <TextBlock Text="CLÍNICAPC · Instalación por red" FontSize="28" FontWeight="Bold"/>
+            <TextBlock Text="Windows 11 Home / Pro · Ethernet · UEFI" Foreground="{StaticResource MutedBrush}" Margin="0,6,0,8"/>
+            <TextBlock x:Name="ConnectionLabel"/>
+        </StackPanel>
+        <Border DockPanel.Dock="Bottom" Background="{StaticResource InsetBrush}" Padding="12" Margin="0,12,0,0">
+            <StackPanel><ProgressBar x:Name="BusyBar" IsIndeterminate="True" Height="4" Visibility="Collapsed"/>
+                <TextBlock x:Name="StatusLabel" Text="Vincula la estación y completa los pasos de configuración para habilitar la instalación." Margin="0,8,0,0" AutomationProperties.LiveSetting="Polite"/>
+            </StackPanel>
+        </Border>
+        <TabControl x:Name="Tabs" Background="{StaticResource PageBrush}" BorderBrush="{StaticResource LineBrush}">
+            <TabItem Header="_Equipos">
+                <DockPanel Margin="12">
+                    <StackPanel DockPanel.Dock="Top" Margin="0,0,0,12">
+                        <TextBlock Text="Enciende los destinos y elige el arranque PXE por Ethernet. Compara el identificador con la pantalla del equipo."/>
+                        <WrapPanel Margin="0,10,0,0"><Button Content="Actualizar desde el panel" Click="SyncClick"/>
+                            <Button Content="Explorar subred" Click="ScanClick"/>
+                            <ComboBox x:Name="ProfileBox" Width="260" DisplayMemberPath="Name" Margin="12,0,0,0" SelectionChanged="ProfileChanged"/>
+                            <Button Content="Revisar seleccionados…" Click="ReviewClick"/>
+                        </WrapPanel>
+                    </StackPanel>
+                    <StackPanel DockPanel.Dock="Bottom" Margin="0,12,0,0"><TextBlock Text="Detección local: información limitada; una respuesta de red no identifica el tipo de dispositivo ni su sistema operativo."/>
+                        <ListBox x:Name="DetectedList" MaxHeight="100"/></StackPanel>
+                    <DataGrid x:Name="TargetsGrid" AutoGenerateColumns="False" CanUserAddRows="False" SelectionMode="Extended">
+                        <DataGrid.Columns>
+                            <DataGridCheckBoxColumn Header="Elegir" Binding="{Binding Selected}" Width="60"/>
+                            <DataGridTextColumn Header="Equipo" Binding="{Binding Label}" IsReadOnly="True" Width="*"/>
+                            <DataGridTextColumn Header="Serie" Binding="{Binding Serial}" IsReadOnly="True" Width="130"/>
+                            <DataGridTextColumn Header="Estado" Binding="{Binding StateLabel}" IsReadOnly="True" Width="145"/>
+                            <DataGridTemplateColumn Header="Disco interno" Width="200"><DataGridTemplateColumn.CellTemplate><DataTemplate>
+                                <ComboBox ItemsSource="{Binding Disks}" SelectedItem="{Binding Disk, Mode=TwoWay}" DisplayMemberPath="Label" IsEnabled="{Binding Ready}"/>
+                            </DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
+                            <DataGridTextColumn Header="Usuario" Binding="{Binding Username, UpdateSourceTrigger=PropertyChanged}" Width="130"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </DockPanel>
+            </TabItem>
+            <TabItem Header="_Sistemas y controladores">
+                <ScrollViewer><StackPanel Margin="20">
+                    <TextBlock Text="Imágenes de Windows" FontSize="22" FontWeight="Bold"/>
+                    <TextBlock Text="Importa una ISO oficial Home/Pro x64 24H2 o posterior en español. Se verifican firma de Setup, ediciones y SHA-256." Margin="0,8,0,16"/>
+                    <Button Content="Importar ISO…" Click="ImportClick" HorizontalAlignment="Left"/>
+                    <ListBox x:Name="ImagesList" DisplayMemberPath="Name" Margin="0,16,0,20" MinHeight="120"/>
+                    <TextBlock Text="Controladores INF firmados" FontSize="22" FontWeight="Bold"/>
+                    <TextBlock Text="Los controladores de red y almacenamiento se incorporan al entorno WinPE durante su construcción. Consulta la guía antes de activar PXE en un modelo nuevo." Margin="0,8,0,12"/>
+                    <Button Content="Importar carpeta de controladores…" Click="DriversClick" HorizontalAlignment="Left"/>
+                </StackPanel></ScrollViewer>
+            </TabItem>
+            <TabItem Header="_Trabajos">
+                <DockPanel Margin="20">
+                    <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,12"><Button Content="Cancelar trabajo en cola" Click="CancelClick"/>
+                        <Button Content="Autorizar reanudación de aplicaciones" Click="ResumeClick"/>
+                        <Button Content="Cerrar incidencia revisada" Click="CloseFailureClick"/>
+                        <Button Content="Exportar diagnóstico…" Click="ExportClick"/></WrapPanel>
+                    <DataGrid x:Name="JobsGrid" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Trabajo" Binding="{Binding Id}" Width="140"/>
+                            <DataGridTextColumn Header="Usuario" Binding="{Binding Username}" Width="120"/>
+                            <DataGridTextColumn Header="Perfil" Binding="{Binding Profile.Name}" Width="170"/>
+                            <DataGridTextColumn Header="Fase" Binding="{Binding Phase}" Width="*"/>
+                            <DataGridTextColumn Header="%" Binding="{Binding Percent}" Width="45"/>
+                            <DataGridTemplateColumn Header="Progreso" Width="100"><DataGridTemplateColumn.CellTemplate><DataTemplate>
+                                <ProgressBar Height="6" Value="{Binding Percent, TargetNullValue=0}"><ProgressBar.Style><Style TargetType="ProgressBar">
+                                    <Setter Property="IsIndeterminate" Value="False"/>
+                                    <Style.Triggers><DataTrigger Binding="{Binding Percent}" Value="{x:Null}"><Setter Property="IsIndeterminate" Value="True"/></DataTrigger></Style.Triggers>
+                                </Style></ProgressBar.Style></ProgressBar>
+                            </DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
+                            <DataGridCheckBoxColumn Header="Reinicio necesario" Binding="{Binding RebootRequired}" Width="140"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </DockPanel>
+            </TabItem>
+            <TabItem Header="_Configuración" x:Name="ConfigurationTab">
+                <ScrollViewer><StackPanel Margin="20" MaxWidth="760" HorizontalAlignment="Left">
+                    <TextBlock Text="1 · Vincular al panel" FontSize="22" FontWeight="Bold"/>
+                    <TextBlock Text="Genera un código en el panel → Instalación de sistemas. Caduca a los diez minutos." Margin="0,8,0,8"/>
+                    <TextBox x:Name="ServerBox" Text="https://panel.clinicapc.es" AutomationProperties.Name="Dirección del panel"/>
+                    <TextBox x:Name="StationNameBox" Text="PC del encargado" Margin="0,8,0,0" AutomationProperties.Name="Nombre de estación"/>
+                    <TextBox x:Name="CodeBox" Margin="0,8,0,8" AutomationProperties.Name="Código temporal"/>
+                    <Button Content="Vincular estación" Click="EnrollClick" HorizontalAlignment="Left"/>
+                    <TextBlock Text="2 · Ethernet y almacenamiento" FontSize="22" FontWeight="Bold" Margin="0,24,0,8"/>
+                    <ComboBox x:Name="AdapterBox" DisplayMemberPath="Name" AutomationProperties.Name="Interfaz Ethernet"/>
+                    <WrapPanel Margin="0,8,0,8"><TextBox x:Name="StorageBox" Width="500" AutomationProperties.Name="Carpeta de almacenamiento"/><Button Content="Elegir…" Click="StorageClick"/></WrapPanel>
+                    <WrapPanel Margin="0,0,0,8"><TextBlock Text="Instalaciones simultáneas (1–8)" VerticalAlignment="Center"/><TextBox x:Name="CapacityBox" Text="3" Width="60" Margin="12,0,0,0" AutomationProperties.Name="Capacidad"/></WrapPanel>
+                    <Button Content="Guardar red y capacidad" Click="NetworkClick" HorizontalAlignment="Left"/>
+                    <TextBlock Text="3 · Contraseña local predeterminada" FontSize="22" FontWeight="Bold" Margin="0,24,0,8"/>
+                    <TextBlock Text="Se protege en este PC y se puede cambiar por instalación. No se envía al panel."/>
+                    <PasswordBox x:Name="DefaultPasswordBox" Margin="0,8,0,8" AutomationProperties.Name="Contraseña predeterminada"/>
+                    <Button Content="Guardar contraseña" Click="PasswordClick" HorizontalAlignment="Left"/>
+                    <TextBlock Text="4 · Importar ISO y activar PXE" FontSize="22" FontWeight="Bold" Margin="0,24,0,8"/>
+                    <TextBlock Text="Importa una imagen en Sistemas y controladores. El router seguirá asignando direcciones. La activación comprueba la interfaz, archivos de arranque y puertos UDP 67, 69 y 4011."/>
+                    <WrapPanel Margin="0,12,0,0"><Button Content="Comprobar y activar PXE" Click="ActivateClick"/><Button Content="Desactivar PXE" Click="DeactivateClick"/></WrapPanel>
+                </StackPanel></ScrollViewer>
+            </TabItem>
+        </TabControl>
+    </DockPanel>
+</Window>

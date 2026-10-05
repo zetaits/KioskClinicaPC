@@ -3,14 +3,15 @@
 <div class="theme-scene-editor">
     <div class="theme-scene-title">@Title</div>
     <ThemeSlotEditor Label="Adorno principal" Slot="Scene.Primary"
-                     PresetAsset="PresetScene.PrimaryAssetKey" Assets="Assets" />
+                     PresetAsset="@PresetScene.PrimaryAssetKey" LibraryAssets="LibraryAssets" OnChanged="OnChanged" />
     <ThemeSlotEditor Label="Adorno secundario" Slot="Scene.Secondary"
-                     PresetAsset="PresetScene.SecondaryAssetKey" Assets="Assets" />
+                     PresetAsset="@PresetScene.SecondaryAssetKey" LibraryAssets="LibraryAssets" OnChanged="OnChanged" />
 </div>
 
 @code {
     [Parameter, EditorRequired] public string Title { get; set; } = "";
     [Parameter, EditorRequired] public ThemeSceneOverride Scene { get; set; } = new();
     [Parameter, EditorRequired] public ResolvedThemeScene PresetScene { get; set; } = new();
-    [Parameter] public IReadOnlyList<string> Assets { get; set; } = Array.Empty<string>();
+    [Parameter] public IReadOnlyList<string> LibraryAssets { get; set; } = Array.Empty<string>();
+    [Parameter] public EventCallback OnChanged { get; set; }
 }

@@ -5,15 +5,15 @@
     @for (int i = 0; i < Slides.Count; i++)
     {
         var s = Slides[i];
-        <div class="slide-item">
+        <div class="slide-item" @key="s">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
                 <div class="k" style="margin:0;">Slide @((i + 1).ToString("00"))</div>
                 <button class="icon sm" title="Quitar slide" @onclick="() => Remove(s)">✕</button>
             </div>
-            <input type="text" class="line" style="font-family:var(--font-mono);font-weight:400;font-size:11px;color:var(--muted);" placeholder="Eyebrow" @bind="s.Eyebrow" />
-            <input type="text" class="line" placeholder="Título 1" @bind="s.Title1" />
-            <input type="text" class="line accent" placeholder="Título 2 (acento)" @bind="s.Title2" />
-            <input type="text" class="line sub" placeholder="Subtítulo" @bind="s.Subtitle" />
+            <input type="text" class="line" style="font-family:var(--font-mono);font-weight:400;font-size:11px;color:var(--muted);" placeholder="Encabezado" aria-label="Encabezado del slide" @bind="s.Eyebrow" @bind:event="oninput" @bind:after="NotifyChanged" />
+            <input type="text" class="line" placeholder="Título 1" aria-label="Título 1 del slide" @bind="s.Title1" @bind:event="oninput" @bind:after="NotifyChanged" />
+            <input type="text" class="line accent" placeholder="Título 2 (acento)" aria-label="Título 2 del slide" @bind="s.Title2" @bind:event="oninput" @bind:after="NotifyChanged" />
+            <input type="text" class="line sub" placeholder="Subtítulo" aria-label="Subtítulo del slide" @bind="s.Subtitle" @bind:event="oninput" @bind:after="NotifyChanged" />
         </div>
     }
 </div>
@@ -23,6 +23,8 @@
 @code {
     [Parameter, EditorRequired] public List<AttractSlide> Slides { get; set; } = new();
 
-    private void Add() => Slides.Add(new AttractSlide());
-    private void Remove(AttractSlide s) => Slides.Remove(s);
+    [Parameter] public EventCallback OnChanged { get; set; }
+    private Task NotifyChanged() => OnChanged.InvokeAsync();
+    private Task Add() { Slides.Add(new AttractSlide()); return NotifyChanged(); }
+    private Task Remove(AttractSlide s) { Slides.Remove(s); return NotifyChanged(); }
 }

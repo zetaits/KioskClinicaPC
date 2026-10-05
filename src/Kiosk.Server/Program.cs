@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using Kiosk.Server;
 using Kiosk.Server.Components;
 using Kiosk.Server.Hubs;
 using Kiosk.Server.Services;
@@ -106,6 +107,8 @@ builder.Services.AddSingleton(new InstallationJobStore(dataDir));
 builder.Services.AddSingleton(new InitialSetupSessionStore(dataDir));
 builder.Services.AddSingleton(new InitialSetupBundleStore(setupDir));
 builder.Services.AddSingleton(new PackCatalogStore(dataDir));
+builder.Services.AddSingleton(new DeploymentStore(dataDir));
+builder.Services.AddSingleton(new DeploymentReleaseStore(setupDir));
 builder.Services.AddSingleton(new MaintenanceJobStore(dataDir));
 builder.Services.AddSingleton(new KioskUpdateStore(dataDir, updatesDir, maxInstallerBytes, storeTz,
     updateTokenKey, updateSigningKeys));
@@ -123,6 +126,9 @@ builder.Services.AddSingleton<LoginThrottle>();
 builder.Services.AddRazorComponents().AddInteractiveServerComponents();
 builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddAuthorization();
+builder.Services.AddRateLimiter(options => options.AddPolicy("deployment-enrollment", context =>
+    RateLimitPartition.GetFixedWindowLimiter(context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        _ => new FixedWindowRateLimiterOptions { PermitLimit = 5, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 })));
 builder.Services.AddRateLimiter(options => options.AddPolicy("initial-setup", context =>
     RateLimitPartition.GetFixedWindowLimiter(
         context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
@@ -176,7 +182,24 @@ static bool SecretEquals(string? expected, string? actual)
 // El bootstrap inicial usa una clave limitada propia; el resto de /api conserva la clave de los kioscos.
 app.Use(async (ctx, next) =>
 {
-    if (ctx.Request.Path.StartsWithSegments("/api/releases"))
+    if (ctx.Request.Path.StartsWithSegments("/api/deployment") || ctx.Request.Path.StartsWithSegments("/hub/deployment"))
+    {
+        bool enrollment = ctx.Request.Path == "/api/deployment/v1/enrollment" && HttpMethods.IsPost(ctx.Request.Method);
+        bool panelHub = ctx.Request.Path.StartsWithSegments("/hub/deployment") && ctx.User.Identity?.IsAuthenticated == true;
+        if (!enrollment && !panelHub)
+        {
+            var station = ctx.RequestServices.GetRequiredService<DeploymentStore>().Authenticate(
+                ctx.Request.Headers["X-Deployment-Credential"].FirstOrDefault());
+            if (station is null) { ctx.Response.StatusCode = 401; return; }
+            ctx.Items["DeploymentStation"] = station;
+        }
+        if (ctx.Request.Path.StartsWithSegments("/api/deployment"))
+        {
+            var limit = ctx.Features.Get<IHttpMaxRequestBodySizeFeature>();
+            if (limit is { IsReadOnly: false }) limit.MaxRequestBodySize = 8 * 1024 * 1024;
+        }
+    }
+    else if (ctx.Request.Path.StartsWithSegments("/api/releases"))
     {
         // La importación de CI usa una credencial independiente y no expone la API key de la flota.
     }
@@ -208,7 +231,7 @@ app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
 
 // La sonda de despliegue comprueba el estado que /health deliberadamente no consulta.
 // No devuelve contenido ni detalles internos al visitante.
-app.MapGet("/health/ready", () =>
+app.MapGet("/health/ready", (HttpContext ctx) =>
 {
     try
     {
@@ -219,9 +242,13 @@ app.MapGet("/health/ready", () =>
             !Directory.Exists(assetsDir) || !Directory.Exists(installersDir) ||
             !Directory.Exists(setupDir) || !Directory.Exists(updatesDir))
             return Results.Json(new { status = "unavailable" }, statusCode: 503);
+        string deploymentStatePath = Path.Combine(dataDir, "deployment-v1.json");
+        if (File.Exists(deploymentStatePath) && (JToken.Parse(File.ReadAllText(deploymentStatePath)) is not JObject deploymentState || deploymentState.Value<int>("schemaVersion") != 1))
+            return Results.Json(new { status = "unavailable" }, statusCode: 503);
+        ctx.Response.Headers["X-Deployment-Protocol"] = "1";
         return Results.Ok(new { status = "ok" });
     }
-    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or Newtonsoft.Json.JsonException)
+    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or Newtonsoft.Json.JsonException or FormatException or InvalidCastException)
     {
         return Results.Json(new { status = "unavailable" }, statusCode: 503);
     }
@@ -632,6 +659,7 @@ app.MapPost("/panel/installers/upload", async (HttpContext ctx, InstallerCatalog
 
 // Hub de sincronización del attract. Fuera de /api → sin guardia X-Api-Key (no lleva datos sensibles,
 // solo el origen/duración del cronómetro). El cliente escucha el evento "SyncState".
+app.MapDeployment(releasePublishKey);
 app.MapHub<SyncHub>("/hub/sync");
 
 // Hub de control de la flota: registro + heartbeat de los kioscos y órdenes dirigidas del panel. Exige

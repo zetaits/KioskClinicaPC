@@ -11,16 +11,24 @@ internal sealed record PayloadManifest(int SchemaVersion, int CatalogApiVersion,
     string AssistantVersion, string WorkerVersion, string KioskVersion, string SourceCommit, string WorkerSha256, string KioskSha256);
 internal static class Payload
 {
+    private static Assembly _source = typeof(Payload).Assembly;
+    private static string? _directory;
+    internal static void UseAssembly(Assembly source) { _source = source; _directory = null; }
+    internal static void UseDirectory(string directory) { _directory = Path.GetFullPath(directory); }
     internal static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
-    internal static Stream Open(string name) => Assembly.GetExecutingAssembly().GetManifestResourceStream("Equipment." + name)
-        ?? throw new InvalidDataException("Falta un recurso del asistente.");
+    internal static Stream Open(string name)
+    {
+        if (name != Path.GetFileName(name)) throw new InvalidDataException("Nombre de recurso no válido.");
+        return _directory is null ? _source.GetManifestResourceStream("Equipment." + name)
+            ?? throw new InvalidDataException("Falta un recurso del asistente.") : File.OpenRead(Path.Combine(_directory, name));
+    }
     internal static T Read<T>(string name) { using var stream = Open(name); return JsonSerializer.Deserialize<T>(stream, Json) ?? throw new InvalidDataException("Recurso incompatible."); }
     internal static EquipmentConfiguration Configuration => Read<EquipmentConfiguration>("config.json");
     internal static PayloadManifest Manifest => Read<PayloadManifest>("payload.json");
     internal static bool Compatible()
     {
         var manifest = Manifest;
-        var actual = Assembly.GetExecutingAssembly().GetName().Version;
+        var actual = _source.GetName().Version;
         return manifest.SchemaVersion == 2 && manifest.CatalogApiVersion == 2 && manifest.InstallerKind == "equipment-wpf" &&
             Version.TryParse(manifest.AssistantVersion, out var assistant) && actual?.ToString(3) == assistant.ToString(3) &&
             Version.TryParse(manifest.WorkerVersion, out _) && Version.TryParse(manifest.KioskVersion, out _) &&

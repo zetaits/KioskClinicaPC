@@ -15,6 +15,7 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../Kiosk.Shared/Kiosk.Shared.csproj" />
+    <ProjectReference Include="../Kiosk.EquipmentCore/Kiosk.EquipmentCore.csproj" />
     <EmbeddedResource Include="$(EquipmentResourcesDir)/*" LogicalName="Equipment.%(Filename)%(Extension)" />
     <Resource Include="../Kiosk.Client/Fonts/SpaceGrotesk-Regular.ttf" Link="Fonts/SpaceGrotesk-Regular.ttf" />
     <Resource Include="../Kiosk.Client/Fonts/SpaceGrotesk-Bold.ttf" Link="Fonts/SpaceGrotesk-Bold.ttf" />

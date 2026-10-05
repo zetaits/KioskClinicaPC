@@ -38,7 +38,7 @@ bajo). Todas las claves cuelgan de la sección `Kiosk`:
 
 | Clave | Env var | Para qué | Por defecto |
 |---|---|---|---|
-| `ApiKey` | `Kiosk__ApiKey` | Protege **`/api/*`**. Los kioscos la mandan en la cabecera `X-Api-Key`. Es obligatoria fuera de Development. | vacía solo en Development |
+| `ApiKey` | `Kiosk__ApiKey` | Protege las API de flota y contenido mediante `X-Api-Key`. Setup, publicación y despliegue tienen credenciales independientes. Es obligatoria fuera de Development. | vacía solo en Development |
 | `InitialSetupKey` | `Kiosk__InitialSetupKey` | Clave de 64 hex separada y limitada al catálogo/descarga del pack durante la instalación inicial. Vacía deshabilita esa función. | vacía |
 | `PanelInitialPassword` | `Kiosk__PanelInitialPassword` | Contraseña del panel que se hashea al crear `panel.json`. Mínimo 12 caracteres; después puede quitarse del entorno. | sin valor; el primer arranque falla de forma segura |
 | `DataDir` | `Kiosk__DataDir` | Carpeta de los JSON de datos. | `data/` bajo el ContentRoot |

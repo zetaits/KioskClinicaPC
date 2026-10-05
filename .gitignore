@@ -63,6 +63,7 @@ publish-maintenance/
 publish-setup-helper/
 publish-update-runner/
 equipment-build/
+deployment-build/
 panel-vps/
 panel-vps.zip
 installer/Output/

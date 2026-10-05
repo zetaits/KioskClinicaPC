@@ -1,0 +1,14 @@
+{
+  "adkVersion": "10.1.26100.9457",
+  "winpeBaseSha256": "REQUIRED_OFFICIAL_BASE_WIM_SHA256",
+  "ipxeVersion": "REQUIRED_PINNED_OFFICIAL_SIGNED_RELEASE",
+  "wimbootVersion": "REQUIRED_PINNED_OFFICIAL_RELEASE",
+  "servicingReviewedAtUtc": null,
+  "winpeUpdates": [],
+  "files": [
+    { "name": "ipxe-shim.efi", "path": "", "sha256": "" },
+    { "name": "ipxe.efi", "path": "", "sha256": "" },
+    { "name": "shimx64.efi", "path": "", "sha256": "" },
+    { "name": "wimboot", "path": "", "sha256": "" }
+  ]
+}

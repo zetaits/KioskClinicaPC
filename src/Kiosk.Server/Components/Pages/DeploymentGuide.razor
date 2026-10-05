@@ -1,0 +1,17 @@
+@page "/despliegue/guia"
+@attribute [Authorize]
+<section class="card">
+    <h2>Guía de instalación por red</h2>
+    <ol>
+        <li>Instala la aplicación en un PC Windows 11 x64 de la tienda conectado por Ethernet. Vincúlalo con un código de diez minutos generado en <a href="/despliegue">Instalación de sistemas</a>.</li>
+        <li>Selecciona la interfaz de la tienda y una carpeta local con espacio para las ISO extraídas. Configura la contraseña local: nunca se envía al panel.</li>
+        <li>Importa una ISO oficial Windows 11 Home/Pro x64 24H2 o posterior en español. Comprueba la edición y activa el servicio cuando la comprobación de red finalice.</li>
+        <li>Enciende los destinos y elige PXE/UEFI por Ethernet con Secure Boot. Espera a que aparezcan como «Listo para instalar» y comprueba el identificador en sus pantallas.</li>
+        <li>Selecciona un perfil y revisa modelo, serie, disco, edición, usuario y componentes para cada destino. La confirmación borra todas las particiones del disco elegido. Los discos USB quedan excluidos.</li>
+        <li>El servicio mantiene los trabajos si cierras la ventana. Tres equipos se preparan en paralelo por defecto; los demás esperan en cola.</li>
+    </ol>
+    <h3>Si una instalación se interrumpe</h3>
+    <p>Una caída del panel no interrumpe trabajos autorizados. Para confirmar otro lote se requiere conexión. Si se reinicia la estación o cambia un disco, revisa el destino: nunca se repite automáticamente el borrado. El fallo de aplicaciones permite recuperar la preparación sin reinstalar Windows.</p>
+    <p>Solo los trabajos en cola se pueden cancelar. «Reinicio necesario» requiere comprobar que no hay instaladores activos antes de reiniciar manualmente. Kiosk se abrirá en el siguiente inicio de sesión; la instalación termina en el escritorio.</p>
+    <p>El router sigue asignando direcciones. Se requiere la misma subred y no debe existir otro servicio PXE. No se admiten BIOS heredada, Wi-Fi, conservación de datos ni activación de licencias.</p>
+</section>

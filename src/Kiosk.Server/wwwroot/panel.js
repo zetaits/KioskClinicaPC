@@ -1,4 +1,12 @@
 (() => {
+  window.kioskEvents = {
+    focusStep: () => {
+      const heading = document.getElementById("event-step-heading");
+      if (!heading) return;
+      heading.focus({ preventScroll: true });
+      heading.scrollIntoView({ behavior: "auto", block: "nearest" });
+    }
+  };
   // El layout es SSR estático; el menú móvil no depende de un circuito Blazor.
   const mobileNav = window.matchMedia("(max-width: 900px)");
   const navLinks = () => [...document.querySelectorAll("#panel-navigation a[href], #panel-navigation button:not(:disabled)")];
@@ -58,7 +66,9 @@
     url.searchParams.set("downloadId", id);
     const label = link.querySelector("[data-setup-download-label]");
     const status = link.parentElement.querySelector("[data-setup-download-status]");
-    document.cookie = "kioskSetupDownload=; Max-Age=0; Path=/instalador; SameSite=Strict";
+    const cookieName = link.dataset.downloadCookie || "kioskSetupDownload";
+    const originalLabel = label.textContent;
+    document.cookie = cookieName + "=; Max-Age=0; Path=/instalador; SameSite=Strict";
     link.dataset.busy = "true";
     link.classList.add("is-loading");
     link.setAttribute("aria-disabled", "true");
@@ -74,14 +84,14 @@
       link.dataset.busy = "false";
       link.classList.remove("is-loading");
       link.removeAttribute("aria-disabled");
-      label.textContent = "Descargar instalador";
+      label.textContent = originalLabel;
       status.textContent = message;
     };
     poll = setInterval(() => {
       if (!link.isConnected) { clearInterval(poll); clearTimeout(timeout); return; }
-      const marker = document.cookie.split("; ").find(cookie => cookie.startsWith("kioskSetupDownload="));
-      if (marker?.slice("kioskSetupDownload=".length) !== id) return;
-      document.cookie = "kioskSetupDownload=; Max-Age=0; Path=/instalador; SameSite=Strict";
+      const marker = document.cookie.split("; ").find(cookie => cookie.startsWith(cookieName + "="));
+      if (marker?.slice(cookieName.length + 1) !== id) return;
+      document.cookie = cookieName + "=; Max-Age=0; Path=/instalador; SameSite=Strict";
       finish("Descarga iniciada. Revisa las descargas del navegador.");
     }, 250);
     timeout = setTimeout(() => finish("La preparación está tardando. Puedes volver a intentarlo."), 60000);

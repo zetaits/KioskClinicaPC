@@ -9,6 +9,7 @@ internal static class Program
     [STAThread]
     public static int Main(string[] args)
     {
+        Payload.UseAssembly(typeof(Program).Assembly);
         try
         {
             if (args is ["--diagnose"] or ["--diagnose-json"])

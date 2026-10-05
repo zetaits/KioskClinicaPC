@@ -5,7 +5,7 @@
     <select value="@Value" @onchange="Changed">
         <option value="preset">Usar adorno del tema@(string.IsNullOrWhiteSpace(PresetAsset) ? " (ninguno)" : $" · {PresetAsset}")</option>
         <option value="hidden">Sin adorno</option>
-        @foreach (string asset in Assets)
+        @foreach (string asset in LibraryAssets)
         {
             <option value="@($"asset:{asset}")">Biblioteca · @asset</option>
         }
@@ -16,7 +16,8 @@
     [Parameter, EditorRequired] public string Label { get; set; } = "";
     [Parameter, EditorRequired] public ThemeSlotOverride Slot { get; set; } = new();
     [Parameter] public string? PresetAsset { get; set; }
-    [Parameter] public IReadOnlyList<string> Assets { get; set; } = Array.Empty<string>();
+    [Parameter] public IReadOnlyList<string> LibraryAssets { get; set; } = Array.Empty<string>();
+    [Parameter] public EventCallback OnChanged { get; set; }
 
     private string Value => Slot.Mode switch
     {
@@ -25,7 +26,7 @@
         _ => "preset"
     };
 
-    private void Changed(ChangeEventArgs args)
+    private async Task Changed(ChangeEventArgs args)
     {
         string value = args.Value?.ToString() ?? "preset";
         if (value == "hidden")
@@ -43,5 +44,6 @@
             Slot.Mode = ThemeSlotMode.Preset;
             Slot.AssetKey = null;
         }
+        await OnChanged.InvokeAsync();
     }
 }
