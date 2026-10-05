@@ -10,6 +10,7 @@
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>../Kiosk.Client/Assets/clinicapc-logo.ico</ApplicationIcon>
     <EquipmentResourcesDir Condition="'$(EquipmentResourcesDir)' == ''">$(MSBuildProjectDirectory)/Resources</EquipmentResourcesDir>
   </PropertyGroup>
   <ItemGroup>
@@ -17,5 +18,6 @@
     <EmbeddedResource Include="$(EquipmentResourcesDir)/*" LogicalName="Equipment.%(Filename)%(Extension)" />
     <Resource Include="../Kiosk.Client/Fonts/SpaceGrotesk-Regular.ttf" Link="Fonts/SpaceGrotesk-Regular.ttf" />
     <Resource Include="../Kiosk.Client/Fonts/SpaceGrotesk-Bold.ttf" Link="Fonts/SpaceGrotesk-Bold.ttf" />
+    <Resource Include="../Kiosk.Client/Assets/clinicapc-logo.ico" Link="Assets/clinicapc-logo.ico" />
   </ItemGroup>
 </Project>

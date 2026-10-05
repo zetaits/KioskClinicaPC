@@ -30,6 +30,13 @@ ordinario permite intentar las siguientes. Solo se declara éxito si todos los
 componentes elegidos están verificados y el autostart de Kiosk se ha confirmado
 para el usuario original.
 
+La ventana usa los colores y la tipografía Space Grotesk del panel, controles
+propios y el icono de Clínica PC en el EXE y la barra de tareas. La barra superior
+personalizada permite arrastrar, redimensionar, minimizar, maximizar/restaurar
+y cerrar; el cierre conserva la espera segura del trabajador. Los controles
+incluyen estados de foco por teclado, hover y deshabilitado. Las listas se
+desplazan y los textos se ajustan al ancho disponible.
+
 Estado: `%ProgramData%\ClinicaPC\Setup\last-run.json`, `kiosk-run.json` y
 `logs/`. Los directorios `work/` son exclusivos de administradores y SYSTEM.
 El trabajador conserva el bloqueo `run.lock` durante comprobación, Kiosk y pack;

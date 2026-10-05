@@ -149,6 +149,7 @@ public partial class MainWindow : Window
         ShowStep(3); ResultTitle.Text = result.ExitCode == 0 ? "Equipo preparado" : "Preparación incompleta";
         ResultLabel.Text = result.Message + (result.RebootRequired ? "\nEs necesario reiniciar manualmente." : "");
         ResultDetails.Text = _lastRun == null ? "" : string.Join("\n", _lastRun.Items.Select(i => $"{i.Application.DisplayName} · {i.Application.PinnedVersion}: {i.Message}"));
+        ResultDetails.Visibility = string.IsNullOrWhiteSpace(ResultDetails.Text) ? Visibility.Collapsed : Visibility.Visible;
         if (result.ExitCode != 0) { BackButton.Visibility = Visibility.Visible; BackButton.Content = "Revisar"; }
         LaunchCheck.IsChecked = false;
         LaunchCheck.Visibility = result.KioskVerified ? Visibility.Visible : Visibility.Collapsed;
@@ -164,5 +165,22 @@ public partial class MainWindow : Window
     {
         if (_running) { e.Cancel = true; _closeRequested = true; _cancel?.Cancel(); StatusLabel.Text = "Esperando a que el trabajador termine. No se matará al instalador."; }
         else { _cancel?.Cancel(); _cancel?.Dispose(); }
+    }
+    private void MinimizeWindow(object sender, RoutedEventArgs e) => SystemCommands.MinimizeWindow(this);
+    private void ToggleMaximize(object sender, RoutedEventArgs e)
+    {
+        if (WindowState == WindowState.Maximized) SystemCommands.RestoreWindow(this);
+        else SystemCommands.MaximizeWindow(this);
+    }
+    private void CloseWindow(object sender, RoutedEventArgs e) => Close();
+    private void WindowStateChanged(object? sender, EventArgs e)
+    {
+        if (MaximizeGlyph == null) return;
+        bool maximized = WindowState == WindowState.Maximized;
+        MaximizeGlyph.Data = System.Windows.Media.Geometry.Parse(maximized
+            ? "M 4,1 L 11,1 L 11,8 M 1,4 L 8,4 L 8,11 L 1,11 Z"
+            : "M 1,1 L 11,1 L 11,11 L 1,11 Z");
+        MaximizeButton.ToolTip = maximized ? "Restaurar" : "Maximizar";
+        System.Windows.Automation.AutomationProperties.SetName(MaximizeButton, maximized ? "Restaurar" : "Maximizar");
     }
 }
