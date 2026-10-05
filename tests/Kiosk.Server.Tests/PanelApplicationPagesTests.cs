@@ -50,6 +50,8 @@ public sealed class PanelApplicationPagesTests : IDisposable
         byte[] bytes = [0x4d, 0x5a, 1, 2];
         var manifest = new InitialSetupBundleManifest
         {
+            SchemaVersion = 2, InstallerKind = "equipment-wpf", CatalogApiVersion = 2, SourceCommit = new string('a', 40),
+            AssistantVersion = "1.2.0", WorkerVersion = "1.3.0", KioskVersion = "1.2.0",
             Version = "1.2.0", FileName = "Setup-EquipoClinicaPC-1.2.0.exe", SizeBytes = bytes.Length,
             Sha256 = Convert.ToHexString(SHA256.HashData(bytes)), ServerUrl = "https://panel.clinicapc.es"
         };

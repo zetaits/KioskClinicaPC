@@ -29,6 +29,7 @@ public sealed class PackApiTests : IDisposable
         client.DefaultRequestHeaders.Add("X-Api-Key", "general-api");
         Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync("/api/setup/v2/catalog")).StatusCode);
         client.DefaultRequestHeaders.Add("X-Setup-Key", Key);
+        Assert.Equal("2", (await client.GetAsync("/api/setup/v2/catalog")).Headers.GetValues("X-Setup-Catalog-Version").Single());
         Assert.NotNull(await client.GetFromJsonAsync<PackCatalog>("/api/setup/v2/catalog"));
         Assert.Empty(_factory.Services.GetRequiredService<InitialSetupSessionStore>().Recent());
         Assert.Empty(_factory.Services.GetRequiredService<FleetRegistry>().Devices);
@@ -54,6 +55,8 @@ public sealed class PackApiTests : IDisposable
         byte[] bytes = [1, 2, 3, 4];
         var manifest = new InitialSetupBundleManifest
         {
+            SchemaVersion = 2, InstallerKind = "equipment-wpf", CatalogApiVersion = 2, SourceCommit = new string('a', 40),
+            AssistantVersion = "9.0.0", WorkerVersion = "1.3.0", KioskVersion = "1.2.0",
             Version = "9.0.0", FileName = "Setup-EquipoClinicaPC-9.0.0.exe", SizeBytes = bytes.Length,
             Sha256 = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(bytes)), ServerUrl = "https://panel.clinicapc.es"
         };

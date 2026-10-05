@@ -11,6 +11,50 @@ public sealed class InitialSetupStoreTests : IDisposable
     private readonly string _root = Path.Combine(Path.GetTempPath(), "kiosk-setup-tests", Guid.NewGuid().ToString("N"));
 
     [Fact]
+    public void Legacy_bundle_is_retained_but_never_offered_when_no_v2_exists()
+    {
+        Directory.CreateDirectory(_root);
+        WriteBundle("1.2.0", [1, 2, 3]);
+        string path = Path.Combine(_root, "Setup-EquipoClinicaPC-1.2.0.bundle.json");
+        var old = JsonSerializer.Deserialize<InitialSetupBundleManifest>(File.ReadAllText(path))!;
+        old.SchemaVersion = 1; old.InstallerKind = "inno";
+        File.WriteAllText(path, JsonSerializer.Serialize(old));
+        var store = new InitialSetupBundleStore(_root);
+        Assert.Null(store.Latest(out var error)); Assert.Contains("Equipment Setup", error);
+        Assert.True(File.Exists(Path.Combine(_root, old.FileName)));
+    }
+    [Theory]
+    [InlineData("schema")]
+    [InlineData("kind")]
+    [InlineData("catalog")]
+    [InlineData("source")]
+    [InlineData("assistant")]
+    [InlineData("worker")]
+    [InlineData("kiosk")]
+    [InlineData("server")]
+    public async Task Incompatible_metadata_is_rejected_before_storing_binary(string invalid)
+    {
+        Directory.CreateDirectory(_root); WriteBundle("1.3.0", [1, 2, 3]);
+        string path = Path.Combine(_root, "Setup-EquipoClinicaPC-1.3.0.bundle.json");
+        var manifest = JsonSerializer.Deserialize<InitialSetupBundleManifest>(File.ReadAllText(path))!;
+        File.Delete(path); File.Delete(Path.Combine(_root, manifest.FileName));
+        switch (invalid)
+        {
+            case "schema": manifest.SchemaVersion = 1; break;
+            case "kind": manifest.InstallerKind = "inno"; break;
+            case "catalog": manifest.CatalogApiVersion = 1; break;
+            case "source": manifest.SourceCommit = "unknown"; break;
+            case "assistant": manifest.AssistantVersion = "1.2.0"; break;
+            case "worker": manifest.WorkerVersion = ""; break;
+            case "kiosk": manifest.KioskVersion = ""; break;
+            case "server": manifest.ServerUrl = "http://panel.invalid"; break;
+        }
+        using var input = new MemoryStream([1, 2, 3]);
+        var store = new InitialSetupBundleStore(_root);
+        await Assert.ThrowsAsync<InvalidDataException>(() => store.ImportAsync(manifest, manifest.FileName, input, CancellationToken.None));
+        Assert.Empty(Directory.EnumerateFiles(_root));
+    }
+    [Fact]
     public void Session_tokens_are_scoped_and_terminal_results_are_persisted()
     {
         var package = new InstallerPackage { Id = "p1", DisplayName = "App", Sha256 = new string('a', 64) };
@@ -50,6 +94,8 @@ public sealed class InitialSetupStoreTests : IDisposable
         File.WriteAllBytes(Path.Combine(_root, fileName), content);
         var manifest = new InitialSetupBundleManifest
         {
+            SchemaVersion = 2, InstallerKind = "equipment-wpf", CatalogApiVersion = 2, SourceCommit = new string('a', 40),
+            AssistantVersion = version, WorkerVersion = "1.3.0", KioskVersion = "1.2.0",
             Version = version, FileName = fileName, SizeBytes = content.Length,
             Sha256 = Convert.ToHexString(SHA256.HashData(content)).ToLowerInvariant(),
             ServerUrl = "https://panel.example", CreatedAtUtc = DateTime.UtcNow

@@ -183,7 +183,7 @@ biblioteca, más el marcador interno que evita resembrar imágenes borradas deli
 Bajo `InstallersDir` (`installers/` por defecto): binarios MSI/EXE privados, con nombres internos aleatorios.
 
 Bajo `SetupDir` (`setups/` por defecto): el `Setup-EquipoClinicaPC-*.exe` interno y su
-`*.bundle.json`. El panel selecciona la versión válida más alta y nunca sirve un binario cuyo hash no coincida.
+`*.bundle.json`. El panel selecciona la versión válida más alta compatible con WPF y catálogo v2 y nunca sirve un binario cuyo hash no coincida. Conserva los artefactos antiguos sin ofrecerlos como alternativa. Publicación y validación: [Asistente de equipos](ASISTENTE-EQUIPOS.md).
 
 Bajo `UpdatesDir` (`updates/` por defecto): instaladores públicos inmutables importados por CI. Incluye esta
 carpeta en las copias de seguridad junto con `data/`, `assets/` e `installers/`.
@@ -231,15 +231,13 @@ durante el build interno:
 
 ```powershell
 $env:KIOSK_SERVER_API_KEY = '<api key de 64 hex>'
-$env:KIOSK_INITIAL_SETUP_KEY = '<setup key distinta de 64 hex>'
 .\build-installer.ps1 -ServerUrl 'https://panel.clinicapc.es'
-Remove-Item Env:KIOSK_SERVER_API_KEY, Env:KIOSK_INITIAL_SETUP_KEY
+Remove-Item Env:KIOSK_SERVER_API_KEY
 ```
 
-El build genera dos variantes. `Setup-KioskClinicaPC-*` se publica para auto-update y contiene
+Este build genera `Setup-KioskClinicaPC-*`, que se publica para auto-update y contiene
 la `ApiKey` de la flota para conectar kioscos nuevos y anteriores sin servidor; cualquiera que
-descargue la release puede extraerla. `Setup-EquipoClinicaPC-*` añade la clave limitada del pack:
-copia su `.exe` y `*.bundle.json` a `SetupDir`, nunca al release público. Rotar la clave del pack
+descargue la release puede extraerla. El asistente WPF `Setup-EquipoClinicaPC-*` se genera y publica por separado con el workflow manual **Equipment Setup** y añade la clave limitada del pack. Se importa exclusivamente por `/api/releases/setup`, nunca al release público. Actualizar la VPS no reconstruye esta descarga. Rotar la clave del pack
 invalida su descarga en Setups internos antiguos, aunque estos siguen pudiendo instalar Kiosk.
 
 En el primer arranque con `ServerUrl`, el agente empareja ese origen HTTPS en

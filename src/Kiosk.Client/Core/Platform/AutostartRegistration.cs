@@ -26,7 +26,7 @@ namespace KioskClinicaPC.Core.Platform
                     Log.Warning("No se pudo resolver la ruta del ejecutable; autostart no registrado.");
                     return;
                 }
-                using var key = Registry.CurrentUser.OpenSubKey(RunKeyPath, true);
+                using var key = Registry.CurrentUser.CreateSubKey(RunKeyPath, true);
                 key?.SetValue(AppName, $"\"{exePath}\"");
             }
             catch (Exception ex)

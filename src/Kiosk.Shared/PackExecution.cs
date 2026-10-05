@@ -10,7 +10,8 @@ public interface IPackBackend
 public static class PackExecution
 {
     public static async Task<bool> Run(PackRun run, IPackBackend engine, string logs,
-        Action<PackRun>? changed, Action<PackRun> save, bool preflight, CancellationToken ct)
+        Action<PackRun>? changed, Action<PackRun> save, bool preflight, CancellationToken ct,
+        Func<Task<bool>>? beforeInstall = null)
     {
         bool blocked = false;
         foreach (var item in run.Items)
@@ -33,6 +34,7 @@ public static class PackExecution
         }
         if (!preflight) save(run);
         if (blocked || preflight) return !blocked;
+        if (beforeInstall != null && !await beforeInstall()) return false;
         foreach (var item in run.Items.Where(x => !x.Verified))
         {
             if (ct.IsCancellationRequested) break;
@@ -49,6 +51,7 @@ public static class PackExecution
             }
             catch (Exception ex) { item.State = PackItemState.Failed; item.Message = ex.Message; }
             save(run); changed?.Invoke(run);
+            if (item.RequiresRebootBeforeRetry || item.State == PackItemState.VerificationPending) break;
         }
         return run.Complete;
     }

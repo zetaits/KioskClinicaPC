@@ -50,6 +50,8 @@ public sealed class SetupDownloadIntegrationTests : IAsyncLifetime
         File.WriteAllBytes(Path.Combine(setups, name), bytes);
         var manifest = new InitialSetupBundleManifest
         {
+            SchemaVersion = 2, InstallerKind = "equipment-wpf", CatalogApiVersion = 2, SourceCommit = new string('a', 40),
+            AssistantVersion = "1.2.0", WorkerVersion = "1.3.0", KioskVersion = "1.2.0",
             Version = "1.2.0", FileName = name, SizeBytes = bytes.Length,
             Sha256 = Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant(),
             ServerUrl = "https://panel.clinicapc.es"

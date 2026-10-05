@@ -133,13 +133,20 @@ internal sealed class WinGetEngine : IPackBackend
             throw new OperationCanceledException("Se perdió el resultado de WinGet. El instalador puede seguir activo; se detiene la cola.", ex, ct);
         }
         item.RebootRequired |= result.RebootRequired;
+        if (ct.IsCancellationRequested || result.Status == InstallResultStatus.InternalError)
+            throw new OperationCanceledException("El estado nativo no puede confirmarse. Se detiene la cola para verificarlo antes de reintentar.", ct);
         if (result.Status != InstallResultStatus.Ok) throw new InvalidOperationException($"WinGet {result.Status}; instalador {result.InstallerErrorCode}; {result.ExtendedErrorCode?.Message}");
-        for (int attempt = 0; attempt < 6; attempt++)
+        try
         {
-            if (Verified(await Find(item.Application.WingetId), item.Application.PinnedVersion))
-            { item.State = PackItemState.Succeeded; item.Message = "Instalada y verificada."; return; }
-            await Task.Delay(TimeSpan.FromSeconds(5), ct);
+            for (int attempt = 0; attempt < 6; attempt++)
+            {
+                if (Verified(await Find(item.Application.WingetId), item.Application.PinnedVersion))
+                { item.State = PackItemState.Succeeded; item.Message = "Instalada y verificada."; return; }
+                await Task.Delay(TimeSpan.FromSeconds(5), ct);
+            }
         }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception ex) { throw new OperationCanceledException("Se perdió la verificación del instalador nativo. Se detiene la cola.", ex, ct); }
         item.State = PackItemState.VerificationPending;
         item.RequiresRebootBeforeRetry = true;
         item.Message = "WinGet terminó, pero la versión machine-wide aún no se puede verificar. Revisar o reanudar tras reiniciar.";

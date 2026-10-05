@@ -291,7 +291,11 @@ app.MapGet("/api/assets/manifest", (AssetLibrary assets) => Results.Ok(assets.Ma
 
 static string? UpdateToken(HttpContext ctx) => ctx.Request.Headers["X-Update-Token"].FirstOrDefault();
 
-app.MapGet("/api/setup/v2/catalog", (PackCatalogStore catalog) => Results.Ok(catalog.Snapshot()))
+app.MapGet("/api/setup/v2/catalog", (HttpContext ctx, PackCatalogStore catalog) =>
+{
+    ctx.Response.Headers["X-Setup-Catalog-Version"] = "2";
+    return Results.Ok(catalog.Snapshot());
+})
     .RequireRateLimiting("initial-setup");
 
 app.MapPost("/api/releases/winget-index", async (HttpContext ctx, PackCatalogStore catalog) =>
@@ -577,6 +581,7 @@ app.MapGet("/panel/setup/download", (HttpContext ctx, InitialSetupBundleStore bu
 {
     var bundle = bundles.Latest(out _);
     if (bundle is null) return Results.NotFound();
+    ctx.Response.Headers.CacheControl = "private, no-store";
 
     // La página usa este marcador para retirar el indicador cuando empieza la respuesta.
     // La descarga sigue siendo nativa y el archivo se valida antes de enviarlo.

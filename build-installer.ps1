@@ -2,13 +2,11 @@
 # Uso:  .\build-installer.ps1                 (version leida del <Version> del .csproj)
 #       .\build-installer.ps1 -Version 1.1.0  (sobreescribe la version)
 #       .\build-installer.ps1 -ServerApiKey $env:KIOSK_SERVER_API_KEY (Setup provisionado)
-#       $env:KIOSK_INITIAL_SETUP_KEY = '<64 hex>'           (genera además el Setup interno con pack)
 #       .\build-installer.ps1 -Publish        (ademas crea el GitHub Release vX.Y.Z)
 param(
     [string]$Version,
     [string]$ServerUrl = "https://panel.clinicapc.es",
     [string]$ServerApiKey = $env:KIOSK_SERVER_API_KEY,
-    [string]$InitialSetupKey = $env:KIOSK_INITIAL_SETUP_KEY,
     [string]$SigningKeyId = $env:KIOSK_UPDATE_SIGNING_KEY_ID,
     [string]$SigningPublicKey = $env:KIOSK_UPDATE_SIGNING_PUBLIC_KEY,
     [string]$SigningPrivateKey = $env:KIOSK_UPDATE_SIGNING_PRIVATE_KEY,
@@ -18,7 +16,8 @@ param(
 
 $ErrorActionPreference = "Stop"
 $root      = $PSScriptRoot
-$dotnet    = if (Get-Command dotnet -ErrorAction SilentlyContinue) { (Get-Command dotnet).Source } else { throw "dotnet no está en PATH." }
+. (Join-Path $root 'tools\resolve-dotnet.ps1')
+$dotnet = Resolve-KioskDotnet
 $iscc      = if (Get-Command iscc -ErrorAction SilentlyContinue) { (Get-Command iscc).Source } elseif (Test-Path "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe") { "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe" } else { throw "ISCC no está instalado o no está en PATH." }
 $csproj    = Join-Path $root "src\Kiosk.Client\Kiosk.Client.csproj"
 $publishDir= Join-Path $root "publish"
@@ -26,8 +25,6 @@ $agentProject = Join-Path $root "src\Kiosk.InstallerAgent\Kiosk.InstallerAgent.c
 $agentPublishDir = Join-Path $root "publish-agent"
 $maintenanceProject = Join-Path $root "src\Kiosk.MaintenanceRunner\Kiosk.MaintenanceRunner.csproj"
 $maintenancePublishDir = Join-Path $root "publish-maintenance"
-$setupHelperProject = Join-Path $root "src\Kiosk.SetupHelper\Kiosk.SetupHelper.csproj"
-$setupHelperPublishDir = Join-Path $root "publish-setup-helper"
 $updateRunnerProject = Join-Path $root "src\Kiosk.UpdateRunner\Kiosk.UpdateRunner.csproj"
 $updateRunnerPublishDir = Join-Path $root "publish-update-runner"
 $releaseToolProject = Join-Path $root "tools\Kiosk.ReleaseTool\Kiosk.ReleaseTool.csproj"
@@ -58,31 +55,21 @@ if ($ServerUrl -and -not $ServerUrl.StartsWith("https://", [StringComparison]::O
 if ($ServerApiKey -and $ServerApiKey -notmatch '^[0-9a-fA-F]{64}$') {
     throw "ServerApiKey debe tener 64 caracteres hexadecimales."
 }
-if ($InitialSetupKey -and $InitialSetupKey -notmatch '^[0-9a-fA-F]{64}$') {
-    throw "InitialSetupKey debe tener 64 caracteres hexadecimales."
-}
 if ([string]::IsNullOrWhiteSpace($ServerApiKey)) {
     Write-Warning "No se indicó ServerApiKey: el instalador no preconfigurará el servidor."
 }
 if ($Publish -and ([string]::IsNullOrWhiteSpace($ServerUrl) -or [string]::IsNullOrWhiteSpace($ServerApiKey))) {
     throw "Para publicar una release que conecte los kioscos se requieren ServerUrl y KIOSK_SERVER_API_KEY."
 }
-if ($Publish -and [string]::IsNullOrWhiteSpace($InitialSetupKey)) {
-    throw "KIOSK_INITIAL_SETUP_KEY es obligatoria para publicar también el instalador interno del panel."
-}
-if ([string]::IsNullOrWhiteSpace($InitialSetupKey)) {
-    Write-Warning "No se indicó InitialSetupKey: no se generará el instalador interno con pack."
-}
 
 # 1. Valida las rutas antes de limpiar salidas generadas.
-foreach ($generatedPath in @($publishDir, $agentPublishDir, $maintenancePublishDir, $setupHelperPublishDir, $updateRunnerPublishDir)) {
+foreach ($generatedPath in @($publishDir, $agentPublishDir, $maintenancePublishDir, $updateRunnerPublishDir)) {
     $resolvedPath = [IO.Path]::GetFullPath($generatedPath)
     if ([IO.Path]::GetDirectoryName($resolvedPath) -ne [IO.Path]::GetFullPath($root)) { throw "Salida fuera del workspace: $resolvedPath" }
 }
 if (Test-Path $publishDir) { Remove-Item $publishDir -Recurse -Force }
 if (Test-Path $agentPublishDir) { Remove-Item $agentPublishDir -Recurse -Force }
 if (Test-Path $maintenancePublishDir) { Remove-Item $maintenancePublishDir -Recurse -Force }
-if (Test-Path $setupHelperPublishDir) { Remove-Item $setupHelperPublishDir -Recurse -Force }
 if (Test-Path $updateRunnerPublishDir) { Remove-Item $updateRunnerPublishDir -Recurse -Force }
 
 # 2. Publish Release self-contained win-x64. Fija la version del assembly = $Version (la lee el
@@ -98,11 +85,6 @@ if ($LASTEXITCODE -ne 0) { throw "dotnet publish del agente fallo (exit $LASTEXI
 Write-Host "==> dotnet publish del ejecutor de mantenimiento..." -ForegroundColor Cyan
 & $dotnet publish $maintenanceProject -c Release -r win-x64 --self-contained true -p:Version=$Version -o $maintenancePublishDir -nologo @dotnetBuildArgs
 if ($LASTEXITCODE -ne 0) { throw "dotnet publish del ejecutor de mantenimiento fallo (exit $LASTEXITCODE)" }
-
-Write-Host "==> dotnet publish del helper de instalación inicial..." -ForegroundColor Cyan
-& $dotnet publish $setupHelperProject -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true `
-    -p:DebugType=None -p:DebugSymbols=false -p:Version=$Version -o $setupHelperPublishDir -nologo @dotnetBuildArgs
-if ($LASTEXITCODE -ne 0) { throw "dotnet publish del helper fallo (exit $LASTEXITCODE)" }
 
 Write-Host "==> dotnet publish del runner de actualizaciones..." -ForegroundColor Cyan
 & $dotnet publish $updateRunnerProject -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true `
@@ -129,37 +111,6 @@ if ($ServerUrl -and $ServerApiKey) {
 $publicArgs += $iss
 & $iscc @publicArgs
 if ($LASTEXITCODE -ne 0) { throw "ISCC fallo (exit $LASTEXITCODE)" }
-
-# El instalador interno se sirve desde el panel y contiene credenciales de provisión de esta tienda.
-$internalSetup = $null
-if ($ServerUrl -and $ServerApiKey -and $InitialSetupKey) {
-    Write-Host "==> Compilando instalador interno con pack..." -ForegroundColor Cyan
-    $internalArgs = @(
-        "/DMyAppVersion=$Version",
-        "/DInternalSetup=1",
-        "/DDefaultServerUrl=$ServerUrl",
-        "/DDefaultServerApiKey=$ServerApiKey",
-        "/DDefaultInitialSetupKey=$InitialSetupKey",
-        $iss
-    )
-    & $iscc @internalArgs
-    if ($LASTEXITCODE -ne 0) { throw "ISCC interno fallo (exit $LASTEXITCODE)" }
-    $internalSetup = Join-Path $outputDir "Setup-EquipoClinicaPC-$Version.exe"
-    if (-not (Test-Path $internalSetup)) { throw "No se encontró el instalador interno esperado: $internalSetup" }
-    $internalInfo = Get-Item $internalSetup
-    $internalHash = (Get-FileHash $internalSetup -Algorithm SHA256).Hash.ToLower()
-    $bundleManifest = [ordered]@{
-        version = $Version
-        fileName = $internalInfo.Name
-        sizeBytes = $internalInfo.Length
-        sha256 = $internalHash
-        serverUrl = $ServerUrl
-        createdAtUtc = [DateTime]::UtcNow.ToString("o")
-    }
-    $bundlePath = Join-Path $outputDir "Setup-EquipoClinicaPC-$Version.bundle.json"
-    $bundleManifest | ConvertTo-Json | Out-File -LiteralPath $bundlePath -Encoding utf8
-    Write-Host "Instalador interno: $internalSetup" -ForegroundColor Green
-}
 
 # 4. Localiza el Setup y genera su checksum SHA256 (lo verifica el auto-update antes de instalar).
 $setup = Join-Path $outputDir "Setup-KioskClinicaPC-$Version.exe"
@@ -207,11 +158,6 @@ if ($Publish) {
     $headers = @{ "X-Release-Publish-Key" = $ReleasePublishKey }
     $form = @{ manifest = Get-Item $manifestPath; signature = Get-Content $signaturePath -Raw; setup = Get-Item $setup }
     Invoke-RestMethod -Method Post -Uri "$($ServerUrl.TrimEnd('/'))/api/releases" -Headers $headers -Form $form | Out-Null
-    # Private provisioning key must never be uploaded to a public GitHub release.
-    if ($internalSetup) {
-        $internalForm = @{ manifest = Get-Item $bundlePath; setup = Get-Item $internalSetup }
-        Invoke-RestMethod -Method Post -Uri "$($ServerUrl.TrimEnd('/'))/api/releases/setup" -Headers $headers -Form $internalForm | Out-Null
-    }
     Write-Host "Release v$Version publicado." -ForegroundColor Green
 }
 

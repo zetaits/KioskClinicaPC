@@ -14,6 +14,7 @@ internal static class Program
     [STAThread]
     public static int Main(string[] args)
     {
+        if (args is ["equipment-worker"]) return EquipmentWorker.Run().GetAwaiter().GetResult();
         if (args.Length < 2) return 64;
         if (args[0] == "inspect" && args.Length == 3)
         {
@@ -101,12 +102,16 @@ internal static class Program
             sections[$"Package{i++}"] = new() { ["Id"] = app.Id, ["Name"] = app.DisplayName + " · " + app.PinnedVersion, ["Default"] = app.SelectedByDefault ? "1" : "0" };
         Ini.Write(output, sections);
     }
-    private static PackRun? ReadPending()
+    internal static PackRun? ReadPending()
+    {
+        var run = ReadLastRun();
+        return run is { Complete: false, Items.Count: > 0 } ? run : null;
+    }
+    internal static PackRun? ReadLastRun()
     {
         string path = Path.Combine(StateRoot, "last-run.json");
         if (!File.Exists(path)) return null;
-        var run = JsonSerializer.Deserialize<PackRun>(File.ReadAllText(path), Json);
-        return run is { Complete: false, Items.Count: > 0 } ? run : null;
+        return JsonSerializer.Deserialize<PackRun>(File.ReadAllText(path), Json);
     }
     internal static void Save(PackRun run)
     {

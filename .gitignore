@@ -62,6 +62,7 @@ publish-agent/
 publish-maintenance/
 publish-setup-helper/
 publish-update-runner/
+equipment-build/
 panel-vps/
 panel-vps.zip
 installer/Output/

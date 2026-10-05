@@ -5,6 +5,13 @@ namespace Kiosk.Server.Services;
 
 public sealed class InitialSetupBundleManifest
 {
+    public int SchemaVersion { get; set; }
+    public string InstallerKind { get; set; } = "";
+    public int CatalogApiVersion { get; set; }
+    public string SourceCommit { get; set; } = "";
+    public string AssistantVersion { get; set; } = "";
+    public string WorkerVersion { get; set; } = "";
+    public string KioskVersion { get; set; } = "";
     public string Version { get; set; } = "";
     public string FileName { get; set; } = "";
     public long SizeBytes { get; set; }
@@ -29,11 +36,19 @@ public sealed class InitialSetupBundleStore
     public string Root => _root;
 
     private readonly SemaphoreSlim _importGate = new(1, 1);
+    public static bool Compatible(InitialSetupBundleManifest manifest) => manifest.SchemaVersion == 2 &&
+        manifest.InstallerKind == "equipment-wpf" && manifest.CatalogApiVersion == 2 &&
+        manifest.AssistantVersion == manifest.Version && Version.TryParse(manifest.AssistantVersion, out _) &&
+        Version.TryParse(manifest.WorkerVersion, out _) && Version.TryParse(manifest.KioskVersion, out _) &&
+        System.Text.RegularExpressions.Regex.IsMatch(manifest.SourceCommit ?? "", "^[a-fA-F0-9]{40}$") &&
+        System.Text.RegularExpressions.Regex.IsMatch(manifest.Sha256 ?? "", "^[a-fA-F0-9]{64}$") &&
+        Uri.TryCreate(manifest.ServerUrl, UriKind.Absolute, out var server) && server.Scheme == "https" &&
+        string.IsNullOrEmpty(server.UserInfo) && string.IsNullOrEmpty(server.Query) && string.IsNullOrEmpty(server.Fragment);
     public async Task ImportAsync(InitialSetupBundleManifest manifest, string uploadedName, Stream input, CancellationToken ct)
     {
-        if (!Version.TryParse(manifest.Version, out _) || manifest.FileName != Path.GetFileName(manifest.FileName) ||
+        if (!Compatible(manifest) || !Version.TryParse(manifest.Version, out _) || manifest.FileName != Path.GetFileName(manifest.FileName) ||
             manifest.FileName != uploadedName || !manifest.FileName.StartsWith("Setup-EquipoClinicaPC-", StringComparison.Ordinal) ||
-            !manifest.FileName.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) || manifest.SizeBytes is <= 0 or > 1024L * 1024 * 1024)
+            manifest.FileName != $"Setup-EquipoClinicaPC-{manifest.Version}.exe" || manifest.SizeBytes is <= 0 or > 1024L * 1024 * 1024)
             throw new InvalidDataException("Manifiesto del instalador interno no válido.");
         await _importGate.WaitAsync(ct);
         string staging = Path.Combine(_root, Guid.NewGuid().ToString("N") + ".tmp");
@@ -77,10 +92,11 @@ public sealed class InitialSetupBundleStore
             {
                 var manifest = JsonConvert.DeserializeObject<InitialSetupBundleManifest>(File.ReadAllText(manifestPath))
                     ?? throw new InvalidDataException("Manifiesto vac\u00edo.");
+                if (!Compatible(manifest)) continue; // Retain legacy artifacts, never offer them as a fallback.
                 if (!Version.TryParse(manifest.Version, out Version? version))
                     throw new InvalidDataException("Versi\u00f3n no v\u00e1lida.");
                 string fileName = Path.GetFileName(manifest.FileName);
-                if (!fileName.Equals(manifest.FileName, StringComparison.Ordinal) || !fileName.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+                if (!fileName.Equals(manifest.FileName, StringComparison.Ordinal) || fileName != $"Setup-EquipoClinicaPC-{manifest.Version}.exe")
                     throw new InvalidDataException("Nombre de Setup no v\u00e1lido.");
                 string full = Path.GetFullPath(Path.Combine(_root, fileName));
                 if (!full.StartsWith(_root + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) || !File.Exists(full))
@@ -101,6 +117,7 @@ public sealed class InitialSetupBundleStore
         }
 
         var latest = candidates.OrderByDescending(c => c.Version).FirstOrDefault();
+        if (latest.Manifest == null) error = "Debe publicarse un asistente WPF compatible con catálogo v2 mediante el workflow Equipment Setup. Actualizar la VPS no reconstruye el instalador descargable.";
         return latest.Manifest == null ? null : new(latest.Manifest, latest.Path);
     }
 }

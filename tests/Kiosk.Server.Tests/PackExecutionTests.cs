@@ -9,7 +9,7 @@ public sealed class PackExecutionTests
     private sealed class Backend : IPackBackend
     {
         public List<string> Calls = [];
-        public string? Reject, Fail, Cancel, Already;
+        public string? Reject, Fail, Cancel, Already, Unverified;
         public Task Preflight(PackItemResult item, string log)
         {
             Calls.Add("check" + item.Application.Id);
@@ -22,8 +22,16 @@ public sealed class PackExecutionTests
             Calls.Add("install" + item.Application.Id);
             if (item.Application.Id == Cancel) throw new OperationCanceledException();
             if (item.Application.Id == Fail) throw new InvalidOperationException("Instalador fallido");
+            if (item.Application.Id == Unverified) { item.State = PackItemState.VerificationPending; item.RequiresRebootBeforeRetry = true; return Task.CompletedTask; }
             item.State = PackItemState.Succeeded; return Task.CompletedTask;
         }
+    }
+    [Fact]
+    public async Task Native_success_without_verification_stops_the_remaining_queue()
+    {
+        var backend = new Backend { Unverified = "1" }; var run = Run();
+        Assert.False(await PackExecution.Run(run, backend, ".", null, _ => { }, false, CancellationToken.None));
+        Assert.Equal(PackItemState.VerificationPending, run.Items[1].State); Assert.DoesNotContain("install2", backend.Calls);
     }
     [Fact]
     public async Task Whole_selection_is_checked_before_any_install()
