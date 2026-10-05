@@ -88,14 +88,24 @@ if ($PackageOnly) {
     return
 }
 
-# OpenSSH 9 uses SFTP by default; the VPS closed that upload connection after SSH login.
-# The upload names are generated locally and contain only validated ASCII characters.
-& scp.exe -O -o StrictHostKeyChecking=yes -- $archive "${remote}:/home/ubuntu/kiosk-server-$releaseId.tar.gz"
-if ($LASTEXITCODE -ne 0) { throw "Package upload failed with exit code $LASTEXITCODE" }
-& scp.exe -O -o StrictHostKeyChecking=yes -- $helper "${remote}:/home/ubuntu/kiosk-server-deploy-$releaseId.sh"
-if ($LASTEXITCODE -ne 0) { throw "Deployment helper upload failed with exit code $LASTEXITCODE" }
-& scp.exe -O -o StrictHostKeyChecking=yes -- $preflight "${remote}:/home/ubuntu/kiosk-server-preflight-$releaseId.py"
-if ($LASTEXITCODE -ne 0) { throw "Preflight helper upload failed with exit code $LASTEXITCODE" }
+# Send all three files through one authenticated SCP connection. Keep the legacy protocol
+# because this VPS previously closed SFTP sessions. Generated basenames match the remote helper.
+$helperUpload = Join-Path $artifacts "kiosk-server-deploy-$releaseId.sh"
+$preflightUpload = Join-Path $artifacts "kiosk-server-preflight-$releaseId.py"
+try {
+    Copy-Item -LiteralPath $helper -Destination $helperUpload
+    Copy-Item -LiteralPath $preflight -Destination $preflightUpload
+    Write-Host 'Uploading the package and both deployment helpers in one SSH connection.'
+    & scp.exe -O -o StrictHostKeyChecking=yes -o ConnectTimeout=10 -- $archive $helperUpload $preflightUpload "${remote}:/home/ubuntu/"
+    if ($LASTEXITCODE -ne 0) {
+        throw "Deployment upload failed with exit code $LASTEXITCODE. Activation has not started; the running release is unchanged."
+    }
+}
+finally {
+    foreach ($uploadCopy in @($helperUpload, $preflightUpload)) {
+        if (Test-Path -LiteralPath $uploadCopy -PathType Leaf) { Remove-Item -LiteralPath $uploadCopy -Force }
+    }
+}
 
 # -tt lets ssh and sudo request passwords interactively. Arguments are locally validated.
 $command = "sudo python3 /home/ubuntu/kiosk-server-preflight-$releaseId.py && sudo bash /home/ubuntu/kiosk-server-deploy-$releaseId.sh $releaseId $archiveHash"

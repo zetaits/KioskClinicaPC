@@ -12,7 +12,9 @@ Cada actualización, desde PowerShell en la raíz del proyecto:
 La segunda orden debe devolver HTTP 200 y {"status":"ok"}. El primer comando
 hace la comprobación previa, compila, sube el paquete, guarda una copia de
 datos, activa la release y la verifica. Si falla, intenta restaurar la versión
-anterior y termina con error. SSH y sudo pueden pedir contraseña.
+anterior y termina con error. El paquete y los dos scripts auxiliares se suben
+en una sola conexión SCP. SSH y sudo pueden pedir contraseña en la comprobación
+previa, en la subida y en la activación.
 
 Opcional: `& .\deploy-server-vps.ps1 -CheckOnly` inspecciona la VPS sin
 modificarla; `-PackageOnly` genera el paquete sin subirlo. El comando normal
@@ -31,3 +33,9 @@ respaldo de datos no se restaura automáticamente para evitar borrar cambios
 recibidos durante el intento.
 
 El procedimiento de actualización no cambia Caddy ni los ajustes de los kioscos.
+
+Si SSH cierra la conexión durante la subida, la activación aún no ha comenzado
+y la versión en servicio se mantiene. El mensaje «Connection closed» no indica
+por sí solo la causa: revisa la autenticación y el registro SSH de la VPS con
+`sudo journalctl -u ssh -n 100 --no-pager`. Vuelve a ejecutar el comando tras
+resolver el problema; los archivos de una subida incompleta no se activan solos.
