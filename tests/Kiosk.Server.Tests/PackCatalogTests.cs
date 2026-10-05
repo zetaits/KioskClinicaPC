@@ -28,6 +28,20 @@ public sealed class PackCatalogTests : IDisposable
         Assert.Throws<InvalidDataException>(() => store.Add("Vendor.App"));
     }
     [Fact]
+    public void Missing_index_entry_preserves_configured_application_and_pinned_version()
+    {
+        var store = new PackCatalogStore(_root);
+        var originalIndex = Index();
+        store.Import(originalIndex); store.Add("Vendor.App");
+        var originalApplication = store.Snapshot().Applications.Single();
+        store.Import(new(originalIndex.GeneratedAtUtc.AddSeconds(1),
+            [new("Vendor.Other", "Other application", "Vendor", "2.0", true)]));
+
+        Assert.Equal(new[] { originalApplication.DisplayName }, store.UpdateVersions());
+        Assert.Equal(originalApplication, new PackCatalogStore(_root).Snapshot().Applications.Single());
+        Assert.Empty(store.Search("Vendor.App"));
+    }
+    [Fact]
     public void Configure_preserves_identity_and_pinned_version()
     {
         var store = new PackCatalogStore(_root); store.Import(Index()); store.Add("Vendor.App");

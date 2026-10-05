@@ -154,32 +154,30 @@ internal sealed class WinGetEngine : IPackBackend
         _info?.Invoke($"Search status: {result.Status}; matches: {result.Matches.Count}; limit exceeded: {result.WasLimitExceeded}.");
         if (result.Status != FindPackagesResultStatus.Ok || result.WasLimitExceeded || result.Matches.Count < 1000)
             throw new InvalidDataException($"Exportación incompleta: status={result.Status}, matches={result.Matches.Count}, limitExceeded={result.WasLimitExceeded}; no se publicará el índice.");
-        var entries = new List<WingetIndexEntry>();
-        for (int i = 0; i < result.Matches.Count; i++)
+        var entries = await CatalogExportReader.ReadAsync(result.Matches.Count, i =>
         {
             _phase?.Invoke($"Reading catalogue package {i + 1}/{result.Matches.Count}");
             var match = result.Matches[i];
-            var package = match.CatalogPackage; var version = package.DefaultInstallVersion;
-            if (version == null) continue;
-            _phase?.Invoke($"Validating {package.Id} {version.Version}");
+            var package = match.CatalogPackage;
+            string id = package.Id;
+            _phase?.Invoke($"Reading default version for {id} (package {i + 1}/{result.Matches.Count})");
+            var version = package.DefaultInstallVersion ?? throw new InvalidDataException($"No default version for {id}.");
+            string name = package.Name;
+            _phase?.Invoke($"Validating {id} {version.Version}");
             bool eligible = true; string? reason = null;
             try
             {
-                _ = Options(package, new("export", package.Id, package.Name, version.Version), "");
-                if (!ManifestPolicy.ValidateLocal(manifestRepository, package.Id, version.Version))
+                _ = Options(package, new("export", id, name, version.Version), "");
+                if (!ManifestPolicy.ValidateLocal(manifestRepository, id, version.Version))
                     throw new InvalidDataException("No declara instalación silenciosa para todo el equipo.");
             }
-            catch (Exception ex) { eligible = false; reason = ExportDiagnostics.Describe(ex); }
-            _phase?.Invoke($"Reading publisher metadata for {package.Id} {version.Version}");
-            entries.Add(new(package.Id, package.Name, version.GetCatalogPackageMetadata().Publisher, version.Version, eligible, reason));
-            if ((i + 1) % 100 == 0) _info?.Invoke($"Progress: {i + 1}/{result.Matches.Count}; entries: {entries.Count}; eligible: {entries.Count(x => x.Eligible)}.");
-        }
+            catch (InvalidDataException ex) { eligible = false; reason = ExportDiagnostics.Describe(ex); }
+            _phase?.Invoke($"Reading publisher metadata for {id} {version.Version}");
+            return new WingetIndexEntry(id, name, version.GetCatalogPackageMetadata().Publisher, version.Version, eligible, reason);
+        }, _info);
         _phase?.Invoke("Checking catalogue completeness");
-        _info?.Invoke($"Catalogue totals: {entries.Count} entries; {entries.Count(x => x.Eligible)} eligible.");
         foreach (var rejection in entries.Where(x => !x.Eligible).GroupBy(x => x.Reason).OrderByDescending(x => x.Count()).Take(10))
             _info?.Invoke($"Rejected packages: {rejection.Count()}; reason: {rejection.Key}");
-        if (entries.Count < 1000 || entries.Count(x => x.Eligible) < 100)
-            throw new InvalidDataException($"Índice incompleto: {entries.Count} entradas, {entries.Count(x => x.Eligible)} elegibles (mínimos: 1000/100). Se conserva el índice anterior.");
         return new(DateTime.UtcNow, entries);
     }
 }
