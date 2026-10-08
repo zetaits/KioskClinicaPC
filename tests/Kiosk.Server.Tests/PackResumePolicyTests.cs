@@ -6,6 +6,20 @@ public sealed class PackResumePolicyTests
 {
     private static PackApplication App => new(new string('a', 32), "Vendor.App", "App", "2");
     [Fact]
+    public void Latest_resume_keeps_verified_concrete_version_and_resolves_only_pending_items_again()
+    {
+        var other = App with { Id = new string('b', 32), WingetId = "Vendor.Other" };
+        var definition = PackDefinition.FromCatalog(new(8, [App, other]));
+        var previous = new PackRun { Items = [new() { Application = App with { PinnedVersion = "1" }, State = PackItemState.Succeeded, InstalledVersion = "1", ResolvedChannel = "" },
+            new() { Application = other with { PinnedVersion = "1" }, State = PackItemState.Failed }] };
+        var resumed = PackResumePolicy.Create(definition.ForExecution(), previous, true);
+        Assert.Equal("1", resumed.Items[0].Application.PinnedVersion); Assert.False(resumed.Items[0].ResolveLatest);
+        Assert.Equal("1", resumed.Items[0].InstalledVersion); Assert.True(resumed.Items[1].ResolveLatest);
+        Assert.Empty(resumed.Items[1].Application.PinnedVersion);
+        Assert.All(PackResumePolicy.Create(definition.ForExecution(), previous, false).Items, i => Assert.True(i.ResolveLatest));
+        Assert.Equal("1", previous.Items[0].Application.PinnedVersion);
+    }
+    [Fact]
     public void Resume_uses_authorized_versions_and_carries_verification_guards_even_if_resume_is_disabled()
     {
         var previous = new PackRun { Items = [new() { Application = App with { PinnedVersion = "1" }, State = PackItemState.Installing }] };

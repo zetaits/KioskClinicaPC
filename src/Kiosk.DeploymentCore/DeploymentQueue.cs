@@ -162,9 +162,14 @@ public sealed class DeploymentQueue
                 "Evento fuera de secuencia o estado no permitido.");
             DeploymentPolicy.Require(progress.State != DeploymentState.Completed ||
                 (progress.WindowsVerified && progress.AccountVerified && progress.ComponentsVerified), "No se puede declarar éxito sin verificar todos los componentes.");
+            var applications = progress.ApplicationResult ?? job.ApplicationResult;
+            if (applications is not null) DeploymentPolicy.ApplicationResult(job.Profile, applications, progress.ComponentsVerified);
+            DeploymentPolicy.Require(job.Profile.ApplicationDefinition is null || !progress.ComponentsVerified || applications?.Complete == true,
+                "Falta el resultado verificado de las aplicaciones.");
             Replace(job with { State = progress.State, LastSequence = progress.Sequence, Phase = progress.Phase, Percent = progress.Percent,
                 WindowsVerified = progress.WindowsVerified, AccountVerified = progress.AccountVerified,
-                ComponentsVerified = progress.ComponentsVerified, RebootRequired = progress.RebootRequired });
+                ComponentsVerified = progress.ComponentsVerified, RebootRequired = progress.RebootRequired,
+                ApplicationResult = applications is null ? null : DeploymentPolicy.Copy(applications) });
         }
     }
     public void Cancel(string id)

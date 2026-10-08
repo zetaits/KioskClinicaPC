@@ -15,7 +15,8 @@ internal sealed class PackSession(string work, Action<string> diagnostic) : IEqu
     private readonly TaskCompletionSource<bool> _finished = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private Action<EquipmentEvent>? _progress;
     public bool RebootRequired { get; private set; }
-    public async Task<bool> Preflight(PackCatalog snapshot, bool resume, Action<EquipmentEvent> progress, CancellationToken ct)
+    public PackRun? LastRun { get; private set; }
+    public async Task<bool> Preflight(PackCatalog snapshot, bool resume, Action<EquipmentEvent> progress, CancellationToken ct, bool allowPartial = false)
     {
         _progress = progress;
         ProcessStartInfo start;
@@ -33,7 +34,7 @@ internal sealed class PackSession(string work, Action<string> diagnostic) : IEqu
         _process = Process.Start(start) ?? throw new IOException("No se pudo iniciar el trabajador.");
         _reader = Read();
         _errors = Task.Run(async () => { while (await _process.StandardError.ReadLineAsync() is { } line) diagnostic(line); });
-        await _process.StandardInput.WriteLineAsync(JsonSerializer.Serialize(new PackWorkerStart(snapshot, resume), Payload.Json));
+        await _process.StandardInput.WriteLineAsync(JsonSerializer.Serialize(new PackWorkerStart(snapshot, resume, allowPartial), Payload.Json));
         using var registration = ct.Register(Cancel);
         return await _ready.Task.WaitAsync(ct);
     }
@@ -46,6 +47,7 @@ internal sealed class PackSession(string work, Action<string> diagnostic) : IEqu
             {
                 if (line.Length > 1024 * 1024) throw new InvalidDataException();
                 var value = JsonSerializer.Deserialize<EquipmentEvent>(line, Payload.Json) ?? throw new InvalidDataException();
+                if (value.Run is not null) LastRun = value.Run;
                 if (value.Kind == "result")
                 {
                     RebootRequired = value.RebootRequired; _finished.TrySetResult(value.ExitCode == 0); resultSeen = true;

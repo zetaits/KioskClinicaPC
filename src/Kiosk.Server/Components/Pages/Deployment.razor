@@ -186,8 +186,8 @@
             }
             <fieldset class="deployment-applications">
                 <legend>Aplicaciones</legend>
-                <p class="muted section-copy">Selecciona las aplicaciones del <a href="/aplicaciones">catálogo</a>. Sus versiones quedarán fijadas al confirmar la instalación.</p>
-                @{ var applications = Catalog.Snapshot().Applications; }
+                <p class="muted section-copy">Selecciona las aplicaciones del <a href="/aplicaciones">catálogo</a>. Cada equipo resolverá la última versión compatible al instalar; las aplicaciones no disponibles quedarán pendientes.</p>
+                @{ var applications = Catalog.Definition().Applications; }
                 @if (applications.Count == 0)
                 {
                     <div class="empty-state compact">
@@ -200,7 +200,7 @@
                     {
                         <label class="device-choice deployment-app @(_apps.Contains(app.Id) ? "selected" : "")" @key="app.Id">
                             <input type="checkbox" checked="@_apps.Contains(app.Id)" @onchange="e => SelectApp(app.Id, e.Value is true)" />
-                            <span><b>@app.DisplayName</b><small>Versión @app.PinnedVersion</small></span>
+                            <span><b>@app.DisplayName</b><small>Última compatible al instalar</small></span>
                         </label>
                     }
                 </div>
@@ -253,6 +253,16 @@
                                         @if (job.RebootRequired) { <span class="badge warn">Reinicio necesario</span> }
                                     </div>
                                     <p class="muted"><span>@job.Phase</span>@if (job.Percent is { } percent) { <strong>@percent%</strong> }</p>
+                                    @if (job.ApplicationResult is { } result)
+                                    {
+                                        <details><summary>Resultado de aplicaciones</summary>
+                                            @foreach (var item in result.Items)
+                                            {
+                                                <p class="muted"><b>@item.Application.DisplayName</b> · Resuelta: @(string.IsNullOrEmpty(item.Application.PinnedVersion) ? "no disponible" : item.Application.PinnedVersion)
+                                                    · Instalada: @(item.InstalledVersion ?? "sin verificar") · @item.Message</p>
+                                            }
+                                        </details>
+                                    }
                                 </div>
                             </div>
                         }
@@ -294,7 +304,7 @@
     private void New() { _id = null; _revision = 0; _name = "Nuevo perfil"; _imageId = null; _edition = null; _username = "Usuario"; _apps = []; _kiosk = false; }
     private void Edit(DeploymentProfile p) { _id = p.Id; _revision = p.Revision; _name = p.Name; _imageId = p.ImageId; _edition = p.EditionIndex; _username = p.Username; _apps = p.Applications.Applications.Select(a => a.Id).ToHashSet(); _kiosk = p.Kiosk; }
     private void SelectApp(string id, bool selected) { if (selected) _apps.Add(id); else _apps.Remove(id); }
-    private Task Save() => Run(() => { var p = Store.SaveProfile(new(_id, _revision, _name, string.IsNullOrEmpty(_imageId) ? null : _imageId, _edition, "es-ES", _username, _apps.ToList(), _kiosk), Catalog.Snapshot()); Edit(p); });
+    private Task Save() => Run(() => { var p = Store.SaveProfile(new(_id, _revision, _name, string.IsNullOrEmpty(_imageId) ? null : _imageId, _edition, "es-ES", _username, _apps.ToList(), _kiosk), Catalog.Snapshot(), Catalog.Definition()); Edit(p); });
     private static string State(DeploymentState state) => state switch {
         DeploymentState.Detected => "Detectado en red", DeploymentState.Booting => "Preparando arranque", DeploymentState.Ready => "Listo para instalar",
         DeploymentState.Queued => "En cola", DeploymentState.Installing => "Instalando", DeploymentState.PostInstall => "Preparando escritorio",

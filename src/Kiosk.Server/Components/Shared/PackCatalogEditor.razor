@@ -2,7 +2,7 @@
 @inject PackCatalogStore Catalog
 
 @{
-    var pack = Catalog.Snapshot();
+    var pack = Catalog.Definition();
     var results = Catalog.Search(_query);
     int selectedCount = pack.Applications.Count(x => x.SelectedByDefault);
     bool indexReady = Catalog.IndexUpdatedAtUtc != DateTime.MinValue;
@@ -12,7 +12,6 @@
     <div class="card-head">
         <div><h2>Aplicaciones del pack</h2><p class="muted section-copy">Esta es la lista que aparecerá en el instalador de equipos.</p></div>
         <div class="catalog-actions pack-header-actions">
-            <button type="button" disabled="@(pack.Applications.Count == 0)" @onclick="Update">Actualizar versiones del pack</button>
             <a class="btn primary button-link" href="/instalador">Ir al instalador</a>
         </div>
     </div>
@@ -28,9 +27,17 @@
         <div class="catalog-list">
             @foreach (var app in pack.Applications)
             {
+                var latest = Catalog.Search(app.WingetId).FirstOrDefault(x => x.Id.Equals(app.WingetId, StringComparison.OrdinalIgnoreCase));
                 <article class="catalog-item" @key="app.Id" data-pack-application="@app.WingetId">
                     <div class="app-mark" aria-hidden="true">APP</div>
-                    <div class="catalog-main"><strong>@app.DisplayName</strong><span>Versión del pack: @app.PinnedVersion</span><code>@app.WingetId</code></div>
+                    <div class="catalog-main"><strong>@app.DisplayName</strong><span>Última versión compatible al instalar</span><code>@app.WingetId</code>
+                        @if (latest is not null)
+                        {
+                            <span class="muted">Versión observada en el índice: @latest.Version</span>
+                            @if (!latest.Eligible) { <span class="muted">@latest.Reason Se comprobará de nuevo en el equipo.</span> }
+                        }
+                        else { <span class="muted">Sin entrada en el índice actual. Se conserva la aplicación y se comprobará en el equipo.</span> }
+                    </div>
                     <div class="catalog-meta">
                         <label class="check-row"><input type="checkbox" checked="@app.SelectedByDefault" @onchange="e => Change(() => Catalog.Configure(app.Id, (bool)(e.Value ?? false), app.Order))" /> Seleccionada por defecto</label>
                         <label class="setup-order">Orden de instalación <input aria-label="@($"Orden de instalación de {app.DisplayName}")" type="number" min="0" max="10000" value="@app.Order" @onchange="e => SetOrder(app, e.Value)" /></label>
@@ -41,7 +48,7 @@
         </div>
         <p class="muted">Puedes cambiar la selección en cada ordenador antes de instalar. Los números de orden menores se instalan primero. Quitar una app del pack no la desinstala de ningún equipo.</p>
     }
-    <p class="muted">Las versiones quedan fijadas hasta que pulses Actualizar versiones del pack. Renovar el catálogo de WinGet no cambia tu pack automáticamente.</p>
+    <p class="muted">Cada equipo consulta WinGet al comenzar y resuelve las versiones compatibles. Las aplicaciones no disponibles quedan pendientes y las demás pueden instalarse. Las versiones del índice son orientativas.</p>
 </section>
 
 <section class="card setup-section">
@@ -61,6 +68,10 @@
     else
     {
         <p id="pack-index-status" class="muted">Catálogo WinGet actualizado: @Catalog.IndexUpdatedAtUtc.ToLocalTime().ToString("dd/MM/yyyy HH:mm"). Escribe al menos dos caracteres para buscar.</p>
+        @if (Catalog.IndexUpdatedAtUtc < DateTime.UtcNow.AddHours(-48))
+        {
+            <p class="alert warning" role="status">El índice lleva más de 48 horas sin renovarse. Se conserva el último catálogo válido; el asistente consultará WinGet en cada equipo.</p>
+        }
     }
     @if (indexReady && _query.Trim().Length >= 2 && results.Count == 0)
     {
@@ -71,16 +82,16 @@
         <div class="catalog-list" aria-label="Resultados del catálogo WinGet">
             @foreach (var app in results)
             {
-                bool added = pack.Applications.Any(x => x.WingetId.Equals(app.Id, StringComparison.OrdinalIgnoreCase));
+                var added = pack.Applications.FirstOrDefault(x => x.WingetId.Equals(app.Id, StringComparison.OrdinalIgnoreCase));
                 <article class="catalog-item" @key="app.Id">
                     <div class="app-mark" aria-hidden="true">APP</div>
-                    <div class="catalog-main"><strong>@app.Name</strong><span>@app.Publisher · Versión disponible: @app.Version</span><code>@app.Id</code></div>
+                    <div class="catalog-main"><strong>@app.Name</strong><span>@app.Publisher · Versión observada: @app.Version</span><code>@app.Id</code></div>
                     <div class="catalog-meta">
                         <span class="badge @(app.Eligible ? "ok" : "warn")">@(app.Eligible ? "Instalación desatendida" : "No compatible con el pack")</span>
                         @if (!app.Eligible) { <span class="muted">@app.Reason</span> }
                     </div>
                     <div class="catalog-actions">
-                        @if (added) { <span class="badge ok">En el pack</span> }
+                        @if (added is not null) { <span class="badge ok">En el pack · última compatible</span> }
                         else if (app.Eligible) { <button type="button" @onclick="() => Change(() => Catalog.Add(app.Id))">Añadir al pack</button> }
                     </div>
                 </article>
@@ -98,18 +109,9 @@
         try { action(); _message = "Pack guardado."; _error = false; }
         catch (Exception ex) { _message = ex.Message; _error = true; }
     }
-    private void SetOrder(PackApplication app, object? value)
+    private void SetOrder(PackEntry app, object? value)
     {
         if (!int.TryParse(value?.ToString(), out int order)) { _message = "Introduce un orden entre 0 y 10000."; _error = true; return; }
         Change(() => Catalog.Configure(app.Id, app.SelectedByDefault, order));
-    }
-    private void Update()
-    {
-        try
-        {
-            var failed = Catalog.UpdateVersions(); _error = failed.Count > 0;
-            _message = failed.Count == 0 ? "Versiones del pack actualizadas." : "Se conserva la versión anterior de: " + string.Join(", ", failed);
-        }
-        catch (Exception ex) { _message = ex.Message; _error = true; }
     }
 }

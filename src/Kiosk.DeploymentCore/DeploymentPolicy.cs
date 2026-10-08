@@ -43,5 +43,16 @@ public static partial class DeploymentPolicy
              s.Hardware.Mac.Equals(session.Hardware.Mac, StringComparison.OrdinalIgnoreCase)));
     public static bool Active(DeploymentState state) => state is DeploymentState.Installing or DeploymentState.PostInstall;
     public static bool Terminal(DeploymentState state) => state is DeploymentState.Completed or DeploymentState.Attention or DeploymentState.Cancelled;
+    public static void ApplicationResult(DeploymentProfile profile, KioskClinicaPC.Core.Sync.PackRun run, bool componentsVerified)
+    {
+        var allowed = profile.ApplicationDefinition ?? KioskClinicaPC.Core.Sync.PackDefinition.FromCatalog(profile.Applications);
+        Require(run.Items is not null && run.Items.Count == allowed.Applications.Count &&
+            run.Items.All(i => i is not null && i.Application is not null && Enum.IsDefined(i.State) &&
+                (!componentsVerified || !i.Verified || !string.IsNullOrWhiteSpace(i.Application.PinnedVersion) && !i.RequiresRebootBeforeRetry &&
+                    (profile.ApplicationDefinition is null || !string.IsNullOrWhiteSpace(i.InstalledVersion)))) &&
+            run.Items.Select(i => i.Application.Id).Distinct().Count() == run.Items.Count &&
+            run.Items.All(i => allowed.Applications.Any(a => a.Id == i.Application.Id && a.WingetId == i.Application.WingetId)) &&
+            (!componentsVerified || run.Complete), "El resultado de aplicaciones no corresponde al perfil confirmado.");
+    }
     public static T Copy<T>(T value) => JsonSerializer.Deserialize<T>(JsonSerializer.Serialize(value))!;
 }

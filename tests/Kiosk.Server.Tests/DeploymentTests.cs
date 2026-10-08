@@ -195,6 +195,64 @@ public sealed class DeploymentTests : IDisposable
         Assert.Equal(2, store.Snapshot().Profiles.Single(p => p.Id == profile.Id).Revision);
     }
     [Fact]
+    public void Migration_creates_latest_profile_revision_but_preserves_confirmed_legacy_jobs()
+    {
+        var clock = new Clock(); var store = new DeploymentStore(_root, clock); var station = store.Enroll(new(1, store.CreateCode().Code, "Station"));
+        store.Sync(station.StationId, new(1, 3, [Image], [Session()], [], []));
+        var app = new PackApplication(new string('c', 32), "Google.Chrome", "Chrome", "154"); var catalog = new PackCatalog(7, [app]);
+        var profile = store.SaveProfile(new(null, 0, "Pack", Image.Id, 6, "es-ES", "Usuario", [app.Id], false), catalog);
+        var queue = Queue(); queue.Confirm(Confirmation() with { ProfileId = profile.Id, ProfileRevision = profile.Revision }, profile, true, Now);
+        var state = queue.Snapshot(); store.Sync(station.StationId, new(1, 3, state.Images, state.Sessions, state.Batches, state.Jobs));
+        var restored = new DeploymentStore(_root, clock);
+        var current = restored.Snapshot().Profiles.Single(p => p.Id == profile.Id);
+        Assert.Equal(2, current.Revision); Assert.NotNull(current.ApplicationDefinition);
+        var oldJob = restored.Snapshot().Jobs[station.StationId].Single(); Assert.Null(oldJob.Profile.ApplicationDefinition);
+        Assert.Equal("154", oldJob.Profile.Applications.Applications.Single().PinnedVersion); Assert.Equal(1, oldJob.Profile.Revision);
+        Assert.DoesNotContain(restored.Configuration(station.StationId, catalog).Profiles, p => p.Id == profile.Id);
+        Assert.Contains(restored.Configuration(station.StationId, catalog, PackDefinition.FromCatalog(catalog), 2).Profiles, p => p.Id == profile.Id);
+        Assert.Equal(2, new DeploymentStore(_root, clock).Snapshot().Profiles.Single(p => p.Id == profile.Id).Revision);
+        Assert.True(File.Exists(Path.Combine(_root, "deployment-v1.json.before-v3.bak")));
+        restored.Sync(station.StationId, new(1, 3, state.Images, state.Sessions, state.Batches, state.Jobs));
+    }
+    [Fact]
+    public void Latest_jobs_require_station_capability_and_matching_definition()
+    {
+        var store = new DeploymentStore(_root, new Clock()); var station = store.Enroll(new(1, store.CreateCode().Code, "Station"));
+        store.Sync(station.StationId, new(1, 3, [Image], [Session()], [], []));
+        var app = new PackApplication(new string('c', 32), "Google.Chrome", "Chrome", "154"); var catalog = new PackCatalog(7, [app]);
+        var request = new ProfileRequest(null, 0, "Latest", Image.Id, 6, "es-ES", "Usuario", [app.Id], false);
+        Assert.Throws<InvalidDataException>(() => store.SaveProfile(request, catalog, new(7, [])));
+        var profile = store.SaveProfile(request, catalog, PackDefinition.FromCatalog(catalog));
+        var queue = Queue(); queue.Confirm(Confirmation() with { ProfileId = profile.Id, ProfileRevision = profile.Revision }, profile, true, Now);
+        var state = queue.Snapshot();
+        Assert.Throws<InvalidDataException>(() => store.Sync(station.StationId, new(1, 3, state.Images, state.Sessions, state.Batches, state.Jobs)));
+        store.Sync(station.StationId, new(1, 3, state.Images, state.Sessions, state.Batches, state.Jobs, ComponentPolicyVersion: 2));
+        Assert.NotNull(store.Snapshot().Jobs[station.StationId].Single().Profile.ApplicationDefinition);
+    }
+    [Fact]
+    public void Latest_job_cannot_report_success_without_complete_matching_application_results()
+    {
+        var app = new PackApplication(new string('c', 32), "Google.Chrome", "Chrome", "155");
+        var catalog = new PackCatalog(7, [app]); var profile = Profile with { Applications = catalog, ApplicationDefinition = PackDefinition.FromCatalog(catalog) };
+        var queue = Queue(); var batch = queue.Confirm(Confirmation(), profile, true, Now); queue.Acknowledge(batch.JobIds);
+        var job = queue.Claim(Session().Id, _ => true, Now)!;
+        var success = new DeploymentProgress(job.Id, 1, DeploymentState.Completed, "Verified", null, true, true, true);
+        Assert.Throws<InvalidDataException>(() => queue.Progress(success));
+        var failed = new PackRun { Items = [new() { Application = app, State = PackItemState.Failed, Message = "Unavailable" }] };
+        Assert.Throws<InvalidDataException>(() => queue.Progress(success with { ApplicationResult = failed }));
+        queue.Progress(new(job.Id, 1, DeploymentState.PostInstall, "Pending", null, true, true, ApplicationResult: failed));
+        Assert.Throws<InvalidDataException>(() => queue.Progress(success with { Sequence = 2 }));
+        var verified = new PackRun { Items = [new() { Application = app, State = PackItemState.Succeeded, InstalledVersion = "155" }] };
+        var oldVerification = new PackRun { Items = [new() { Application = app, State = PackItemState.Succeeded }] };
+        // A legacy success is visible while being rechecked, but cannot complete a new-policy job without actual version evidence.
+        DeploymentPolicy.ApplicationResult(profile, oldVerification, false);
+        Assert.Throws<InvalidDataException>(() => DeploymentPolicy.ApplicationResult(profile, oldVerification, true));
+        queue.Progress(success with { Sequence = 2, ApplicationResult = verified });
+        verified.Items.Clear(); Assert.Equal("155", queue.Snapshot().Jobs.Single().ApplicationResult!.Items.Single().InstalledVersion);
+        Assert.Throws<InvalidDataException>(() => DeploymentPolicy.ApplicationResult(profile, new PackRun { Items = [new() {
+            Application = app with { WingetId = "Another.App" }, State = PackItemState.Succeeded }] }, true));
+    }
+    [Fact]
     public async Task Only_compatible_validated_private_packages_are_offered_and_hash_changes_remove_download()
     {
         byte[] bytes = [1, 2, 3, 4]; var hashes = new Dictionary<string, string> { ["ipxe-shim.efi"] = new('a', 64), ["ipxe.efi"] = new('b', 64), ["wimboot"] = new('c', 64), ["boot.wim"] = new('d', 64) };

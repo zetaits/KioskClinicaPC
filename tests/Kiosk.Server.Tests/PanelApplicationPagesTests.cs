@@ -91,6 +91,24 @@ public sealed class PanelApplicationPagesTests : IDisposable
         Assert.Empty(_factory.Services.GetRequiredService<InitialSetupSessionStore>().Recent());
     }
 
+    [Fact]
+    public async Task New_index_version_updates_observation_and_legacy_projection_without_changing_definition()
+    {
+        using var client = PanelClient();
+        var catalog = _factory.Services.GetRequiredService<PackCatalogStore>();
+        catalog.Import(new(DateTime.UtcNow.AddMinutes(-1), [new("Google.Chrome", "Google Chrome", "Google LLC", "154.0", true)]));
+        catalog.Add("Google.Chrome"); var before = catalog.Definition();
+        catalog.Import(new(DateTime.UtcNow, [new("Google.Chrome", "Google Chrome", "Google LLC", "155.0", true)]));
+        string html = WebUtility.HtmlDecode(await client.GetStringAsync("/aplicaciones"));
+        Assert.Contains("Última versión compatible", html); Assert.Contains("155.0", html);
+        Assert.DoesNotContain("Actualizar versiones del pack", html);
+        Assert.Equal(before.Revision, catalog.Definition().Revision);
+        Assert.Equal("155.0", catalog.Snapshot().Applications.Single().PinnedVersion);
+        catalog.UpdateVersions();
+        html = WebUtility.HtmlDecode(await client.GetStringAsync("/aplicaciones"));
+        Assert.Contains("Última versión compatible", html); Assert.Contains("155.0", html);
+    }
+
     [Theory]
     [InlineData("device=11111111111111111111111111111111")]
     [InlineData("ok=Uploaded")]

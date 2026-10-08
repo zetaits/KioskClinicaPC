@@ -34,6 +34,17 @@ public sealed class WorkerSessionTests
         await Assert.ThrowsAsync<IOException>(() => worker.Preflight(Catalog, false, _ => { }, CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(20)));
     }
     [Fact]
+    public async Task Partial_option_is_sent_to_worker_and_nonzero_result_stays_incomplete()
+    {
+        const string script = "$request=[Console]::ReadLine() | ConvertFrom-Json; if(!$request.allowPartial){exit 1}; " +
+            "[Console]::WriteLine('{\"kind\":\"preflight-ready\",\"message\":\"Only available apps\"}'); " +
+            "$command=[Console]::ReadLine(); if($command -ne 'install'){exit 1}; " +
+            "[Console]::WriteLine('{\"kind\":\"result\",\"message\":\"One unavailable app\",\"exitCode\":2}'); exit 2";
+        await using var worker = new PackSession("unused", _ => { }, _ => Fake(script));
+        Assert.True(await worker.Preflight(Catalog, true, _ => { }, CancellationToken.None, allowPartial: true));
+        Assert.False(await worker.Install(_ => { }, CancellationToken.None));
+    }
+    [Fact]
     public async Task Cancellation_is_sent_over_stdin_and_worker_is_allowed_to_finish()
     {
         const string script = "[Console]::ReadLine() | Out-Null; [Console]::WriteLine('{\"kind\":\"preflight-ready\",\"message\":\"Ready\"}'); " +

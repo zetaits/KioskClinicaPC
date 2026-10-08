@@ -12,10 +12,10 @@ public sealed class EquipmentExecutionTests
     private static EquipmentRequest Request(bool pack = true, bool kiosk = true) => new(pack, kiosk, 10, pack ? [new(App.Id, App.PinnedVersion)] : [], true);
     private sealed class Pack(List<string> calls) : IEquipmentPackSession
     {
-        public bool PreflightOk = true, Complete = true;
+        public bool PreflightOk = true, Complete = true, AllowPartial;
         public bool RebootRequired { get; set; }
-        public Task<bool> Preflight(PackCatalog snapshot, bool resume, Action<EquipmentEvent> progress, CancellationToken ct)
-        { calls.Add("check-all"); Assert.Equal(Catalog.Revision, snapshot.Revision); Assert.Equal(Catalog.Applications, snapshot.Applications); progress(new("applications", "Comprobado")); return Task.FromResult(PreflightOk); }
+        public Task<bool> Preflight(PackCatalog snapshot, bool resume, Action<EquipmentEvent> progress, CancellationToken ct, bool allowPartial = false)
+        { AllowPartial = allowPartial; calls.Add("check-all"); Assert.Equal(Catalog.Revision, snapshot.Revision); Assert.Equal(Catalog.Applications, snapshot.Applications); progress(new("applications", "Comprobado")); return Task.FromResult(PreflightOk); }
         public Task<bool> Install(Action<EquipmentEvent> progress, CancellationToken ct) { calls.Add("pack"); ct.ThrowIfCancellationRequested(); return Task.FromResult(Complete); }
         public ValueTask DisposeAsync() { calls.Add("dispose"); return ValueTask.CompletedTask; }
     }
@@ -56,6 +56,15 @@ public sealed class EquipmentExecutionTests
         Assert.Equal(1, result.ExitCode); Assert.Equal(new[] { "check-all", "dispose" }, calls);
     }
     [Fact]
+    public async Task Partial_pack_option_reaches_worker_and_preserves_incomplete_result_and_verified_kiosk()
+    {
+        var calls = new List<string>(); var pack = new Pack(calls) { Complete = false };
+        var result = await new EquipmentExecution(_ => Task.FromResult(Catalog), () => pack, new Kiosk(calls))
+            .Run(Request() with { AllowPartialPack = true }, _ => { }, CancellationToken.None);
+        Assert.True(pack.AllowPartial); Assert.True(result.KioskVerified); Assert.Equal(2, result.ExitCode);
+        Assert.Equal(new[] { "check-all", "kiosk", "pack", "dispose" }, calls);
+    }
+    [Fact]
     public async Task Cancel_after_kiosk_retains_verified_component_and_does_not_start_pack()
     {
         using var cancel = new CancellationTokenSource(); var calls = new List<string>(); var pack = new Pack(calls);
@@ -79,6 +88,18 @@ public sealed class EquipmentExecutionTests
         Assert.Throws<ArgumentException>(() => EquipmentPolicy.ValidateRequest(Request(false, true) with { Applications = [new(App.Id, "2")] }));
     }
     [Fact]
+    public void Latest_selection_ignores_observed_versions_but_requires_same_definition_and_policy()
+    {
+        var authorized = PackDefinition.FromCatalog(Catalog).ForExecution();
+        var request = Request() with { ResolveLatest = true, Applications = [new(App.Id, "stale observation")] };
+        var snapshot = EquipmentPolicy.Snapshot(request, authorized);
+        Assert.Empty(snapshot.Applications.Single().PinnedVersion); Assert.NotNull(snapshot.Definition);
+        authorized.Definition!.Applications.Clear(); Assert.Single(snapshot.Definition!.Applications);
+        Assert.Throws<SelectionChangedException>(() => EquipmentPolicy.Snapshot(request, Catalog));
+        Assert.Throws<SelectionChangedException>(() => EquipmentPolicy.Snapshot(Request(), PackDefinition.FromCatalog(Catalog).ForExecution()));
+        Assert.Throws<SelectionChangedException>(() => EquipmentPolicy.Snapshot(request with { CatalogRevision = 9 }, PackDefinition.FromCatalog(Catalog).ForExecution()));
+    }
+    [Fact]
     public void Authorized_snapshot_has_no_alias_to_mutable_catalogue_list()
     {
         var catalog = Catalog; var snapshot = EquipmentPolicy.Snapshot(Request(), catalog);
@@ -96,8 +117,8 @@ public sealed class EquipmentExecutionTests
     }
     private static HttpResponseMessage Response(PackCatalog catalog, bool version = true)
     {
-        var response = new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(catalog) };
-        if (version) response.Headers.Add("X-Setup-Catalog-Version", "2"); return response;
+        var response = new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(PackDefinition.FromCatalog(catalog)) };
+        if (version) response.Headers.Add("X-Setup-Catalog-Version", "3"); return response;
     }
     [Fact]
     public async Task Catalogue_retries_transient_failures_only_and_never_uses_private_catalogue()
@@ -106,7 +127,7 @@ public sealed class EquipmentExecutionTests
         using var http = new HttpClient(handler);
         var catalog = await new EquipmentCatalogClient(http, new("https://panel.invalid", "fictional-key"), (_, _) => Task.CompletedTask).Load(CancellationToken.None);
         Assert.Equal(10, catalog.Revision); Assert.Equal(3, handler.Attempts);
-        Assert.All(handler.Paths, path => Assert.Equal("/api/setup/v2/catalog", path));
+        Assert.All(handler.Paths, path => Assert.Equal("/api/setup/v3/catalog", path));
     }
     [Theory]
     [InlineData(401, CatalogFailure.Unauthorized, 1)]

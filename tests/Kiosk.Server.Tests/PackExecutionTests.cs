@@ -48,6 +48,46 @@ public sealed class PackExecutionTests
         Assert.DoesNotContain(backend.Calls, x => x.StartsWith("install"));
     }
     [Fact]
+    public async Task Partial_pack_installs_only_checked_apps_and_keeps_failure_in_saved_result()
+    {
+        var backend = new Backend { Reject = "1" }; var run = Run(); int gates = 0; PackRun? saved = null;
+        Assert.False(await PackExecution.Run(run, backend, ".", null, value => saved = value, false, CancellationToken.None,
+            () => { gates++; Assert.Equal(new[] { "check0", "check1", "check2" }, backend.Calls); return Task.FromResult(true); }, allowPartial: true));
+        Assert.Equal(new[] { "check0", "check1", "check2", "install0", "install2" }, backend.Calls);
+        Assert.Equal(1, gates); Assert.Same(run, saved); Assert.False(run.Complete);
+        Assert.Equal(PackItemState.Failed, run.Items[1].State); Assert.Equal("No compatible", run.Items[1].Message);
+        Assert.Equal(PackItemState.Succeeded, run.Items[0].State); Assert.Equal(PackItemState.Succeeded, run.Items[2].State);
+    }
+    [Fact]
+    public async Task Partial_option_does_not_override_preflight_only_or_active_native_install()
+    {
+        var backend = new Backend { Reject = "1" }; var run = Run();
+        Assert.False(await PackExecution.Run(run, backend, ".", null, _ => { }, true, CancellationToken.None, allowPartial: true));
+        Assert.DoesNotContain(backend.Calls, x => x.StartsWith("install"));
+        run.Items[0].State = PackItemState.Installing;
+        Assert.False(await PackExecution.Run(run, backend, ".", null, _ => { }, false, CancellationToken.None,
+            () => throw new Exception("Must not start Kiosk"), allowPartial: true));
+        Assert.DoesNotContain(backend.Calls, x => x.StartsWith("install"));
+    }
+    [Fact]
+    public async Task Partial_option_does_not_continue_if_all_apps_failed_preflight()
+    {
+        var backend = new Backend { Reject = "1" }; var run = Run(); run.Items = [run.Items[1]];
+        Assert.False(await PackExecution.Run(run, backend, ".", null, _ => { }, false, CancellationToken.None,
+            () => throw new Exception("Must not start Kiosk"), allowPartial: true));
+        Assert.Equal(new[] { "check1" }, backend.Calls);
+    }
+    [Fact]
+    public async Task Latest_policy_with_all_apps_unavailable_still_allows_independent_kiosk_component()
+    {
+        var backend = new Backend { Reject = "1" }; var run = Run(); run.Items = [run.Items[1]];
+        run.Definition = new(1, [new("1", "Vendor.App1", "App1")]); int gates = 0;
+        Assert.False(await PackExecution.Run(run, backend, ".", null, _ => { }, false, CancellationToken.None,
+            () => { gates++; return Task.FromResult(true); }, allowPartial: true));
+        Assert.Equal(1, gates); Assert.Equal(PackItemState.Failed, run.Items.Single().State);
+        Assert.Equal(new[] { "check1" }, backend.Calls);
+    }
+    [Fact]
     public async Task Ordinary_failure_continues_independent_apps_without_blind_retry()
     {
         var backend = new Backend { Fail = "1" }; var run = Run();

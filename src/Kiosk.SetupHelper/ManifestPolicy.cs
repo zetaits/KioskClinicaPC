@@ -3,6 +3,7 @@ using System.Net;
 using System.Net.Http;
 using System.Text.RegularExpressions;
 using YamlDotNet.RepresentationModel;
+using KioskClinicaPC.Core.Sync;
 
 namespace Kiosk.SetupHelper;
 
@@ -47,7 +48,7 @@ internal static class ManifestPolicy
         });
     }
     private static YamlNode? Node(YamlMappingNode map, string key) => map.Children.TryGetValue(new YamlScalarNode(key), out var value) ? value : null;
-    public static async Task ValidateOnline(string id, string version, string architecture, string type)
+    public static async Task ValidateOnline(string id, string version, string architecture, string type, CancellationToken ct = default)
     {
         string directory = RelativeDirectory(id, version);
         foreach (string name in new[] { id + ".installer.yaml", id + ".yaml" })
@@ -57,17 +58,22 @@ internal static class ManifestPolicy
             {
                 try
                 {
-                    using var response = await Http.GetAsync(url);
+                    using var response = await Http.GetAsync(url, ct);
                     if (response.StatusCode == HttpStatusCode.NotFound) break;
                     response.EnsureSuccessStatusCode();
-                    if (!SupportsSilentMachine(await response.Content.ReadAsStringAsync(), architecture, type))
+                    if (!SupportsSilentMachine(await response.Content.ReadAsStringAsync(ct), architecture, type))
                         throw new InvalidDataException("El manifiesto oficial no declara instalación silenciosa machine-wide para el instalador aplicable.");
                     return;
                 }
-                catch (HttpRequestException ex) when (attempt < 2 && (ex.StatusCode == null || (int)ex.StatusCode >= 500)) { await Task.Delay(1000 * (attempt + 1)); }
+                catch (HttpRequestException ex) when (attempt < 2 && (ex.StatusCode == null || ex.StatusCode is HttpStatusCode.RequestTimeout or HttpStatusCode.TooManyRequests || (int)ex.StatusCode >= 500)) { await Task.Delay(1000 * (attempt + 1), ct); }
+                catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+                {
+                    if (attempt >= 2) throw new IOException("El manifiesto oficial no respondió después de tres intentos.");
+                    await Task.Delay(1000 * (attempt + 1), ct);
+                }
             }
         }
-        throw new InvalidDataException("No se pudo validar el manifiesto oficial de la versión fijada.");
+        throw new CatalogDriftException("El manifiesto oficial de esta versión ya no está disponible.");
     }
     public static bool ValidateLocal(string repository, string id, string version)
     {

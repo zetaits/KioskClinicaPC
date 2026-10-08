@@ -8,6 +8,9 @@ internal sealed class WinGetEngine : IPackBackend
 {
     private readonly PackageManager _manager;
     private readonly Action<string>? _phase, _info;
+    private bool _latest;
+    private PackCatalogSession? _catalogSession;
+    private CancellationToken _preflightToken;
     public WinGetEngine(Action<string>? phase = null, Action<string>? info = null)
     {
         (_phase, _info) = (phase, info);
@@ -21,14 +24,37 @@ internal sealed class WinGetEngine : IPackBackend
         if (!Version.TryParse(_manager.Version.TrimStart('v'), out var version) || version < new Version(1, 29, 380))
             throw new System.Runtime.InteropServices.COMException("Se necesita WinGet 1.29.380 o superior.", unchecked((int)0x80004002));
     }
-    private async Task<PackageCatalog> Connect(bool installed)
+    private PackageCatalogReference OfficialSource()
     {
         _phase?.Invoke("Locating and validating official winget source");
-        var source = _manager.GetPackageCatalogByName("winget") ?? throw new InvalidOperationException("Falta el origen oficial winget.");
+        var source = _manager.GetPackageCatalogByName("winget") ?? throw new IOException("Falta el origen oficial winget.");
         // Do not trust a source merely because it was named winget.
         if (!source.Info.Argument.Equals("https://cdn.winget.microsoft.com/cache", StringComparison.OrdinalIgnoreCase))
-            throw new InvalidOperationException("El origen winget no corresponde al catálogo oficial de Microsoft.");
+            throw new KioskClinicaPC.Equipment.NativeStateException("El origen winget no corresponde al catálogo oficial de Microsoft.");
         source.AcceptSourceAgreements = true;
+        return source;
+    }
+    public async Task PrepareLatest(CancellationToken ct)
+    {
+        _latest = true; _preflightToken = ct;
+        _catalogSession = new PackCatalogSession(Refresh);
+        await _catalogSession.Prepare(ct);
+    }
+    private async Task Refresh(CancellationToken ct)
+    {
+        _phase?.Invoke("Actualizando el catálogo oficial WinGet…");
+        var source = OfficialSource();
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct); timeout.CancelAfter(TimeSpan.FromMinutes(2));
+        var operation = source.RefreshPackageCatalogAsync();
+        using var registration = timeout.Token.Register(operation.Cancel);
+        RefreshPackageCatalogResult result;
+        try { result = await operation.AsTask().WaitAsync(timeout.Token); }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested) { throw new IOException("El catálogo WinGet no respondió en dos minutos."); }
+        if (result.Status != RefreshPackageCatalogStatus.Ok) throw new IOException($"Actualización WinGet fallida ({result.Status}).");
+    }
+    private async Task<PackageCatalog> Connect(bool installed)
+    {
+        var source = OfficialSource();
         if (installed)
         {
             var options = WinGetActivation.Create<CreateCompositePackageCatalogOptions>();
@@ -50,10 +76,10 @@ internal sealed class WinGetEngine : IPackBackend
         var options = WinGetActivation.Create<FindPackagesOptions>(); options.Selectors.Add(filter);
         var result = await catalog.FindPackagesAsync(options);
         if (result.Status != FindPackagesResultStatus.Ok || result.Matches.Count != 1)
-            throw new InvalidDataException($"No se encuentra exactamente {id} en WinGet.");
+            throw new CatalogDriftException($"No se encuentra exactamente {id} en el catálogo oficial WinGet.");
         return result.Matches[0].CatalogPackage;
     }
-    private static InstallOptions Options(CatalogPackage package, PackApplication app, string log)
+    private static InstallOptions Options(CatalogPackage package, PackApplication app, string log, string? channel = null)
     {
         // Some WinGet server versions expose IVectorView but not IIterable for this WinRT collection.
         // Indexing uses the stable public API, without depending on the optional iterator interface.
@@ -61,11 +87,11 @@ internal sealed class WinGetEngine : IPackBackend
         var versions = package.AvailableVersions;
         for (int i = 0; i < versions.Count; i++)
         {
-            if (versions[i].Version != app.PinnedVersion) continue;
+            if (versions[i].Version != app.PinnedVersion || (channel is not null && versions[i].Channel != channel)) continue;
             if (version != null) throw new InvalidDataException("Versión ambigua entre canales del catálogo.");
             version = versions[i];
         }
-        if (version == null) throw new InvalidDataException($"La versión fijada {app.PinnedVersion} ya no está disponible.");
+        if (version == null) throw new CatalogDriftException($"La versión resuelta {app.PinnedVersion} no está disponible en WinGet. Reanuda los pendientes para comprobar las versiones actuales.");
         var options = WinGetActivation.Create<InstallOptions>();
         options.PackageVersionId = version; options.PackageInstallScope = PackageInstallScope.System;
         options.PackageInstallMode = PackageInstallMode.Silent; options.AcceptPackageAgreements = true;
@@ -84,20 +110,60 @@ internal sealed class WinGetEngine : IPackBackend
         installed.CompareToVersion(version) is CompareResult.Equal or CompareResult.Greater;
     public async Task Preflight(PackItemResult item, string log)
     {
+        if (_catalogSession is not null) await _catalogSession.Check(() => Check(item, log), _preflightToken);
+        else await Check(item, log);
+    }
+    private async Task Check(PackItemResult item, string log)
+    {
         var package = await Find(item.Application.WingetId);
         if (_manager.GetInstallProgress(package, _manager.GetPackageCatalogByName("winget").Info) is { } active && active.Status == Windows.Foundation.AsyncStatus.Started)
+        {
+            item.RequiresRebootBeforeRetry = true;
             throw new InvalidOperationException("WinGet todavía tiene una instalación activa de esta aplicación. Espera antes de reanudar.");
-        if (Verified(package, item.Application.PinnedVersion)) { item.State = PackItemState.AlreadyInstalled; item.Message = "Ya instalada (versión igual o superior, todo el equipo)."; return; }
+        }
+        if (!item.ResolveLatest && Verified(package, item.Application.PinnedVersion))
+        { item.InstalledVersion = package.InstalledVersion.Version; item.State = PackItemState.AlreadyInstalled; item.Message = "Ya instalada y verificada (todo el equipo)."; return; }
+        if (_latest) await Resolve(package, item, log);
         // Never silently replace a user's copy or accept unknown version/scope.
         if (package.InstalledVersion is { } installed &&
             (!installed.GetMetadata(PackageVersionMetadataField.InstalledScope).Equals("machine", StringComparison.OrdinalIgnoreCase) ||
              installed.CompareToVersion(item.Application.PinnedVersion) == CompareResult.Unknown))
             throw new InvalidDataException("Ya existe una instalación por usuario o de versión desconocida; requiere revisión.");
-        var options = Options(package, item.Application, log);
+        if (Verified(package, item.Application.PinnedVersion))
+        { item.InstalledVersion = package.InstalledVersion.Version; item.State = PackItemState.AlreadyInstalled; item.Message = "Ya instalada (versión igual o superior, todo el equipo)."; return; }
+        var options = Options(package, item.Application, log, item.ResolvedChannel);
         var installer = package.GetPackageVersionInfo(options.PackageVersionId).GetApplicableInstaller(options);
         string type = (installer.InstallerType == PackageInstallerType.Zip ? installer.NestedInstallerType : installer.InstallerType).ToString().ToLowerInvariant();
-        await ManifestPolicy.ValidateOnline(item.Application.WingetId, item.Application.PinnedVersion, installer.Architecture.ToString().ToLowerInvariant(), type);
+        if (!_latest) await ManifestPolicy.ValidateOnline(item.Application.WingetId, item.Application.PinnedVersion, installer.Architecture.ToString().ToLowerInvariant(), type, _preflightToken);
         item.State = PackItemState.Pending; item.Message = "Comprobación previa correcta.";
+    }
+    private async Task Resolve(CatalogPackage package, PackItemResult item, string log)
+    {
+        var defaultVersion = package.DefaultInstallVersion ?? throw new CatalogDriftException("WinGet no ofrece una versión aplicable de esta aplicación.");
+        var keys = new Dictionary<PackVersionCandidate, PackageVersionId>();
+        var available = package.AvailableVersions;
+        for (int i = 0; i < available.Count; i++)
+        {
+            var key = available[i];
+            if (key.Channel != defaultVersion.Channel) continue;
+            if (!keys.TryAdd(new(key.Version, key.Channel), key)) throw new InvalidDataException("Versión ambigua en el catálogo oficial.");
+        }
+        var selected = await PackVersionPolicy.Select(keys.Keys, defaultVersion.Channel, (a, b) =>
+            package.GetPackageVersionInfo(keys[a]).CompareToVersion(b.Version) switch
+            { CompareResult.Greater => 1, CompareResult.Equal => 0, CompareResult.Lesser => -1, _ => null }, async candidate =>
+        {
+            var application = item.Application with { PinnedVersion = candidate.Version };
+            InstallOptions options;
+            try { options = Options(package, application, log, candidate.Channel); }
+            catch (InvalidDataException) { return false; }
+            var installer = package.GetPackageVersionInfo(options.PackageVersionId).GetApplicableInstaller(options);
+            var type = (installer.InstallerType == PackageInstallerType.Zip ? installer.NestedInstallerType : installer.InstallerType).ToString().ToLowerInvariant();
+            try { await ManifestPolicy.ValidateOnline(application.WingetId, candidate.Version, installer.Architecture.ToString().ToLowerInvariant(), type, _preflightToken); }
+            catch (InvalidDataException) { return false; }
+            return true;
+        }, _preflightToken);
+        item.Application = item.Application with { PinnedVersion = selected.Version };
+        item.ResolvedChannel = selected.Channel; item.ResolveLatest = false;
     }
     public async Task<PackItemResult> Inspect(string id, string version)
     {
@@ -108,8 +174,8 @@ internal sealed class WinGetEngine : IPackBackend
     public async Task Install(PackItemResult item, string log, Action<string> progress, CancellationToken ct)
     {
         var package = await Find(item.Application.WingetId);
-        if (Verified(package, item.Application.PinnedVersion)) { item.State = PackItemState.AlreadyInstalled; item.Message = "Ya instalada y verificada."; return; }
-        var options = Options(package, item.Application, log);
+        if (Verified(package, item.Application.PinnedVersion)) { item.InstalledVersion = package.InstalledVersion.Version; item.State = PackItemState.AlreadyInstalled; item.Message = "Ya instalada y verificada."; return; }
+        var options = Options(package, item.Application, log, item.ResolvedChannel);
         Windows.Foundation.IAsyncOperationWithProgress<InstallResult, InstallProgress> operation;
         try { operation = package.InstalledVersion == null ? _manager.InstallPackageAsync(package, options) : _manager.UpgradePackageAsync(package, options); }
         catch (System.Runtime.InteropServices.COMException ex)
@@ -140,8 +206,9 @@ internal sealed class WinGetEngine : IPackBackend
         {
             for (int attempt = 0; attempt < 6; attempt++)
             {
-                if (Verified(await Find(item.Application.WingetId), item.Application.PinnedVersion))
-                { item.State = PackItemState.Succeeded; item.Message = "Instalada y verificada."; return; }
+                var installed = await Find(item.Application.WingetId);
+                if (Verified(installed, item.Application.PinnedVersion))
+                { item.InstalledVersion = installed.InstalledVersion.Version; item.State = PackItemState.Succeeded; item.Message = "Instalada y verificada."; return; }
                 await Task.Delay(TimeSpan.FromSeconds(5), ct);
             }
         }

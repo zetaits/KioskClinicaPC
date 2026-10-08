@@ -1,5 +1,5 @@
 param(
-    [string]$Version = '0.1.0',
+    [string]$Version = '0.2.0',
     [Parameter(Mandatory)][string]$BootDirectory,
     [string]$Validation,
     [string]$WorkerZip,
@@ -18,10 +18,21 @@ foreach ($name in @('ipxe-shim.efi','ipxe.efi','shimx64.efi','wimboot','BCD','bo
 }
 $sourceCommit = (& git -C $PSScriptRoot rev-parse HEAD).Trim()
 if ($LASTEXITCODE -ne 0 -or $sourceCommit -notmatch '^[a-f0-9]{40}$') { throw 'No se pudo determinar el commit de origen.' }
+if ($WorkerZip) {
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $workerArchive = [IO.Compression.ZipFile]::OpenRead([IO.Path]::GetFullPath($WorkerZip))
+    try {
+        $entry = $workerArchive.GetEntry('pack-worker.json')
+        if (-not $entry -or $entry.Length -gt 4096) { throw 'Reconstruye worker.zip con el asistente 1.4.0 o posterior: falta la compatibilidad v3.' }
+        $reader = [IO.StreamReader]::new($entry.Open())
+        try { $metadata = $reader.ReadToEnd() | ConvertFrom-Json } finally { $reader.Dispose() }
+        if ($metadata.schemaVersion -ne 1 -or $metadata.catalogApiVersion -ne 3 -or $metadata.workerVersion -notmatch '^\d+\.\d+\.\d+$' -or $metadata.sourceCommit -notmatch '^[a-fA-F0-9]{40}$') { throw 'El trabajador no admite la política de versiones actuales.' }
+    } finally { $workerArchive.Dispose() }
+}
 $validated = $false
 if ($Validation) {
     $evidence = Get-Content -LiteralPath $Validation -Raw | ConvertFrom-Json
-    $checks = @('pxeRealNetworkSecureBoot','homeUefiSecureBoot','proUefiSecureBoot','threeSimultaneous','twoPhysicalModels','nonSelectedDiskIntact','vpsDisconnect','localNetworkDisconnect','stationRestart','windowsOnly','windowsPack','windowsPackKiosk','desktopAccountCleanupTracking')
+    $checks = @('pxeRealNetworkSecureBoot','homeUefiSecureBoot','proUefiSecureBoot','threeSimultaneous','twoPhysicalModels','nonSelectedDiskIntact','vpsDisconnect','localNetworkDisconnect','stationRestart','windowsOnly','windowsPack','windowsPackKiosk','desktopAccountCleanupTracking','packUnavailableContinues','packResumeVerifiedOnly','packFrozenAfterPreflight','packNativeUncertainStops','legacyConfirmedJobUnchanged')
     $validated = $evidence.schemaVersion -eq 1 -and $evidence.sourceCommit -eq $sourceCommit -and $evidence.operator -and $evidence.evidence -and $evidence.validatedAtUtc
     foreach ($check in $checks) { if ($evidence.checks.$check -ne $true) { $validated = $false } }
     foreach ($name in $hashes.PSObject.Properties.Name) { if ($evidence.bootHashes.$name -ne $hashes.$name) { $validated = $false } }

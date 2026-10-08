@@ -1,5 +1,5 @@
 param(
-    [string]$Version = '1.3.0',
+    [string]$Version = '1.4.0',
     [string]$KioskVersion,
     [switch]$Publish
 )
@@ -46,6 +46,9 @@ try {
     & $dotnet publish (Join-Path $root 'src\Kiosk.SetupHelper\Kiosk.SetupHelper.csproj') -c Release -r win-x64 --self-contained true -p:PublishSingleFile=false -p:Version=$Version -p:DebugType=None -p:DebugSymbols=false -o $worker -nologo @buildArgs
     if ($LASTEXITCODE -ne 0) { throw 'No se pudo publicar el trabajador WinGet.' }
     if (-not (Test-Path -LiteralPath (Join-Path $worker 'Microsoft.Management.Deployment.winmd'))) { throw 'Faltan los metadatos físicos WinGet.' }
+    [IO.File]::WriteAllText((Join-Path $worker 'pack-worker.json'), (@{
+        schemaVersion=1; catalogApiVersion=3; workerVersion=$Version; sourceCommit=$sourceCommit
+    } | ConvertTo-Json), [Text.UTF8Encoding]::new($false))
     # Windows PowerShell Compress-Archive writes backslash paths. Always emit canonical ZIP paths.
     Add-Type -AssemblyName System.IO.Compression, System.IO.Compression.FileSystem
     $archive = [IO.Compression.ZipFile]::Open((Join-Path $resources 'worker.zip'), [IO.Compression.ZipArchiveMode]::Create)
@@ -56,7 +59,7 @@ try {
         }
     } finally { $archive.Dispose() }
     $payload = [ordered]@{
-        schemaVersion = 2; installerKind = 'equipment-wpf'; catalogApiVersion = 2; sourceCommit = $sourceCommit
+        schemaVersion = 2; installerKind = 'equipment-wpf'; catalogApiVersion = 3; sourceCommit = $sourceCommit
         assistantVersion = $Version; workerVersion = $Version; kioskVersion = $KioskVersion
         workerSha256 = (Get-FileHash -LiteralPath (Join-Path $resources 'worker.zip') -Algorithm SHA256).Hash.ToLowerInvariant()
         kioskSha256 = (Get-FileHash -LiteralPath (Join-Path $resources 'kiosk.exe') -Algorithm SHA256).Hash.ToLowerInvariant()
@@ -78,7 +81,7 @@ try {
     $process.Dispose()
     $info = Get-Item -LiteralPath $setup
     $manifest = [ordered]@{
-        schemaVersion = 2; installerKind = 'equipment-wpf'; catalogApiVersion = 2; sourceCommit = $sourceCommit
+        schemaVersion = 2; installerKind = 'equipment-wpf'; catalogApiVersion = 3; sourceCommit = $sourceCommit
         version = $Version; assistantVersion = $Version; workerVersion = $Version; kioskVersion = $KioskVersion
         fileName = $info.Name; sizeBytes = $info.Length; sha256 = (Get-FileHash -LiteralPath $setup -Algorithm SHA256).Hash.ToLowerInvariant()
         serverUrl = $serverUrl; createdAtUtc = [DateTime]::UtcNow.ToString('o')

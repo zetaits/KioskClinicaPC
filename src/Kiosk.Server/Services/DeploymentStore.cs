@@ -23,6 +23,15 @@ public sealed class DeploymentStore
         _state = AtomicState.Read(_path, () => new DeploymentServerState(1, [], [],
             [new("00000000000000000000000000000001", 1, "Solo Windows", null, null, "es-ES", "Usuario", new PackCatalog(0, []), false)]));
         DeploymentPolicy.Require(_state.SchemaVersion == 1, "Estado del despliegue incompatible.");
+        var migrated = _state.Profiles.GroupBy(p => p.Id).Select(g => g.MaxBy(p => p.Revision)!).Where(p =>
+            p.ApplicationDefinition is null && p.Applications.Applications.Count > 0).Select(p =>
+                p with { Revision = p.Revision + 1, ApplicationDefinition = PackDefinition.FromCatalog(p.Applications) }).ToList();
+        if (migrated.Count > 0)
+        {
+            foreach (var profile in migrated) KioskClinicaPC.Equipment.EquipmentCatalogClient.Validate(profile.ApplicationDefinition);
+            if (File.Exists(_path) && !File.Exists(_path + ".before-v3.bak")) File.Copy(_path, _path + ".before-v3.bak");
+            Commit(_state with { Profiles = [.. _state.Profiles, .. migrated] });
+        }
     }
     private void Commit(DeploymentServerState next) { AtomicState.Write(_path, next); _state = next; }
     private static string Hash(string value) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value)));
@@ -70,21 +79,30 @@ public sealed class DeploymentStore
             _state.Profiles.GroupBy(p => p.Id).Select(g => g.MaxBy(p => p.Revision)!).ToList(),
             _state.Stations.ToDictionary(s => s.Station.Id, s => s.Batches), _state.Stations.ToDictionary(s => s.Station.Id, s => s.Jobs)));
     }
-    public DeploymentConfiguration Configuration(string id, PackCatalog catalog)
+    public DeploymentConfiguration Configuration(string id, PackCatalog catalog, PackDefinition? definition = null, int componentPolicyVersion = 1)
     {
         lock (_gate)
         {
             var station = _state.Stations.Single(s => s.Station.Id == id && !s.Station.Revoked);
             return DeploymentPolicy.Copy(new DeploymentConfiguration(1,
-                _state.Profiles.GroupBy(p => p.Id).Select(g => g.MaxBy(p => p.Revision)!).ToList(), station.Station.Sessions, catalog));
+                _state.Profiles.GroupBy(p => p.Id).Select(g => g.MaxBy(p => p.Revision)!).Where(p =>
+                    componentPolicyVersion >= 2 || p.ApplicationDefinition is null).ToList(), station.Station.Sessions, catalog,
+                    componentPolicyVersion >= 2 ? definition : null, componentPolicyVersion >= 2 ? 2 : 1));
         }
     }
-    public DeploymentProfile SaveProfile(ProfileRequest request, PackCatalog catalog)
+    public DeploymentProfile SaveProfile(ProfileRequest request, PackCatalog catalog, PackDefinition? definition = null)
     {
         DeploymentPolicy.Username(request.Username);
         DeploymentPolicy.Require(request.Language == "es-ES" && !string.IsNullOrWhiteSpace(request.Name) && request.Name.Trim().Length <= 100 && request.ApplicationIds is not null &&
             request.ApplicationIds.Count <= 1000 && request.ApplicationIds.Distinct().Count() == request.ApplicationIds.Count &&
             request.ApplicationIds.All(id => catalog.Applications.Any(a => a.Id == id)), "Perfil no válido. Revisa idioma y aplicaciones.");
+        if (definition is not null)
+        {
+            KioskClinicaPC.Equipment.EquipmentCatalogClient.Validate(definition);
+            DeploymentPolicy.Require(request.ApplicationIds.All(id => definition.Applications.Any(a => a.Id == id &&
+                catalog.Applications.Any(c => c.Id == a.Id && c.WingetId == a.WingetId))),
+                "El pack cambió mientras se guardaba el perfil. Recarga y revisa las aplicaciones.");
+        }
         lock (_gate)
         {
             var previous = request.Id is null ? null : _state.Profiles.Where(p => p.Id == request.Id).MaxBy(p => p.Revision);
@@ -95,7 +113,9 @@ public sealed class DeploymentStore
                 "Selecciona una imagen y edición disponibles en una estación vinculada.");
             var profile = new DeploymentProfile(previous?.Id ?? Guid.NewGuid().ToString("N"), (previous?.Revision ?? 0) + 1,
                 request.Name.Trim(), request.ImageId, request.EditionIndex, request.Language, request.Username,
-                DeploymentPolicy.Copy(new PackCatalog(catalog.Revision, catalog.Applications.Where(a => request.ApplicationIds.Contains(a.Id)).ToList())), request.Kiosk);
+                DeploymentPolicy.Copy(new PackCatalog(catalog.Revision, catalog.Applications.Where(a => request.ApplicationIds.Contains(a.Id)).ToList())), request.Kiosk,
+                definition is null || request.ApplicationIds.Count == 0 ? null : new(definition.Revision, definition.Applications.Where(a => request.ApplicationIds.Contains(a.Id)).ToList()));
+            if (profile.ApplicationDefinition is not null) KioskClinicaPC.Equipment.EquipmentCatalogClient.Validate(profile.ApplicationDefinition);
             Commit(_state with { Profiles = [.. _state.Profiles, profile] }); return DeploymentPolicy.Copy(profile);
         }
     }
@@ -115,7 +135,7 @@ public sealed class DeploymentStore
     }
     public void Sync(string id, DeploymentInventory inventory)
     {
-        DeploymentPolicy.Require(inventory.ProtocolVersion == 1 && inventory.Capacity is >= 1 and <= 8 && inventory.Images is not null &&
+        DeploymentPolicy.Require(inventory.ProtocolVersion == 1 && inventory.ComponentPolicyVersion is 1 or 2 && inventory.Capacity is >= 1 and <= 8 && inventory.Images is not null &&
             inventory.Sessions is not null && inventory.Jobs is not null && inventory.Batches is not null &&
             inventory.Images.Count <= 100 && inventory.Sessions.Count <= 1000 && inventory.Jobs.Count <= 10000 && inventory.Batches.Count <= 10000,
             "Inventario incompatible o demasiado grande.");
@@ -133,6 +153,8 @@ public sealed class DeploymentStore
             {
                 var session = previous.Station.Sessions.Find(s => s.Id == job.SessionId);
                 var profile = _state.Profiles.Where(p => p.Id == job.Profile.Id).MaxBy(p => p.Revision);
+                DeploymentPolicy.Require(job.Profile.ApplicationDefinition is null || inventory.ComponentPolicyVersion >= 2,
+                    "Actualiza la estación para preparar aplicaciones con versiones actuales.");
                 DeploymentPolicy.Require(job.State == DeploymentState.Queued && !job.DestructiveStarted && session is not null &&
                     session.State == DeploymentState.Ready && session.OptionsRevision == job.OptionsRevision &&
                     (session.PendingUsername is null || session.PendingUsername == job.Username) && profile is not null &&
@@ -148,6 +170,10 @@ public sealed class DeploymentStore
                     System.Text.Json.JsonSerializer.Serialize(job.Profile) == System.Text.Json.JsonSerializer.Serialize(old.Profile),
                     "No se pueden modificar opciones de un trabajo confirmado.");
             }
+            foreach (var job in inventory.Jobs.Where(j => j.ApplicationResult is not null))
+                DeploymentPolicy.ApplicationResult(job.Profile, job.ApplicationResult!, job.ComponentsVerified);
+            DeploymentPolicy.Require(inventory.Jobs.All(j => j.Profile.ApplicationDefinition is null || !j.ComponentsVerified ||
+                j.ApplicationResult?.Complete == true), "Falta el resultado verificado de las aplicaciones.");
             var sessions = inventory.Sessions.Select(s =>
             {
                 var old = previous.Station.Sessions.Find(p => p.Id == s.Id);

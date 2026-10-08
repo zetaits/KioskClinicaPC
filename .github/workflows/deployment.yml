@@ -41,5 +41,5 @@ jobs:
           KIOSK_RELEASE_PUBLISH_KEY: ${{ secrets.KIOSK_RELEASE_PUBLISH_KEY }}
         run: |
           $ready = Invoke-WebRequest 'https://panel.clinicapc.es/health/ready'
-          if (($ready.Content | ConvertFrom-Json).status -ne 'ok' -or $ready.Headers['X-Deployment-Protocol'] -ne '1') { throw 'El servidor compatible debe estar desplegado y listo antes de publicar la estación.' }
+          if (($ready.Content | ConvertFrom-Json).status -ne 'ok' -or $ready.Headers['X-Deployment-Protocol'] -ne '1' -or $ready.Headers['X-Deployment-Component-Policy'] -ne '2') { throw 'El servidor con política de aplicaciones v2 debe estar desplegado y listo antes de publicar la estación.' }
           .\build-deployment.ps1 -Version $env:DEPLOYMENT_VERSION -BootDirectory (Join-Path $env:DEPLOYMENT_LAB_BUNDLE 'boot') -Validation (Join-Path $env:DEPLOYMENT_LAB_BUNDLE 'validation.json') -WorkerZip (Join-Path $env:DEPLOYMENT_LAB_BUNDLE 'worker.zip') -KioskInstaller (Join-Path $env:DEPLOYMENT_LAB_BUNDLE 'kiosk.exe') -KioskVersion $env:DEPLOYMENT_KIOSK_VERSION -Publish

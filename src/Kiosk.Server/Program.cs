@@ -246,6 +246,8 @@ app.MapGet("/health/ready", (HttpContext ctx) =>
         if (File.Exists(deploymentStatePath) && (JToken.Parse(File.ReadAllText(deploymentStatePath)) is not JObject deploymentState || deploymentState.Value<int>("schemaVersion") != 1))
             return Results.Json(new { status = "unavailable" }, statusCode: 503);
         ctx.Response.Headers["X-Deployment-Protocol"] = "1";
+        ctx.Response.Headers["X-Deployment-Component-Policy"] = "2";
+        ctx.Response.Headers["X-Setup-Catalog-Version"] = "3";
         return Results.Ok(new { status = "ok" });
     }
     catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or Newtonsoft.Json.JsonException or FormatException or InvalidCastException)
@@ -324,6 +326,13 @@ app.MapGet("/api/setup/v2/catalog", (HttpContext ctx, PackCatalogStore catalog) 
     return Results.Ok(catalog.Snapshot());
 })
     .RequireRateLimiting("initial-setup");
+
+app.MapGet("/api/setup/v3/catalog", (HttpContext ctx, PackCatalogStore catalog) =>
+{
+    ctx.Response.Headers["X-Setup-Catalog-Version"] = "3";
+    ctx.Response.Headers.CacheControl = "no-store";
+    return Results.Ok(catalog.Definition());
+}).RequireRateLimiting("initial-setup");
 
 app.MapPost("/api/releases/winget-index", async (HttpContext ctx, PackCatalogStore catalog) =>
 {

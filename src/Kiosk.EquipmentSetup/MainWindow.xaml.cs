@@ -11,6 +11,7 @@ public partial class MainWindow : Window
     {
         public PackApplication Application { get; } = application;
         public bool Selected { get; set; } = application.SelectedByDefault;
+        public string VersionDescription => string.IsNullOrWhiteSpace(Application.PinnedVersion) ? "Última versión compatible al instalar" : "Versión " + Application.PinnedVersion;
     }
     private int _step;
     private bool _loading, _running, _closeRequested;
@@ -48,6 +49,7 @@ public partial class MainWindow : Window
         BackButton.Content = "Atrás";
         BackButton.IsEnabled = !_running;
         RetryButton.Visibility = Visibility.Collapsed;
+        InstallAvailableButton.Visibility = Visibility.Collapsed;
         NextButton.Content = step == 2 ? "Instalar" : step == 3 ? "Cerrar" : "Continuar";
         NextButton.IsEnabled = CanContinue();
         CancelButton.Visibility = step == 3 ? Visibility.Collapsed : Visibility.Visible;
@@ -85,9 +87,11 @@ public partial class MainWindow : Window
     {
         ShowStep(2); Activity.Clear(); Progress.Visibility = Visibility.Collapsed;
         ResumeCheck.IsEnabled = true;
+        PartialPackCheck.IsEnabled = true;
+        PartialPackCheck.Visibility = PackCheck.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
         string components = PackCheck.IsChecked == true ? $"Pack: {_applications.Count(a => a.Selected)} aplicaciones · revisión {_catalog!.Revision}. " : "";
         SummaryLabel.Text = components + (KioskCheck.IsChecked == true ? $"Kiosk {Payload.Manifest.KioskVersion}." : "");
-        Activity.Text = "Al confirmar se comprobará toda la selección y se instalarán los componentes en silencio. Si eliges ambos, Kiosk se instala después de la comprobación y antes de las aplicaciones.\n\nSe reanudarán los pendientes comprobando el estado anterior. Nunca se reiniciará automáticamente.";
+        Activity.Text = "Se actualizará el origen oficial WinGet y se resolverá la última versión compatible de cada aplicación antes de instalar. Si eliges ambos, Kiosk se instala después de la comprobación y antes de las aplicaciones.\n\nLas aplicaciones disponibles se instalarán aunque alguna falle: las que fallen conservarán su diagnóstico y el pack quedará incompleto.\n\nAl reanudar se verificará lo ya instalado y se comprobarán de nuevo los pendientes. Nunca se reiniciará automáticamente.";
         StatusLabel.Text = "Windows pedirá permisos al comenzar.";
     }
     internal async Task LoadCatalog()
@@ -104,7 +108,7 @@ public partial class MainWindow : Window
             _catalog = catalog; _applications = catalog.Applications.OrderBy(a => a.Order).Select(a => new ApplicationRow(a)).ToList();
             ApplicationsList.ItemsSource = _applications;
             CatalogLabel.Text = catalog.Applications.Count == 0 ? "El pack del panel está vacío. Configura Aplicaciones en el panel o vuelve atrás para elegir solo Kiosk." : $"Revisión {catalog.Revision} · selecciona las aplicaciones que quieres instalar.";
-            StatusLabel.Text = "Versiones fijadas por el panel.";
+            StatusLabel.Text = "Las versiones se comprobarán en este equipo al instalar.";
         }
         catch (OperationCanceledException) { if (_step == 1) { CatalogLabel.Text = "Carga cancelada. Puedes reintentar o volver atrás."; RetryButton.Visibility = Visibility.Visible; } }
         catch (Exception ex)
@@ -123,8 +127,10 @@ public partial class MainWindow : Window
     {
         _cancel?.Dispose(); _cancel = new CancellationTokenSource();
         var request = new EquipmentRequest(PackCheck.IsChecked == true, KioskCheck.IsChecked == true, _catalog?.Revision ?? 0,
-            PackCheck.IsChecked == true ? _applications.Where(a => a.Selected).Select(a => new EquipmentSelection(a.Application.Id, a.Application.PinnedVersion)).ToList() : [], ResumeCheck.IsChecked == true);
+            PackCheck.IsChecked == true ? _applications.Where(a => a.Selected).Select(a => new EquipmentSelection(a.Application.Id, a.Application.PinnedVersion)).ToList() : [], ResumeCheck.IsChecked == true,
+            PackCheck.IsChecked == true && PartialPackCheck.IsChecked == true, _catalog?.Definition is not null);
         ResumeCheck.IsEnabled = false;
+        PartialPackCheck.IsEnabled = false;
         _running = true; _lastRun = null; NextButton.IsEnabled = false; BackButton.IsEnabled = false; Activity.Clear();
         Progress.Visibility = Visibility.Visible; Progress.IsIndeterminate = true; StatusLabel.Text = "Comprobando e instalando…";
         EquipmentEvent result;
@@ -134,7 +140,7 @@ public partial class MainWindow : Window
             {
                 Progress.IsIndeterminate = value.Percent == null;
                 if (value.Percent is { } percent) Progress.Value = percent;
-                if (value.Run != null) { _lastRun = value.Run; Activity.Text = string.Join("\n", value.Run.Items.Select(i => $"{i.Application.DisplayName} · {i.Application.PinnedVersion}: {i.Message}")); }
+                if (value.Run != null) { _lastRun = value.Run; Activity.Text = string.Join("\n", value.Run.Items.Select(ItemDetails)); }
                 else { Activity.AppendText(value.Message + "\n"); Activity.ScrollToEnd(); }
             }), _cancel.Token);
             if (result.KioskVerified)
@@ -146,16 +152,30 @@ public partial class MainWindow : Window
         catch (Win32Exception ex) when (ex.NativeErrorCode == 1223) { result = new("result", "Se canceló la solicitud de permisos. No se inició la instalación.", ExitCode: 1); }
         catch { result = new("result", "No se recibió un resultado verificable del trabajador. Puede quedar un instalador activo. Revisa los diagnósticos antes de reanudar.", ExitCode: 2); }
         _running = false;
+        if (result.Run is not null) _lastRun = result.Run;
         if (result.Kind == "review") { ShowStep(1); await LoadCatalog(); CatalogLabel.Text = result.Message; return; }
-        ShowStep(3); ResultTitle.Text = result.ExitCode == 0 ? "Equipo preparado" : "Preparación incompleta";
+        ShowStep(3); ResultTitle.Text = result.ExitCode == 0 ? "Preparación completa" : result.ExitCode == 1 || _lastRun?.Items.Any(i => i.RequiresRebootBeforeRetry) == true ? "Preparación detenida" : "Preparación parcial";
         ResultLabel.Text = result.Message + (result.RebootRequired ? "\nEs necesario reiniciar manualmente." : "");
-        ResultDetails.Text = _lastRun == null ? "" : string.Join("\n", _lastRun.Items.Select(i => $"{i.Application.DisplayName} · {i.Application.PinnedVersion}: {i.Message}"));
+        ResultDetails.Text = _lastRun == null ? "" : string.Join("\n", _lastRun.Items.Select(ItemDetails));
         ResultDetails.Visibility = string.IsNullOrWhiteSpace(ResultDetails.Text) ? Visibility.Collapsed : Visibility.Visible;
         if (result.ExitCode != 0) { BackButton.Visibility = Visibility.Visible; BackButton.Content = "Revisar"; }
+        InstallAvailableButton.Visibility = result.ExitCode == 1 && !request.AllowPartialPack && _lastRun is { } run &&
+            run.Items.Any(i => i.State == PackItemState.Failed) && run.Items.Any(i => i.State == PackItemState.Pending || i.Verified) &&
+            !run.Items.Any(i => i.RequiresRebootBeforeRetry) ? Visibility.Visible : Visibility.Collapsed;
         LaunchCheck.IsChecked = false;
         LaunchCheck.Visibility = result.KioskVerified ? Visibility.Visible : Visibility.Collapsed;
         StatusLabel.Text = $"Resultado: {result.ExitCode}";
         if (_closeRequested) StatusLabel.Text += " · La operación ha terminado; ya puedes cerrar.";
+    }
+    private static string ItemDetails(PackItemResult item) => $"{item.Application.DisplayName} · " +
+        (string.IsNullOrWhiteSpace(item.Application.PinnedVersion) ? "sin versión resuelta" : $"resuelta {item.Application.PinnedVersion}") +
+        (item.InstalledVersion is null ? "" : $" · instalada {item.InstalledVersion}") + $": {item.Message}";
+    private async void InstallAvailable(object sender, RoutedEventArgs e) => await ContinueAvailable();
+    internal async Task ContinueAvailable()
+    {
+        PartialPackCheck.IsChecked = true;
+        Confirm();
+        await Install();
     }
     private void Cancel(object sender, RoutedEventArgs e)
     {

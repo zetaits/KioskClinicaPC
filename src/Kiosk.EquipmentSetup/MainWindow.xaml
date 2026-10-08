@@ -75,7 +75,7 @@
                                 <ItemsControl.ItemTemplate><DataTemplate>
                                     <Border BorderBrush="{StaticResource LineBrush}" BorderThickness="0,0,0,1" Padding="0,6" Margin="0,0,8,0">
                                         <CheckBox IsChecked="{Binding Selected, Mode=TwoWay}" Checked="ApplicationChanged" Unchecked="ApplicationChanged">
-                                            <StackPanel><TextBlock Text="{Binding Application.DisplayName}" FontWeight="Bold"/><TextBlock Text="{Binding Application.PinnedVersion, StringFormat=Versión {0}}" Foreground="{StaticResource MutedBrush}" FontSize="13" Margin="0,4,0,0"/></StackPanel>
+                                            <StackPanel><TextBlock Text="{Binding Application.DisplayName}" FontWeight="Bold"/><TextBlock Text="{Binding VersionDescription}" Foreground="{StaticResource MutedBrush}" FontSize="13" Margin="0,4,0,0"/></StackPanel>
                                         </CheckBox>
                                     </Border>
                                 </DataTemplate></ItemsControl.ItemTemplate>
@@ -85,7 +85,10 @@
                             <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
                             <TextBlock x:Name="ExecutionTitle" Text="Comprobación e instalación" FontSize="22" FontWeight="Bold"/>
                             <TextBlock Grid.Row="1" x:Name="SummaryLabel" Margin="0,12,0,8" Foreground="{StaticResource MutedBrush}" FontSize="13"/>
-                            <CheckBox Grid.Row="2" x:Name="ResumeCheck" IsChecked="True" Margin="0,8,0,16"><TextBlock Text="Reanudar pendientes, comprobando lo ya instalado" FontSize="13"/></CheckBox>
+                            <StackPanel Grid.Row="2" Margin="0,8,0,16">
+                                <CheckBox x:Name="ResumeCheck" IsChecked="True"><TextBlock Text="Reanudar pendientes, comprobando lo ya instalado" FontSize="13"/></CheckBox>
+                                <CheckBox x:Name="PartialPackCheck" IsChecked="True" Margin="0,10,0,0"><TextBlock Text="Instalar las aplicaciones disponibles aunque alguna falle la comprobación" FontSize="13"/></CheckBox>
+                            </StackPanel>
                             <ProgressBar Grid.Row="3" x:Name="Progress" Height="6" Visibility="Collapsed" Margin="0,0,0,16"/>
                             <TextBox Grid.Row="4" x:Name="Activity" IsReadOnly="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" FontSize="13"/>
                         </Grid>
@@ -94,6 +97,7 @@
                                 <TextBlock x:Name="ResultTitle" FontSize="22" FontWeight="Bold"/>
                                 <TextBlock x:Name="ResultLabel" Margin="0,16,0,12"/>
                                 <TextBox x:Name="ResultDetails" MaxHeight="150" IsReadOnly="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" FontSize="13"/>
+                                <Button x:Name="InstallAvailableButton" Content="Instalar aplicaciones disponibles" Click="InstallAvailable" Visibility="Collapsed" HorizontalAlignment="Left" Margin="0,12,0,0"/>
                                 <TextBlock Text="Diagnósticos: %ProgramData%\ClinicaPC\Setup\logs. Los reinicios son siempre manuales." Foreground="{StaticResource MutedBrush}" FontSize="13" Margin="0,12,0,8"/>
                                 <CheckBox x:Name="LaunchCheck" IsChecked="False" Visibility="Collapsed"><TextBlock Text="Abrir Kiosk al cerrar el asistente"/></CheckBox>
                             </StackPanel>

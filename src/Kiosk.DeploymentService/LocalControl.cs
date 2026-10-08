@@ -138,7 +138,7 @@ public sealed class LocalControl(StationState state, PanelConnection panel, Imag
                 var diagnostic = state.Queue.Snapshot();
                 // Export only safe typed fields; never copy DPAPI blobs, answer files, settings or headers.
                 return new { Version = 1, Jobs = diagnostic.Jobs.Select(j => new { j.Id, j.State, j.Phase, j.LastSequence,
-                    j.WindowsVerified, j.AccountVerified, j.ComponentsVerified, j.RebootRequired }), Images = diagnostic.Images.Select(i => new { i.Id, i.Build, i.Verified }) };
+                    j.WindowsVerified, j.AccountVerified, j.ComponentsVerified, j.RebootRequired, j.ApplicationResult }), Images = diagnostic.Images.Select(i => new { i.Id, i.Build, i.Verified }) };
             default: throw new InvalidDataException("Operación local desconocida.");
         }
         return new { ok = true };

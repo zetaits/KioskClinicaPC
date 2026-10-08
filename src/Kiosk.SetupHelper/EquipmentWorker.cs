@@ -45,10 +45,16 @@ internal static class EquipmentWorker
                 finally { cancel.Cancel(); proceed.TrySetResult(false); }
             });
             var engine = await Bootstrap.CreateEngine(message => Emit(new("phase", message)), cancel.Token);
+            if (start.Snapshot.Definition is not null)
+            {
+                Emit(new("phase", "Actualizando el catálogo oficial WinGet y resolviendo versiones compatibles…"));
+                await engine.PrepareLatest(cancel.Token);
+            }
             bool ready = false;
             bool complete = await PackExecution.Run(run, engine, logs,
                 changed => Emit(new("applications", "Estado de las aplicaciones", changed)), Program.Save, false, cancel.Token,
-                async () => { ready = true; Emit(new("preflight-ready", "Todas las aplicaciones comprobadas.", run)); return await proceed.Task; });
+                async () => { ready = true; Emit(new("preflight-ready", run.Items.Any(x => x.State == PackItemState.Failed)
+                    ? "Se instalarán las aplicaciones disponibles. Las que fallaron quedan pendientes." : "Todas las aplicaciones comprobadas.", run)); return await proceed.Task; }, start.AllowPartial);
             if (!ready) Emit(new("preflight-failed", "Hay aplicaciones que no superan la comprobación previa.", run));
             Emit(new("result", run.Summary, run, complete ? 0 : 2, RebootRequired: run.RebootRequired));
             return complete ? 0 : 2;

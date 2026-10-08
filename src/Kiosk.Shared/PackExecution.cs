@@ -11,7 +11,7 @@ public static class PackExecution
 {
     public static async Task<bool> Run(PackRun run, IPackBackend engine, string logs,
         Action<PackRun>? changed, Action<PackRun> save, bool preflight, CancellationToken ct,
-        Func<Task<bool>>? beforeInstall = null)
+        Func<Task<bool>>? beforeInstall = null, bool allowPartial = false)
     {
         bool blocked = false;
         foreach (var item in run.Items)
@@ -29,13 +29,17 @@ public static class PackExecution
                 item.RequiresRebootBeforeRetry = false;
             }
             catch (OperationCanceledException) { throw; }
+            catch (TimeoutException ex) { blocked = true; item.RequiresRebootBeforeRetry = true; item.State = PackItemState.Failed; item.Message = ex.Message; }
             catch (Exception ex) { blocked = true; item.State = PackItemState.Failed; item.Message = ex.Message; }
             changed?.Invoke(run);
         }
         if (!preflight) save(run);
-        if (blocked || preflight) return !blocked;
+        if (preflight) return !blocked;
+        // Partial runs only skip definite preflight failures. An active or uncertain native installer still blocks the entire queue.
+        if (blocked && (!allowPartial || run.Items.Any(x => x.RequiresRebootBeforeRetry) ||
+            (run.Definition is null && !run.Items.Any(x => x.State == PackItemState.Pending || x.Verified)))) return false;
         if (beforeInstall != null && !await beforeInstall()) return false;
-        foreach (var item in run.Items.Where(x => !x.Verified))
+        foreach (var item in run.Items.Where(x => x.State == PackItemState.Pending))
         {
             if (ct.IsCancellationRequested) break;
             item.State = PackItemState.Installing; changed?.Invoke(run); save(run);

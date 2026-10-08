@@ -13,12 +13,13 @@ public sealed class DeploymentProgressJournal
         DeploymentPolicy.Require(_state.SchemaVersion == 1 && _state.Sequence >= initialSequence, "Registro de progreso incompatible.");
     }
     public DeploymentProgress Append(string job, DeploymentState state, string phase, int? percent = null,
-        bool windows = false, bool account = false, bool components = false, bool reboot = false)
+        bool windows = false, bool account = false, bool components = false, bool reboot = false,
+        KioskClinicaPC.Core.Sync.PackRun? applications = null)
     {
         lock (_gate)
         {
             var progress = new DeploymentProgress(job, _state.Sequence + 1, state, phase[..Math.Min(phase.Length, 200)], percent,
-                windows, account, components, reboot);
+                windows, account, components, reboot, applications is null ? null : DeploymentPolicy.Copy(applications));
             var next = new DeploymentProgressJournalState(1, progress.Sequence, [.. _state.Pending, progress]);
             AtomicState.Write(_path, next); _state = next; return progress;
         }

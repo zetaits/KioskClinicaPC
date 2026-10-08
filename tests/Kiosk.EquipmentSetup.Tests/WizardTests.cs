@@ -44,7 +44,23 @@ public sealed class WizardTests
         rows[0].Selected = false; rows[1].Selected = true;
         window.Confirm(); await window.Install();
         Assert.NotNull(sent); Assert.Equal(7, sent.CatalogRevision); Assert.Equal(new EquipmentSelection(new string('b', 32), "2.0"), Assert.Single(sent.Applications));
-        Assert.Equal("Equipo preparado", window.ResultTitle.Text); Assert.Equal(0, registration);
+        Assert.Equal("Preparación completa", window.ResultTitle.Text); Assert.Equal(0, registration);
+        window.Close();
+    });
+    [Fact]
+    public Task Latest_pack_defaults_to_partial_install_and_sends_ids_without_frozen_versions() => Sta(async () =>
+    {
+        var catalog = PackDefinition.FromCatalog(Catalog).ForExecution(); EquipmentRequest? sent = null;
+        var run = new PackRun { Definition = catalog.Definition, Items = [new() { Application = Catalog.Applications[0], State = PackItemState.Failed, Message = "No disponible" }] };
+        var window = new MainWindow(_ => Task.FromResult(catalog), (request, _, _) =>
+        {
+            sent = request; return Task.FromResult(new EquipmentEvent("result", "Pendiente", Run: run, ExitCode: 2));
+        }, () => Task.CompletedTask);
+        window.ShowStep(1); await window.LoadCatalog(); window.Confirm();
+        Assert.True(window.PartialPackCheck.IsChecked); await window.Install();
+        Assert.NotNull(sent); Assert.True(sent.ResolveLatest); Assert.True(sent.AllowPartialPack);
+        Assert.Empty(Assert.Single(sent.Applications).Version);
+        Assert.Contains("3.2", window.ResultDetails.Text); Assert.Contains("No disponible", window.ResultDetails.Text);
         window.Close();
     });
     [Fact]
@@ -73,7 +89,7 @@ public sealed class WizardTests
         Task install = window.Install(); window.Close();
         Assert.True(token.IsCancellationRequested); Assert.False(install.IsCompleted);
         finished.SetResult(new("result", "Cancelado", ExitCode: 2)); await install;
-        Assert.Equal("Preparación incompleta", window.ResultTitle.Text); window.Close();
+        Assert.Equal("Preparación parcial", window.ResultTitle.Text); window.Close();
     });
     [Fact]
     public Task Changed_catalogue_returns_to_review_without_registering_autostart() => Sta(async () =>
@@ -84,6 +100,41 @@ public sealed class WizardTests
         Assert.Equal(2, loads); Assert.Equal(Visibility.Visible, window.ApplicationsPanel.Visibility);
         Assert.Contains("cambió", window.CatalogLabel.Text); window.Close();
     });
+    [Fact]
+    public Task Failed_preflight_offers_available_apps_and_rechecks_original_selection() => Sta(async () =>
+    {
+        int attempts = 0;
+        var run = new PackRun { Items = Catalog.Applications.Select(a => new PackItemResult
+            { Application = a, State = a.SelectedByDefault ? PackItemState.Pending : PackItemState.Failed, Message = a.SelectedByDefault ? "Disponible" : "Versión no disponible" }).ToList() };
+        var window = new MainWindow(_ => Task.FromResult(Catalog), (request, progress, _) =>
+        {
+            attempts++; Assert.Equal(2, request.Applications.Count);
+            Assert.Equal(attempts == 2, request.AllowPartialPack);
+            progress(new("applications", "Comprobado", run));
+            return Task.FromResult(new EquipmentEvent("result", "Queda una aplicación pendiente", ExitCode: attempts == 1 ? 1 : 2));
+        }, () => throw new Exception("No debe registrar Kiosk"));
+        window.ShowStep(1); await window.LoadCatalog();
+        var rows = Assert.IsType<List<MainWindow.ApplicationRow>>(window.ApplicationsList.ItemsSource); rows[1].Selected = true;
+        window.Confirm(); window.PartialPackCheck.IsChecked = false; await window.Install();
+        Assert.Equal(Visibility.Visible, window.InstallAvailableButton.Visibility);
+        await window.ContinueAvailable();
+        Assert.Equal(2, attempts); Assert.Equal("Preparación parcial", window.ResultTitle.Text);
+        Assert.Contains("Versión no disponible", window.ResultDetails.Text);
+        Assert.Equal(Visibility.Collapsed, window.InstallAvailableButton.Visibility); window.Close();
+    });
+    [Fact]
+    public Task Uncertain_native_state_never_offers_partial_install_button() => Sta(async () =>
+    {
+        var run = new PackRun { Items = [new() { Application = Catalog.Applications[0], State = PackItemState.Pending },
+            new() { Application = Catalog.Applications[1], State = PackItemState.Failed, RequiresRebootBeforeRetry = true }] };
+        var window = new MainWindow(_ => Task.FromResult(Catalog), (_, progress, _) =>
+        {
+            progress(new("applications", "Comprobado", run));
+            return Task.FromResult(new EquipmentEvent("result", "Instalador activo", ExitCode: 1));
+        }, () => Task.CompletedTask);
+        window.ShowStep(1); await window.LoadCatalog(); window.Confirm(); await window.Install();
+        Assert.Equal(Visibility.Collapsed, window.InstallAvailableButton.Visibility); window.Close();
+    });
     [Theory]
     [InlineData("/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /COMPONENTS=kiosk", false, true)]
     [InlineData("/VERYSILENT /SUPPRESSMSGBOXES /NORESTART", true, false)]
@@ -92,6 +143,7 @@ public sealed class WizardTests
     {
         var request = Program.ParseSilent(command.Split(' ')); Assert.NotNull(request);
         Assert.Equal(pack, request.Pack); Assert.Equal(kiosk, request.Kiosk);
+        Assert.True(request.AllowPartialPack); Assert.True(request.ResolveLatest);
     }
     [Theory]
     [InlineData("/VERYSILENT")]

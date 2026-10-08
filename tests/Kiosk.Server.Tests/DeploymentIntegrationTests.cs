@@ -55,6 +55,17 @@ public sealed class DeploymentIntegrationTests : IDisposable
         Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync("/api/deployment/v1/configuration")).StatusCode);
     }
     [Fact]
+    public async Task New_station_negotiates_current_application_policy_and_old_station_keeps_v1_configuration()
+    {
+        using var client = Client(); var enrolled = Store.Enroll(new(1, Store.CreateCode().Code, "Station"));
+        client.DefaultRequestHeaders.Add("X-Deployment-Credential", enrolled.Credential);
+        var old = await client.GetFromJsonAsync<DeploymentConfiguration>("/api/deployment/v1/configuration");
+        Assert.Equal(1, old!.ComponentPolicyVersion); Assert.Null(old.Definition);
+        client.DefaultRequestHeaders.Add("X-Deployment-Component-Policy", "2");
+        var current = await client.GetFromJsonAsync<DeploymentConfiguration>("/api/deployment/v1/configuration");
+        Assert.Equal(2, current!.ComponentPolicyVersion); Assert.NotNull(current.Definition);
+    }
+    [Fact]
     public async Task Enrollment_is_separate_single_use_and_rejects_password_fields()
     {
         using var client = Client(); var code = Store.CreateCode();
@@ -112,6 +123,8 @@ public sealed class DeploymentIntegrationTests : IDisposable
     {
         using var client = Client(); var healthy = await client.GetAsync("/health/ready");
         Assert.Equal(HttpStatusCode.OK, healthy.StatusCode); Assert.Equal("1", healthy.Headers.GetValues("X-Deployment-Protocol").Single());
+        Assert.Equal("2", healthy.Headers.GetValues("X-Deployment-Component-Policy").Single());
+        Assert.Equal("3", healthy.Headers.GetValues("X-Setup-Catalog-Version").Single());
         Assert.Equal("ok", (await healthy.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("status").GetString());
         File.WriteAllText(Path.Combine(_root, "data", "deployment-v1.json"), "{");
         Assert.Equal(HttpStatusCode.ServiceUnavailable, (await client.GetAsync("/health/ready")).StatusCode);

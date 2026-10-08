@@ -22,6 +22,25 @@ public sealed class PackApiTests : IDisposable
         });
     }
     [Fact]
+    public async Task V3_has_scoped_auth_and_no_versions_while_v2_receives_updated_concrete_projection()
+    {
+        using var client = _factory.CreateClient();
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync("/api/setup/v3/catalog")).StatusCode);
+        client.DefaultRequestHeaders.Add("X-Api-Key", "general-api");
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync("/api/setup/v3/catalog")).StatusCode);
+        client.DefaultRequestHeaders.Add("X-Setup-Key", Key);
+        var store = _factory.Services.GetRequiredService<PackCatalogStore>();
+        store.Import(new(DateTime.UtcNow.AddMinutes(-1), [new("Google.Chrome", "Chrome", "Google", "154", true)])); store.Add("Google.Chrome");
+        long revision = store.Definition().Revision;
+        store.Import(new(DateTime.UtcNow, [new("Google.Chrome", "Chrome", "Google", "155", true)]));
+        using var v3 = await client.GetAsync("/api/setup/v3/catalog");
+        Assert.Equal("3", v3.Headers.GetValues("X-Setup-Catalog-Version").Single());
+        string json = await v3.Content.ReadAsStringAsync(); Assert.DoesNotContain("pinnedVersion", json);
+        Assert.Equal(revision, (await v3.Content.ReadFromJsonAsync<PackDefinition>())!.Revision);
+        var old = await client.GetFromJsonAsync<PackCatalog>("/api/setup/v2/catalog");
+        Assert.Equal("155", old!.Applications.Single().PinnedVersion); Assert.Null(old.Definition);
+    }
+    [Fact]
     public async Task Scoped_catalog_read_creates_neither_sessions_nor_fleet_records()
     {
         using var client = _factory.CreateClient();

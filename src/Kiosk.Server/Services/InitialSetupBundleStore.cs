@@ -37,7 +37,7 @@ public sealed class InitialSetupBundleStore
 
     private readonly SemaphoreSlim _importGate = new(1, 1);
     public static bool Compatible(InitialSetupBundleManifest manifest) => manifest.SchemaVersion == 2 &&
-        manifest.InstallerKind == "equipment-wpf" && manifest.CatalogApiVersion == 2 &&
+        manifest.InstallerKind == "equipment-wpf" && manifest.CatalogApiVersion is 2 or 3 &&
         manifest.AssistantVersion == manifest.Version && Version.TryParse(manifest.AssistantVersion, out _) &&
         Version.TryParse(manifest.WorkerVersion, out _) && Version.TryParse(manifest.KioskVersion, out _) &&
         System.Text.RegularExpressions.Regex.IsMatch(manifest.SourceCommit ?? "", "^[a-fA-F0-9]{40}$") &&
@@ -117,7 +117,7 @@ public sealed class InitialSetupBundleStore
         }
 
         var latest = candidates.OrderByDescending(c => c.Version).FirstOrDefault();
-        if (latest.Manifest == null) error = "Debe publicarse un asistente WPF compatible con catálogo v2 mediante el workflow Equipment Setup. Actualizar la VPS no reconstruye el instalador descargable.";
+        if (latest.Manifest == null) error = "Debe publicarse un asistente WPF compatible mediante el workflow Equipment Setup. Actualizar la VPS no reconstruye el instalador descargable.";
         return latest.Manifest == null ? null : new(latest.Manifest, latest.Path);
     }
 }

@@ -108,6 +108,12 @@ app.MapPost("/worker/{id}/claim", async (string id, HttpContext ctx, ImageLibrar
         var queued = state.Queue.Snapshot().Jobs.FirstOrDefault(j => j.SessionId == id && j.State == DeploymentState.Queued);
         if (queued is null) return Results.NoContent();
         string? workerHash = queued.Profile.Applications.Applications.Count > 0 ? Hash("worker.zip") : null;
+        if (queued.Profile.ApplicationDefinition is not null)
+        {
+            using var archive = File.OpenRead(Path.Combine(AppContext.BaseDirectory, "postinstall", "worker.zip"));
+            DeploymentPolicy.Require(KioskClinicaPC.Equipment.PackWorkerCompatibility.Validate(archive),
+                "Actualiza el trabajador WinGet de la estación antes de autorizar Windows Setup.");
+        }
         string? kioskHash = queued.Profile.Kiosk ? Hash("kiosk.exe") : null;
         string? kioskVersion = queued.Profile.Kiosk ? AtomicState.Read<string>(Path.Combine(AppContext.BaseDirectory, "postinstall", "kiosk-version.json"), () => throw new InvalidDataException("Falta la versión de Kiosk.")) : null;
         string? password = state.JobPassword(queued.Id);

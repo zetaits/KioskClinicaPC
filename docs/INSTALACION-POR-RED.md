@@ -15,7 +15,7 @@ La integración de código está disponible para preparar un piloto. **No se ha 
 1. Usar un PC Windows 11 x64 administrativo y una red de laboratorio representativa de la tienda. El router sigue siendo DHCP. Reservar la IP de la estación en el router para que los destinos mantengan su dirección de callback después de un reinicio.
 2. Instalar ADK y complemento WinPE **10.1.26100.9457** y revisar las actualizaciones oficiales aplicables. Usar iPXE firmado oficial para x86_64 Secure Boot, su shim y wimboot firmado. Crear un manifiesto basado en `deployment/boot-inputs.example.json` con versiones y hashes reales. El ejemplo incompleto se rechaza: no fija binarios inventados ni descarga `latest` automáticamente.
 3. Como administrador, ejecutar `deployment/build-winpe.ps1 -InputManifest <manifiesto> -Output <carpeta nueva>`. Incluye WMI, NetFX, Scripting, PowerShell, StorageWMI, SecureStartup, DismCmdlets, Setup/Setup-Client, español y scripts. Las actualizaciones especificadas también deben superar SHA-256.
-4. Crear un paquete de laboratorio con `build-deployment.ps1 -Version 0.1.0 -BootDirectory <carpeta WinPE>`, incorporando `-WorkerZip`, `-KioskInstaller` y `-KioskVersion` para probar pack/Kiosk. Requiere Inno Setup 6. Ninguna clave permanente de panel, flota o Setup se incorpora a la estación ni al trabajador posterior.
+4. Crear un paquete de laboratorio con `build-deployment.ps1 -Version 0.2.0 -BootDirectory <carpeta WinPE>`, incorporando `-WorkerZip`, `-KioskInstaller` y `-KioskVersion` para probar pack/Kiosk. Usar `worker.zip` generado con el asistente 1.4.0 o posterior; se comprueba `pack-worker.json` con catálogo v3 al construir y antes de autorizar Windows Setup. Requiere Inno Setup 6. Ninguna clave permanente de panel, flota o Setup se incorpora a la estación ni al trabajador posterior.
 5. Instalar el paquete e indicar la cuenta Windows autorizada del encargado. El instalador crea el servicio `ClinicaPCDeployment`. Administradores y esa cuenta pueden utilizar la canalización local. Una actualización/desinstalación exige desactivar la estación y que no existan trabajos activos o incidentes destructivos sin revisar.
 6. Vincular desde Configuración usando un código de `/despliegue` de un solo uso, válido diez minutos. Elegir interfaz Ethernet y carpeta local vacía dedicada; capacidad inicial tres, rango uno a ocho. Guardar la contraseña local (8–128 caracteres).
 7. Importar una ISO oficial Windows 11 Home/Pro x64 24H2+ español desde Sistemas y controladores. Se monta, se comprueba Windows Setup firmado por Microsoft y las ediciones, se extrae, se vuelve a comprobar la ISO y se registra integridad de cada archivo. El SHA-256 identifica el contenido importado; la procedencia oficial de la ISO debe comprobarse al obtenerla.
@@ -28,7 +28,21 @@ Documentación oficial: [iPXE Secure Boot](https://ipxe.org/secboot), [ADK](http
 
 Encender el destino y elegir arranque de red UEFI por Ethernet con Secure Boot. El trabajador comunica hardware y muestra un identificador corto. El escaneo ICMP de la aplicación se limita a la interfaz/subred elegida (hasta 1024 direcciones); una respuesta solo significa «Detectado en red» y no identifica tipo de dispositivo ni ausencia de sistema operativo.
 
-Crear/editar un perfil en `/despliegue`: imagen y edición, España, usuario inicial `Usuario`, aplicaciones con versión fijada y Kiosk opcional desmarcado. «Solo Windows» existe inicialmente sin imagen y debe configurarse. El panel permite cambiar usuarios pendientes y observar instalaciones; no inicia instalaciones.
+Crear/editar un perfil en `/despliegue`: imagen y edición, España, usuario inicial `Usuario`, aplicaciones con última versión compatible y Kiosk opcional desmarcado. Cada destino actualiza WinGet y resuelve su propia versión; un lote puede terminar con versiones diferentes. «Solo Windows» existe inicialmente sin imagen y debe configurarse. El panel permite cambiar usuarios pendientes y observar instalaciones; no inicia instalaciones.
+
+Al actualizar el servidor, los perfiles antiguos con aplicaciones reciben una revisión
+nueva con `ApplicationDefinition`; se conserva copia `deployment-v1.json.before-v3.bak`.
+Los trabajos ya confirmados conservan perfil y versiones concretas; nunca se reescriben
+durante la migración. Las estaciones antiguas pueden comunicar esos trabajos, pero
+no confirmar perfiles nuevos con esta política. La estación nueva negocia
+`X-Deployment-Component-Policy: 2` y exige servidor compatible.
+
+La preparación continúa automáticamente con las aplicaciones disponibles. Los fallos
+ordinarios quedan pendientes y no bloquean Kiosk. Si falta alguna verificación, el
+trabajo pasa a «Requiere atención». Un instalador activo o incierto detiene la cola.
+El panel, la estación y el diagnóstico conservan versión resuelta, versión instalada
+y resultado por aplicación. El seguimiento durable también conserva estos datos sin
+conexión; no se admite completar un perfil nuevo sin sus resultados verificados.
 
 Seleccionar equipos listos en la aplicación. Con un solo disco interno identificable se preselecciona; con varios se debe elegir. La revisión muestra modelo, serie, disco, edición, usuario y componentes y exige aceptar el borrado de todas las particiones del disco elegido. USB no es candidato.
 
@@ -48,7 +62,7 @@ Estado local: `%ProgramData%\ClinicaPC\Deployment`. No copiarlo a otro ordenador
 
 ## Publicación y verificaciones pendientes
 
-El workflow **Deployment Station (private)** necesita un runner Windows del laboratorio con etiqueta `clinicapc-deployment`, Inno Setup y un directorio que contenga `boot/`, `worker.zip`, `kiosk.exe` y `validation.json`. No crea una release pública de GitHub. El servidor compatible debe estar desplegado primero: `/health/ready` mantiene `{"status":"ok"}` y añade `X-Deployment-Protocol: 1`.
+El workflow **Deployment Station (private)** necesita un runner Windows del laboratorio con etiqueta `clinicapc-deployment`, Inno Setup y un directorio que contenga `boot/`, `worker.zip`, `kiosk.exe` y `validation.json`. No crea una release pública de GitHub. El servidor compatible debe estar desplegado primero: `/health/ready` mantiene `{"status":"ok"}` y anuncia `X-Deployment-Protocol: 1` y `X-Deployment-Component-Policy: 2`.
 
 Completar `deployment/validation.example.json` con evidencias del commit exacto y hashes de arranque/recursos usados. La publicación se bloquea mientras falte cualquiera de estas comprobaciones:
 
@@ -58,5 +72,13 @@ Completar `deployment/validation.example.json` con evidencias del commit exacto 
 - Pérdida de VPS/red local y reinicio de estación en varias fases.
 - Solo Windows, pack y pack con Kiosk.
 - Escritorio, cuenta, limpieza de autologon, componentes y seguimiento final.
+- Pack con aplicaciones no disponibles y continuación automática; reanudación que
+  conserva las verificadas; versión congelada entre comprobación e instalación;
+  bloqueo con estado nativo incierto y conservación de trabajos antiguos confirmados.
 
-En el entorno de desarrollo de esta implementación se pueden compilar proyectos, ejecutar pruebas automatizadas y analizar scripts. Faltan ADK/WinPE, Inno Setup, ISO, binarios oficiales de arranque fijados y acceso a las VM/equipos/red de la tienda. No se han ejecutado borrados, activado servicios/firewall/SMB ni publicado o desplegado paquetes. Los resultados automatizados no sustituyen esa validación real.
+En el entorno de desarrollo se compilan proyectos, se ejecutan pruebas automatizadas
+y se comprueba el asistente empaquetado en modo diagnóstico con configuración ficticia.
+Faltan ADK/WinPE, ISO, binarios oficiales de arranque fijados y acceso a las
+VM/equipos/red de la tienda. No se han ejecutado borrados, activado servicios/firewall/SMB
+ni publicado o desplegado estos cambios. Los resultados automatizados no sustituyen
+esa validación real.

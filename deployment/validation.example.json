@@ -19,6 +19,11 @@
     "windowsOnly": false,
     "windowsPack": false,
     "windowsPackKiosk": false,
-    "desktopAccountCleanupTracking": false
+    "desktopAccountCleanupTracking": false,
+    "packUnavailableContinues": false,
+    "packResumeVerifiedOnly": false,
+    "packFrozenAfterPreflight": false,
+    "packNativeUncertainStops": false,
+    "legacyConfirmedJobUnchanged": false
   }
 }

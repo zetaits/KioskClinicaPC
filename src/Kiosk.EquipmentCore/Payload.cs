@@ -29,7 +29,7 @@ internal static class Payload
     {
         var manifest = Manifest;
         var actual = _source.GetName().Version;
-        return manifest.SchemaVersion == 2 && manifest.CatalogApiVersion == 2 && manifest.InstallerKind == "equipment-wpf" &&
+        return manifest.SchemaVersion == 2 && manifest.CatalogApiVersion == 3 && manifest.InstallerKind == "equipment-wpf" &&
             Version.TryParse(manifest.AssistantVersion, out var assistant) && actual?.ToString(3) == assistant.ToString(3) &&
             Version.TryParse(manifest.WorkerVersion, out _) && Version.TryParse(manifest.KioskVersion, out _) &&
             System.Text.RegularExpressions.Regex.IsMatch(manifest.SourceCommit, "^[a-fA-F0-9]{40}$") &&
@@ -45,8 +45,10 @@ internal static class Payload
         using var archive = new ZipArchive(resource, ZipArchiveMode.Read, leaveOpen: true);
         if (archive.Entries.Count > 2000 || archive.Entries.Sum(e => e.Length) > 1024L * 1024 * 1024 ||
             archive.Entries.Any(e => !SafeEntry(e)) || archive.Entries.Select(e => e.FullName).Distinct(StringComparer.OrdinalIgnoreCase).Count() != archive.Entries.Count) return false;
-        return new[] { "KioskSetupHelper.exe", "KioskSetupHelper.dll", "KioskSetupHelper.runtimeconfig.json", "Microsoft.Management.Deployment.winmd" }
-            .All(name => archive.Entries.Count(e => e.FullName == name && e.Length > 0) == 1);
+        if (!new[] { "KioskSetupHelper.exe", "KioskSetupHelper.dll", "KioskSetupHelper.runtimeconfig.json", "Microsoft.Management.Deployment.winmd" }
+            .All(name => archive.Entries.Count(e => e.FullName == name && e.Length > 0) == 1)) return false;
+        resource.Position = 0;
+        return PackWorkerCompatibility.Validate(resource);
     }
     private static bool SafeEntry(ZipArchiveEntry entry) => !string.IsNullOrEmpty(entry.FullName) && !entry.FullName.StartsWith('/') &&
         !entry.FullName.Contains(':') && !entry.FullName.Contains('\\') &&

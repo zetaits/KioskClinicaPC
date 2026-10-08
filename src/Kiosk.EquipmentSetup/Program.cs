@@ -37,7 +37,7 @@ internal static class Program
         string components = normalized.SingleOrDefault(a => a.StartsWith("/COMPONENTS="))?[12..] ?? "PACK";
         var values = components.Split(',');
         if (values.Length == 0 || values.Distinct().Count() != values.Length || values.Any(v => v is not ("PACK" or "KIOSK"))) return null;
-        return new(values.Contains("PACK"), values.Contains("KIOSK"), 0, [], normalized.Contains("/RESUME"));
+        return new(values.Contains("PACK"), values.Contains("KIOSK"), 0, [], normalized.Contains("/RESUME"), AllowPartialPack: true, ResolveLatest: true);
     }
     private static async Task<int> Silent(EquipmentRequest request)
     {

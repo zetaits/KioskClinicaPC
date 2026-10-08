@@ -16,7 +16,10 @@ internal sealed class ReviewWindow : Window
         var panel = new StackPanel { Margin = new Thickness(24) };
         Content = new ScrollViewer { Content = panel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
         panel.Children.Add(new TextBlock { Text = "Se borrarán todas las particiones del disco seleccionado de cada equipo.", FontSize = 22, FontWeight = FontWeights.Bold, TextWrapping = TextWrapping.Wrap });
-        panel.Children.Add(new TextBlock { Text = $"Perfil {profile.Name} · Revisión {profile.Revision}\n{image?.Name} · {image?.Editions.Find(e => e.Index == profile.EditionIndex)?.Name}\nAplicaciones: {string.Join(", ", profile.Applications.Applications.Select(a => a.DisplayName + " " + a.PinnedVersion))}\nKiosk: {(profile.Kiosk ? "Sí; siguiente inicio de sesión" : "No")}", Margin = new Thickness(0, 16, 0, 16), TextWrapping = TextWrapping.Wrap });
+        string applications = profile.ApplicationDefinition is { } definition
+            ? string.Join(", ", definition.Applications.Select(a => a.DisplayName + " (última compatible)"))
+            : string.Join(", ", profile.Applications.Applications.Select(a => a.DisplayName + " " + a.PinnedVersion));
+        panel.Children.Add(new TextBlock { Text = $"Perfil {profile.Name} · Revisión {profile.Revision}\n{image?.Name} · {image?.Editions.Find(e => e.Index == profile.EditionIndex)?.Name}\nAplicaciones: {applications}\nKiosk: {(profile.Kiosk ? "Sí; siguiente inicio de sesión" : "No")}", Margin = new Thickness(0, 16, 0, 16), TextWrapping = TextWrapping.Wrap });
         var rows = new List<(TargetRow Row, TextBox User, PasswordBox Password)>();
         var commonUser = new TextBox { Text = profile.Username, Margin = new Thickness(0, 8, 0, 8) };
         panel.Children.Add(new TextBlock { Text = "Usuario común (respeta los usuarios pendientes fijados en el panel)" }); panel.Children.Add(commonUser);

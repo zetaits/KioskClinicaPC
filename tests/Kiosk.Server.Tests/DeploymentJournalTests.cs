@@ -19,6 +19,20 @@ public sealed class DeploymentJournalTests : IDisposable
         Assert.Equal(5, restored.Append("job", DeploymentState.PostInstall, "Reviewed recovery").Sequence);
     }
     [Fact]
+    public async Task Application_diagnostics_are_snapshotted_and_survive_offline_restart()
+    {
+        var run = new KioskClinicaPC.Core.Sync.PackRun { Items = [new() {
+            Application = new(new string('a', 32), "Google.Chrome", "Chrome", "155"), State = KioskClinicaPC.Core.Sync.PackItemState.Failed, Message = "Unavailable" }] };
+        string path = Path.Combine(_root, "apps.json"); var journal = new DeploymentProgressJournal(path, 0);
+        journal.Append("job", DeploymentState.Attention, "Partial", applications: run);
+        run.Items.Clear();
+        await new DeploymentProgressJournal(path, 0).Drain(progress =>
+        {
+            var item = Assert.Single(progress.ApplicationResult!.Items); Assert.Equal("155", item.Application.PinnedVersion);
+            Assert.Equal("Unavailable", item.Message); return Task.FromResult(true);
+        });
+    }
+    [Fact]
     public async Task Concurrent_delivery_serializes_and_lost_acknowledgement_resends_same_sequence()
     {
         var journal = new DeploymentProgressJournal(Path.Combine(_root, "progress.json"), 0);

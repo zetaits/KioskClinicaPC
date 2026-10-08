@@ -10,11 +10,28 @@ public sealed class PackCatalogTests : IDisposable
     private static WingetIndex Index(string version = "1.0", bool eligible = true) => new(DateTime.UtcNow,
         [new("Vendor.App", "Aplicación", "Vendor", version, eligible, eligible ? null : "Solo usuario")]);
     [Fact]
-    public void Add_pins_version_and_keeps_pack_independent_of_index_refresh()
+    public void Migration_preserves_ids_order_selection_and_backup_and_is_idempotent()
+    {
+        Directory.CreateDirectory(_root);
+        var original = new PackCatalog(17, [new(new string('a', 32), "Google.Chrome", "Chrome", "154", false, 42)]);
+        string path = Path.Combine(_root, "pack-applications.json");
+        File.WriteAllText(path, System.Text.Json.JsonSerializer.Serialize(original, new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web)));
+        string before = File.ReadAllText(path);
+        var store = new PackCatalogStore(_root); var definition = store.Definition();
+        Assert.Equal(PackDefinition.FromCatalog(original).Applications, definition.Applications); Assert.Equal(17, definition.Revision);
+        Assert.Equal(before, File.ReadAllText(path + ".before-v3.bak"));
+        definition.Applications.Clear(); Assert.Single(store.Definition().Applications);
+        var restarted = new PackCatalogStore(_root);
+        Assert.Equal(17, restarted.Definition().Revision); Assert.Equal(before, File.ReadAllText(path + ".before-v3.bak"));
+    }
+    [Fact]
+    public void Legacy_projection_updates_versions_without_changing_definition_revision()
     {
         var store = new PackCatalogStore(_root); store.Import(Index()); store.Add("Vendor.App"); store.Add("vendor.app");
         Assert.Single(store.Snapshot().Applications);
-        store.Import(Index("2.0")); Assert.Equal("1.0", store.Snapshot().Applications.Single().PinnedVersion);
+        long revision = store.Definition().Revision;
+        store.Import(Index("2.0")); Assert.Equal("2.0", store.Snapshot().Applications.Single().PinnedVersion);
+        Assert.Equal(revision, store.Definition().Revision);
         Assert.Empty(store.UpdateVersions()); Assert.Equal("2.0", new PackCatalogStore(_root).Snapshot().Applications.Single().PinnedVersion);
     }
     [Fact]

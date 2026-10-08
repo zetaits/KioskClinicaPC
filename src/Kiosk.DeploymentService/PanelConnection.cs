@@ -41,14 +41,17 @@ public sealed class PanelConnection(StationState state) : BackgroundService
             DeploymentPolicy.Require(state.Settings.StationId is not null, "Vincula la estación al panel.");
             // Fetch pending options before sending inventory or confirming; server revisions always win.
             using var get = Request(HttpMethod.Get, "api/deployment/v1/configuration");
+            get.Headers.Add("X-Deployment-Component-Policy", "2");
             using var response = await _http.SendAsync(get, ct);
             DeploymentPolicy.Require(response.IsSuccessStatusCode, "El panel no está disponible o el vínculo fue revocado. Los trabajos autorizados continúan.");
             var config = await response.Content.ReadFromJsonAsync<DeploymentConfiguration>(ct) ?? throw new InvalidDataException("Configuración incompatible.");
             DeploymentPolicy.Require(config.ProtocolVersion == 1, "Actualiza la estación: protocolo incompatible.");
+            DeploymentPolicy.Require(config.ComponentPolicyVersion == 2 && config.Definition is not null,
+                "Actualiza el panel antes de utilizar esta versión de la estación.");
             state.Queue.PendingOptions(config.PendingOptions); Configuration = config;
             var q = state.Queue.Snapshot();
             using var post = Request(HttpMethod.Post, "api/deployment/v1/inventory");
-            post.Content = JsonContent.Create(new DeploymentInventory(1, q.Capacity, q.Images, q.Sessions, q.Batches, q.Jobs));
+            post.Content = JsonContent.Create(new DeploymentInventory(1, q.Capacity, q.Images, q.Sessions, q.Batches, q.Jobs, ComponentPolicyVersion: 2));
             using var sent = await _http.SendAsync(post, ct);
             DeploymentPolicy.Require(sent.IsSuccessStatusCode, "El panel rechazó el seguimiento. Revisa el vínculo de la estación.");
             state.Queue.Acknowledge(q.Jobs.Where(j => j.State == DeploymentState.Queued).Select(j => j.Id));

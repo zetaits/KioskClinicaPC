@@ -9,16 +9,29 @@ public sealed class PackCatalogStore
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
     private readonly object _gate = new();
-    private readonly string _packPath, _indexPath;
+    private readonly string _packPath, _indexPath, _definitionPath;
     private PackCatalog _pack;
+    private PackDefinition _definition;
     private WingetIndex _index;
     public PackCatalogStore(string root)
     {
         Directory.CreateDirectory(root);
         _packPath = Path.Combine(root, "pack-applications.json");
         _indexPath = Path.Combine(root, "winget-index.json");
+        _definitionPath = Path.Combine(root, "pack-definition-v3.json");
         _pack = Read<PackCatalog>(_packPath) ?? new(0, []);
         _index = Read<WingetIndex>(_indexPath) ?? new(DateTime.MinValue, []);
+        _definition = Read<PackDefinition>(_definitionPath) ?? Migrate();
+        KioskClinicaPC.Equipment.EquipmentCatalogClient.Validate(_definition);
+        RefreshLegacyProjection();
+    }
+    private PackDefinition Migrate()
+    {
+        var definition = PackDefinition.FromCatalog(_pack);
+        KioskClinicaPC.Equipment.EquipmentCatalogClient.Validate(definition);
+        if (File.Exists(_packPath) && !File.Exists(_packPath + ".before-v3.bak")) File.Copy(_packPath, _packPath + ".before-v3.bak", overwrite: false);
+        Write(_definitionPath, definition);
+        return definition;
     }
     // Corrupt existing data is deliberately not silently replaced.
     private static T? Read<T>(string path) => File.Exists(path) ? JsonSerializer.Deserialize<T>(File.ReadAllText(path), Json)
@@ -30,6 +43,7 @@ public sealed class PackCatalogStore
         finally { if (File.Exists(tmp)) File.Delete(tmp); }
     }
     public PackCatalog Snapshot() { lock (_gate) return new(_pack.Revision, [.. _pack.Applications.OrderBy(x => x.Order).ThenBy(x => x.DisplayName)]); }
+    public PackDefinition Definition() { lock (_gate) return new(_definition.Revision, [.. _definition.Applications.OrderBy(x => x.Order).ThenBy(x => x.DisplayName)]); }
     public DateTime IndexUpdatedAtUtc { get { lock (_gate) return _index.GeneratedAtUtc; } }
     public IReadOnlyList<WingetIndexEntry> Search(string query)
     {
@@ -48,11 +62,27 @@ public sealed class PackCatalogStore
         {
             if (index.GeneratedAtUtc <= _index.GeneratedAtUtc) throw new InvalidDataException("El índice recibido no es más reciente.");
             Write(_indexPath, index); _index = index;
+            RefreshLegacyProjection();
         }
     }
     private static bool ValidId(string id) => Regex.IsMatch(id, "^[A-Za-z0-9][A-Za-z0-9._+-]{1,199}$");
     private void Commit(List<PackApplication> apps)
     {
+        var definition = PackDefinition.FromCatalog(new(_definition.Revision + 1, apps));
+        Write(_definitionPath, definition); _definition = definition;
+        var next = new PackCatalog(_pack.Revision + 1, apps);
+        Write(_packPath, next); _pack = next;
+    }
+    // Rebuildable v2 projection has its own revision. v3 is authoritative for membership/order.
+    private void RefreshLegacyProjection()
+    {
+        var apps = _definition.Applications.Select(a =>
+        {
+            var entry = _index.Applications.Find(x => x.Id.Equals(a.WingetId, StringComparison.OrdinalIgnoreCase) && x.Eligible);
+            var old = _pack.Applications.Find(x => x.Id == a.Id);
+            return new PackApplication(a.Id, a.WingetId, a.DisplayName, entry?.Version ?? old?.PinnedVersion ?? "unknown", a.SelectedByDefault, a.Order);
+        }).ToList();
+        if (_pack.Applications.SequenceEqual(apps)) return;
         var next = new PackCatalog(_pack.Revision + 1, apps);
         Write(_packPath, next); _pack = next;
     }
@@ -63,7 +93,7 @@ public sealed class PackCatalogStore
             var entry = _index.Applications.SingleOrDefault(x => x.Id.Equals(wingetId, StringComparison.OrdinalIgnoreCase))
                 ?? throw new InvalidDataException("Aplicación no encontrada en el índice.");
             if (!entry.Eligible) throw new InvalidDataException(entry.Reason ?? "No admite instalación silenciosa machine-wide.");
-            if (_pack.Applications.Any(x => x.WingetId.Equals(entry.Id, StringComparison.OrdinalIgnoreCase))) return;
+            if (_definition.Applications.Any(x => x.WingetId.Equals(entry.Id, StringComparison.OrdinalIgnoreCase))) return;
             Commit([.. _pack.Applications, new(Guid.NewGuid().ToString("N"), entry.Id, entry.Name, entry.Version, true, _pack.Applications.Count)]);
         }
     }
@@ -78,14 +108,9 @@ public sealed class PackCatalogStore
         lock (_gate)
         {
             if (_index.GeneratedAtUtc < DateTime.UtcNow.AddDays(-7)) throw new InvalidDataException("El índice lleva más de siete días sin actualizarse. Renueva el índice antes de fijar versiones nuevas.");
-            var failures = new List<string>();
-            var apps = _pack.Applications.Select(app =>
-            {
-                var entry = _index.Applications.Find(x => x.Id.Equals(app.WingetId, StringComparison.OrdinalIgnoreCase));
-                if (entry?.Eligible != true) { failures.Add(app.DisplayName); return app; }
-                return app with { PinnedVersion = entry.Version };
-            }).ToList();
-            Commit(apps); return failures;
+            RefreshLegacyProjection();
+            return _definition.Applications.Where(app => !_index.Applications.Any(entry =>
+                entry.Id.Equals(app.WingetId, StringComparison.OrdinalIgnoreCase) && entry.Eligible)).Select(app => app.DisplayName).ToList();
         }
     }
 }

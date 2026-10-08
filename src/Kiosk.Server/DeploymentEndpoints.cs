@@ -26,7 +26,8 @@ public static class DeploymentEndpoints
         app.MapPost("/api/deployment/v1/enrollment", (EnrollmentRequest request, DeploymentStore store) => Guard(() =>
             Task.FromResult<IResult>(Results.Ok(store.Enroll(request))))).RequireRateLimiting("deployment-enrollment");
         app.MapGet("/api/deployment/v1/configuration", (HttpContext ctx, DeploymentStore store, PackCatalogStore catalog) =>
-            Results.Ok(store.Configuration(Station(ctx), catalog.Snapshot())));
+            Results.Ok(store.Configuration(Station(ctx), catalog.Snapshot(), catalog.Definition(),
+                ctx.Request.Headers["X-Deployment-Component-Policy"] == "2" ? 2 : 1)));
         app.MapPost("/api/deployment/v1/inventory", (HttpContext ctx, DeploymentInventory inventory, DeploymentStore store,
             IHubContext<DeploymentHub> hub) => Guard(async () =>
             { store.Sync(Station(ctx), inventory); await hub.Clients.Group("deployment-panel").SendAsync("Changed"); return Results.NoContent(); }));
@@ -38,7 +39,7 @@ public static class DeploymentEndpoints
             { await antiforgery.ValidateRequestAsync(ctx); store.Revoke(id); await Notify(hub); return Results.NoContent(); })).RequireAuthorization();
         app.MapPost("/panel/deployment/profiles", (ProfileRequest request, HttpContext ctx, IAntiforgery antiforgery,
             DeploymentStore store, PackCatalogStore catalog, IHubContext<DeploymentHub> hub) => Guard(async () =>
-            { await antiforgery.ValidateRequestAsync(ctx); var result = store.SaveProfile(request, catalog.Snapshot()); await Notify(hub); return Results.Ok(result); })).RequireAuthorization();
+            { await antiforgery.ValidateRequestAsync(ctx); var result = store.SaveProfile(request, catalog.Snapshot(), catalog.Definition()); await Notify(hub); return Results.Ok(result); })).RequireAuthorization();
         app.MapPost("/panel/deployment/stations/{stationId}/sessions/{sessionId}/username", (string stationId, string sessionId,
             PendingUsernameRequest request, HttpContext ctx, IAntiforgery antiforgery, DeploymentStore store, IHubContext<DeploymentHub> hub) => Guard(async () =>
             { await antiforgery.ValidateRequestAsync(ctx); store.PendingUsername(stationId, sessionId, request); await Notify(hub); return Results.NoContent(); })).RequireAuthorization();

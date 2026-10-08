@@ -47,13 +47,24 @@ internal static class Program
                 try { using var response = await http.PostAsJsonAsync(route + "progress", value); return response.IsSuccessStatusCode; }
                 catch (Exception ex) when (ex is HttpRequestException or OperationCanceledException) { return false; }
             }
+            string? lastApplications = null;
             void ComponentProgress(EquipmentEvent value)
             {
                 if (value.Kind is not ("phase" or "extract" or "preflight-ready" or "preflight-failed" or "applications")) return;
                 string phase = value.Message;
                 var activeApp = value.Run?.Items.FirstOrDefault(i => i.State is KioskClinicaPC.Core.Sync.PackItemState.Checking or KioskClinicaPC.Core.Sync.PackItemState.Installing);
                 if (activeApp is not null) phase = activeApp.Application.DisplayName + ": " + activeApp.Message;
-                journal.Append(plan.Job.Id, DeploymentState.PostInstall, phase, value.Percent, true, true);
+                KioskClinicaPC.Core.Sync.PackRun? applications = null;
+                if (value.Run is { } run)
+                {
+                    var signature = JsonSerializer.Serialize(run.Items.Select(i => new { i.Application.Id,
+                        i.Application.PinnedVersion, i.State, i.InstalledVersion, i.RequiresRebootBeforeRetry, i.RebootRequired,
+                        Error = i.State is KioskClinicaPC.Core.Sync.PackItemState.Failed or KioskClinicaPC.Core.Sync.PackItemState.VerificationPending ? i.Message : null }));
+                    // Retain state/version changes offline without duplicating the full pack for every download tick.
+                    if (signature != lastApplications) { applications = run; lastApplications = signature; }
+                }
+                journal.Append(plan.Job.Id, DeploymentState.PostInstall, phase, value.Percent, true, true,
+                    reboot: value.Run?.RebootRequired ?? value.RebootRequired, applications: applications);
                 _ = journal.Drain(SendProgress);
             }
             // Credential cleanup is mandatory and precedes every application installer, including resumption.
@@ -69,16 +80,22 @@ internal static class Program
                 if (plan.WorkerSha256 is not null) await Verify("worker.zip", plan.WorkerSha256);
                 if (plan.KioskSha256 is not null) await Verify("kiosk.exe", plan.KioskSha256);
                 Payload.UseDirectory(Root);
-                AtomicState.Write(Path.Combine(Root, "payload.json"), new PayloadManifest(2, 2, "equipment-wpf", "0.1.0", "0.1.0",
+                AtomicState.Write(Path.Combine(Root, "payload.json"), new PayloadManifest(2, 3, "equipment-wpf", "0.1.0", "0.1.0",
                     plan.KioskVersion ?? "0.0.0", new string('0', 40), plan.WorkerSha256 ?? new string('0', 64), plan.KioskSha256 ?? new string('0', 64)));
                 string work = MachineState.Prepare();
                 using var lease = SetupLease.Equipment(MachineState.Root, plan.Job.Profile.Applications.Applications.Count > 0);
-                var execution = new EquipmentExecution(_ => Task.FromResult(plan.Job.Profile.Applications),
+                var selectedPack = plan.Job.Profile.ApplicationDefinition?.ForExecution() ?? plan.Job.Profile.Applications;
+                var execution = new EquipmentExecution(_ => Task.FromResult(selectedPack),
                     () => new PackSession(work, _ => { }), new KioskPayload(work));
                 var request = new EquipmentRequest(plan.Job.Profile.Applications.Applications.Count > 0, plan.Job.Profile.Kiosk,
-                    plan.Job.Profile.Applications.Revision, plan.Job.Profile.Applications.Applications.Select(a => new EquipmentSelection(a.Id, a.PinnedVersion)).ToList(), args.Length > 0);
+                    selectedPack.Revision, selectedPack.Applications.Select(a => new EquipmentSelection(a.Id, a.PinnedVersion)).ToList(), args.Length > 0,
+                    AllowPartialPack: selectedPack.Definition is not null, ResolveLatest: selectedPack.Definition is not null);
                 var componentResult = await execution.Run(request, ComponentProgress, CancellationToken.None);
-                if (componentResult.KioskVerified) await KioskPayload.RegisterAutostart();
+                if (componentResult.KioskVerified)
+                {
+                    try { await KioskPayload.RegisterAutostart(); }
+                    catch { return componentResult with { Message = "Revisa el registro de inicio automático de Kiosk.", ExitCode = 2 }; }
+                }
                 return componentResult;
             });
             var result = preparation.Components;
@@ -88,7 +105,7 @@ internal static class Program
             var progress = AtomicState.Read(progressPath, () => journal.Append(plan.Job.Id,
                 result.ExitCode == 0 ? DeploymentState.Completed : DeploymentState.Attention,
                 result.ExitCode == 0 ? result.RebootRequired ? "Reinicio necesario" : "Escritorio y componentes verificados" : "Windows instalado; revisa la preparación de aplicaciones",
-                null, windowsVerified, accountVerified, result.ExitCode == 0, result.RebootRequired));
+                null, windowsVerified, accountVerified, result.ExitCode == 0, result.RebootRequired, result.Run));
             AtomicState.Write(progressPath, progress);
             // Typed durable result is retried verbatim. Repeated delivery cannot rerun Setup or native installers.
             for (int attempt = 0; attempt < 12; attempt++)

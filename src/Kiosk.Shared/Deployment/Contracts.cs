@@ -18,21 +18,23 @@ public sealed record DeploymentImage(string Id, string Name, string Architecture
 public sealed record DeploymentStation(string Id, string Name, DateTimeOffset? LastSeenUtc, bool Revoked,
     List<DeploymentImage> Images, List<BootSession> Sessions, int Capacity = 3);
 public sealed record DeploymentProfile(string Id, long Revision, string Name, string? ImageId, int? EditionIndex,
-    string Language, string Username, PackCatalog Applications, bool Kiosk);
+    string Language, string Username, PackCatalog Applications, bool Kiosk, PackDefinition? ApplicationDefinition = null);
 public sealed record DeploymentBatch(string Id, DateTimeOffset ConfirmedAtUtc, List<string> JobIds);
 public sealed record DeploymentJob(string Id, string BatchId, string SessionId, string HardwareFingerprint,
     DeploymentDisk Disk, DeploymentProfile Profile, string Username, long OptionsRevision, DeploymentState State,
     DateTimeOffset CreatedAtUtc, bool DestructiveStarted = false, long LastSequence = 0, string Phase = "En cola",
     int? Percent = null, bool WindowsVerified = false, bool AccountVerified = false, bool ComponentsVerified = false,
-    bool RebootRequired = false, bool PanelAccepted = false, string WindowsEditionId = "", int WindowsBuild = 0, string? DriverSha256 = null);
+    bool RebootRequired = false, bool PanelAccepted = false, string WindowsEditionId = "", int WindowsBuild = 0, string? DriverSha256 = null,
+    PackRun? ApplicationResult = null);
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record DeploymentProgress(string JobId, long Sequence, DeploymentState State, string Phase, int? Percent,
-    bool WindowsVerified = false, bool AccountVerified = false, bool ComponentsVerified = false, bool RebootRequired = false);
+    bool WindowsVerified = false, bool AccountVerified = false, bool ComponentsVerified = false, bool RebootRequired = false,
+    PackRun? ApplicationResult = null);
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record DeploymentInventory(int ProtocolVersion, int Capacity, List<DeploymentImage> Images,
-    List<BootSession> Sessions, List<DeploymentBatch> Batches, List<DeploymentJob> Jobs);
+    List<BootSession> Sessions, List<DeploymentBatch> Batches, List<DeploymentJob> Jobs, int ComponentPolicyVersion = 1);
 public sealed record DeploymentConfiguration(int ProtocolVersion, List<DeploymentProfile> Profiles, List<BootSession> PendingOptions,
-    PackCatalog Catalog);
+    PackCatalog Catalog, PackDefinition? Definition = null, int ComponentPolicyVersion = 1);
 public sealed record DeploymentPanelSnapshot(List<DeploymentStation> Stations, List<DeploymentProfile> Profiles,
     Dictionary<string, List<DeploymentBatch>> Batches, Dictionary<string, List<DeploymentJob>> Jobs);
 
