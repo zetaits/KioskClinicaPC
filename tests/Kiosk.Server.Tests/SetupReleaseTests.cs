@@ -145,6 +145,14 @@ public sealed class SetupReleaseTests : IDisposable
         var (conflicting, conflictingBytes) = Bundle("1.4.0");
         using (var form = Form(conflicting, conflictingBytes)) Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsync("/api/releases/setup/v3", form)).StatusCode);
         var (release, bytes) = Bundle(); await Publish(client, release, bytes);
+        string html = WebUtility.HtmlDecode(await client.GetStringAsync("/instalador"));
+        Assert.Contains($"href=\"/panel/setup/download?version={release.Version}&edition=online\"", html);
+        Assert.Contains($"href=\"/panel/setup/download?version={release.Version}&edition=complete\"", html);
+        Assert.Contains("Pendiente de activación", html);
+        Assert.Contains("data-setup-download-status", html);
+        Assert.DoesNotContain("1.4.0", html);
+        Assert.DoesNotContain("version=legacy", html);
+        Assert.Null(Store.ActiveVersion);
         var legacyConflict = new InitialSetupBundleManifest { SchemaVersion = 2, InstallerKind = "equipment-wpf", CatalogApiVersion = 3,
             Version = release.Version, AssistantVersion = release.Version, WorkerVersion = release.Version, KioskVersion = "1.2.0", SourceCommit = new string('a', 40),
             ServerUrl = "https://panel.invalid", FileName = $"Setup-EquipoClinicaPC-{release.Version}.exe", SizeBytes = oldBytes.Length, Sha256 = Hash(oldBytes) };
@@ -154,6 +162,15 @@ public sealed class SetupReleaseTests : IDisposable
         Assert.Equal(bytes["complete"], await client.GetByteArrayAsync($"/panel/setup/download?version={release.Version}&edition=complete"));
         await Store.Activate(release.Version, default); Assert.Equal(bytes["online"], await client.GetByteArrayAsync("/panel/setup/download"));
         await Store.Activate(null, default); Assert.Equal(oldBytes, await client.GetByteArrayAsync("/panel/setup/download")); Assert.Single(Store.List());
+        var (latest, latestBytes) = Bundle("1.6.0"); await Publish(client, latest, latestBytes);
+        await Store.Activate(release.Version, default);
+        html = WebUtility.HtmlDecode(await client.GetStringAsync("/instalador"));
+        Assert.True(html.IndexOf("Descargar Online", StringComparison.Ordinal) < html.IndexOf("Instalar sistemas por red", StringComparison.Ordinal));
+        Assert.Contains($"href=\"/panel/setup/download?version={latest.Version}&edition=online\"", html);
+        Assert.True(html.IndexOf("Versión 1.6.0", StringComparison.Ordinal) < html.IndexOf("Versión 1.5.0", StringComparison.Ordinal));
+        Assert.Contains("Otras versiones y recuperación", html);
+        Assert.DoesNotContain("1.4.0", html);
+        Assert.Equal(release.Version, Store.ActiveVersion);
     }
     [Fact]
     public async Task Corrupt_active_pointer_or_active_files_make_readiness_unavailable()

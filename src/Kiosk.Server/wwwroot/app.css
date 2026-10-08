@@ -703,6 +703,26 @@ label.installer-drop {
 .setup-hero-heading h2 { margin: 8px 0 5px; font-size: 23px; }
 .setup-hero-heading p { margin: 0; line-height: 1.5; }
 .setup-hero-heading .badge { flex: none; margin-top: 4px; }
+.setup-release-heading { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin: 24px 0 14px; }
+.setup-editions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+.setup-edition { display: flex; flex-direction: column; min-width: 0; padding: 24px; border: 1px solid var(--line-strong); border-radius: 12px; background: rgba(255,255,255,.025); }
+.setup-edition-online { border-color: var(--accent-2); background: rgba(243,122,74,.045); }
+.setup-edition-heading { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 8px 14px; }
+.setup-edition-heading h3 { margin: 0; font-size: 20px; }
+.setup-edition-size { color: var(--muted); font-family: var(--font-mono); white-space: nowrap; }
+.setup-edition p, .setup-edition-features { line-height: 1.6; }
+.setup-edition-features { margin: 0 0 24px; padding-left: 20px; color: var(--muted); }
+.setup-edition-features li + li { margin-top: 8px; }
+.setup-edition .setup-download-action { margin-top: auto; }
+.setup-activation { display: flex; align-items: center; justify-content: space-between; gap: 24px; margin-top: 20px; padding: 18px 20px; border: 1px solid var(--line-strong); border-radius: 10px; }
+.setup-activation p { margin: 6px 0 0; line-height: 1.5; }
+.setup-activation form { flex: none; }
+.setup-requirements { margin: 20px 0 0; font-size: 12px; line-height: 1.6; }
+.setup-history summary { cursor: pointer; font-size: 16px; font-weight: 600; }
+.setup-history summary span { margin-left: 12px; font-size: 12px; font-weight: 400; }
+.setup-history-release { padding: 18px 0; border-top: 1px solid var(--line-strong); }
+.setup-history-release .setup-release-heading { margin-top: 0; }
+.setup-history-actions { display: flex; flex-wrap: wrap; gap: 10px; }
 .setup-download-row { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 18px; border: 1px solid var(--line-strong); border-radius: 12px; background: rgba(255,255,255,.035); }
 .setup-file { display: flex; align-items: center; gap: 14px; min-width: 0; }
 .setup-file-icon { display: grid; place-items: center; width: 48px; height: 48px; flex: none; border-radius: 11px; background: rgba(243,122,74,.14); color: var(--accent-2); }
@@ -1000,6 +1020,10 @@ label.deployment-kiosk { display: block; margin: 0; cursor: pointer; }
     .job-row { grid-template-columns: 1fr; }
     .job-progress { grid-column: 1; }
     .setup-hero-heading, .setup-download-row { flex-direction: column; align-items: stretch; }
+    .setup-editions { grid-template-columns: 1fr; }
+    .setup-edition { padding: 20px; }
+    .setup-activation { flex-direction: column; align-items: stretch; gap: 16px; }
+    .setup-activation .btn { width: 100%; }
     .setup-hero-heading .badge { align-self: flex-start; }
     .setup-download-action { width: 100%; }
     .setup-download-button { width: 100%; }

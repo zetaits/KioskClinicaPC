@@ -189,7 +189,7 @@ public sealed class PanelApplicationPagesTests : IDisposable
     }
 
     [Fact]
-    public async Task Installer_only_shows_downloads_and_link_back_to_applications()
+    public async Task Installer_shows_pending_editions_and_applications_link_when_only_legacy_exists()
     {
         using var client = PanelClient();
         await ImportInternalSetup();
@@ -197,9 +197,9 @@ public sealed class PanelApplicationPagesTests : IDisposable
         string html = WebUtility.HtmlDecode(await client.GetStringAsync("/instalador"));
         Assert.Contains("Instalador de equipos", html);
         Assert.Contains("solo pack, solo Kiosk o ambos", html);
-        Assert.Contains("href=\"/panel/setup/download\"", html);
-        Assert.Contains("data-setup-download-label", html);
-        Assert.Contains("data-setup-download-status", html);
+        Assert.Contains("Todavía no se han publicado las ediciones Online y Completo para USB", html);
+        Assert.DoesNotContain("href=\"/panel/setup/download", html);
+        Assert.DoesNotContain("1.4.0", html);
         Assert.Contains("href=\"/aplicaciones\"", html);
         Assert.DoesNotContain("pack-search", html);
         Assert.DoesNotContain("Actualizar versiones del pack", html);
@@ -208,7 +208,7 @@ public sealed class PanelApplicationPagesTests : IDisposable
     }
 
     [Fact]
-    public async Task Installer_keeps_single_internal_download_even_when_public_kiosk_releases_exist()
+    public async Task Installer_does_not_offer_legacy_or_public_kiosk_releases()
     {
         using var client = PanelClient();
         var updates = _factory.Services.GetRequiredService<KioskUpdateStore>();
@@ -229,7 +229,7 @@ public sealed class PanelApplicationPagesTests : IDisposable
         await ImportInternalSetup();
 
         string html = await client.GetStringAsync("/instalador");
-        Assert.Single(System.Text.RegularExpressions.Regex.Matches(html, "href=\"/panel/setup/download\""));
+        Assert.DoesNotContain("href=\"/panel/setup/download", html);
         Assert.DoesNotContain("github.com", html);
         Assert.DoesNotContain("Descargar Kiosk", html);
         Assert.Null(updates.ActiveVersion);

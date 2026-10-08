@@ -168,15 +168,17 @@ instalado se omite. No se aceptan URLs, comandos, rutas ni argumentos de fabrica
    y `worker`. El límite agregado sigue siendo 1 GiB más margen multipart. Valida
    tamaños, hashes, nombres, protocolo y ZIP en disco. Un reintento con los mismos
    archivos y manifiesto es idempotente; cambiar contenido exige otra versión.
-4. La publicación queda como **candidata**. En `/instalador`, descargar online y
-   completo de esa versión y probar los equipos piloto. Antes de la primera activación,
-   continúa disponible el asistente compatible anterior 1.4.0. Ambas ediciones usan
-   las mismas versiones fijadas; no resuelven componentes a «latest».
-5. Tras aprobar las pruebas de VM/piloto, pulsar **Activar / restaurar 1.5.0**.
+4. La publicación queda como **candidata**. `/instalador` destaca las ediciones Online
+   y Completo para USB de la versión más reciente, con enlaces fijados a esa versión
+   incluso antes de activarla. Descargar ambas y probar los equipos piloto. El asistente
+   antiguo 1.4.0 no aparece en la página. Ambas ediciones usan las mismas versiones
+   fijadas; no resuelven componentes a «latest».
+5. Tras aprobar las pruebas de VM/piloto, pulsar **Activar versión 1.5.0**.
    Requiere cookie administrativa y antiforgery. Se verifican de nuevo los dos EXE
    y los dos componentes antes de sustituir atómicamente `setups/v3/active.json`.
    La importación fallida nunca modifica ese puntero.
-6. Recuperación: activar otra versión validada o **Restaurar asistente anterior 1.4.0**.
+6. Recuperación: restaurar otra versión validada de las nuevas ediciones desde
+   **Otras versiones y recuperación**, que aparece cuando hay más de una publicación.
    Se conservan publicaciones, almacén antiguo y todos los componentes referenciados.
    Descargar una candidata no cambia la versión activa ni asigna trabajos a la flota.
 
