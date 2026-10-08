@@ -11,11 +11,12 @@ internal static class LocalState
         if (identity.IsSystem || !new WindowsPrincipal(identity).IsInRole(WindowsBuiltInRole.Administrator))
             throw new InvalidOperationException("Ejecuta el Setup como administrador bajo un usuario interactivo, no SYSTEM.");
         // State used by an elevated installer must not be writable by ordinary users.
-        string parent = Path.GetDirectoryName(Program.StateRoot)!;
-        foreach (string path in new[] { parent, Program.StateRoot })
+        string parent = Path.GetDirectoryName(PackState.StateRoot)!;
+        foreach (string path in new[] { parent, PackState.StateRoot })
         {
+            KioskClinicaPC.Equipment.SetupComponentCache.SafePath(path);
             if (Directory.Exists(path) && (File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0)
-                throw new IOException("No se admite un enlace o redirección en la carpeta de estado.");
+                throw new IOException("No se admite un enlace o redirecciÃ³n en la carpeta de estado.");
             var directory = Directory.CreateDirectory(path);
             var security = new DirectorySecurity();
             security.SetAccessRuleProtection(true, false);

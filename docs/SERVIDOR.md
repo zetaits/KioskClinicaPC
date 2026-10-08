@@ -149,7 +149,10 @@ contraseña, identidad y ajustes existentes, incluso si el UAC se aprobó con ot
 | `POST /api/setup/sessions` | clave de Setup | Crea una sesión auditable y fija los paquetes seleccionados. |
 | `GET /api/setup/sessions/{id}/packages/{packageId}/download` | clave + token de sesión | Descarga privada y reanudable para el Setup. |
 | `POST /api/setup/sessions/{id}/packages/{packageId}/status` | clave + token de sesión | Resultado de cada aplicación del pack. |
-| `GET /panel/setup/download` | cookie | Descarga el último Setup interno cuyo tamaño y SHA-256 sean válidos. |
+| `GET /panel/setup/download` | cookie | Online de la versión activa; `edition=complete` para USB y `version=X.Y.Z` para candidatas. |
+| `POST /api/releases/setup/v3` | clave de publicación | Importa manifiesto esquema 3, ambos asistentes y componentes como candidata, sin activarla. |
+| `GET /api/setup/v3/components/{kind}/{sha256}` | clave de Setup | Componentes publicados, inmutables, con ETag y Range. |
+| `POST /panel/setup/activate` | cookie + antiforgery | Verifica y activa/restaura una candidata; `version=legacy` restaura el asistente anterior. |
 | `POST /api/maintenance/{id}/status` | API key + token de mantenimiento | Resultado verificado de una autodesinstalación de Kiosk. |
 | `POST /panel/installers/upload` | cookie + antiforgery | Añade un MSI/Inno/NSIS al catálogo. |
 | `POST /login` · `POST /logout` | cookie | Sesión del panel (con antiforgery + throttle). |
@@ -183,7 +186,12 @@ biblioteca, más el marcador interno que evita resembrar imágenes borradas deli
 Bajo `InstallersDir` (`installers/` por defecto): binarios MSI/EXE privados, con nombres internos aleatorios.
 
 Bajo `SetupDir` (`setups/` por defecto): el `Setup-EquipoClinicaPC-*.exe` interno y su
-`*.bundle.json`. El panel selecciona la versión válida más alta compatible con WPF y catálogo v2 y nunca sirve un binario cuyo hash no coincida. Conserva los artefactos antiguos sin ofrecerlos como alternativa. Publicación y validación: [Asistente de equipos](ASISTENTE-EQUIPOS.md).
+`*.bundle.json` anteriores permanecen como recuperación. Las publicaciones nuevas están en
+`v3/releases/<versión>/` y sus componentes por hash en `v3/components/{kiosk,worker}/`.
+`v3/active.json` conserva el puntero activo y anterior; se sustituye atómicamente tras
+comprobar ambas ediciones y componentes. Antes de activar v3 se ofrece el asistente
+compatible anterior. La publicación no activa descargas. Publicación y validación:
+[Asistente de equipos](ASISTENTE-EQUIPOS.md).
 
 Bajo `UpdatesDir` (`updates/` por defecto): instaladores públicos inmutables importados por CI. Incluye esta
 carpeta en las copias de seguridad junto con `data/`, `assets/` e `installers/`.
@@ -237,7 +245,7 @@ Remove-Item Env:KIOSK_SERVER_API_KEY
 
 Este build genera `Setup-KioskClinicaPC-*`, que se publica para auto-update y contiene
 la `ApiKey` de la flota para conectar kioscos nuevos y anteriores sin servidor; cualquiera que
-descargue la release puede extraerla. El asistente WPF `Setup-EquipoClinicaPC-*` se genera y publica por separado con el workflow manual **Equipment Setup** y añade la clave limitada del pack. Se importa exclusivamente por `/api/releases/setup`, nunca al release público. Actualizar la VPS no reconstruye esta descarga. Rotar la clave del pack
+descargue la release puede extraerla. El asistente WPF `Setup-EquipoClinicaPC-*` se genera y publica por separado con el workflow manual **Equipment Setup** y añade la clave limitada del pack. Las dos ediciones 1.5.0 se importan como candidatas por `/api/releases/setup/v3` y se activan desde el panel, nunca en el release público. Se conserva `/api/releases/setup` para paquetes anteriores. Actualizar la VPS no reconstruye esta descarga. Rotar la clave del pack
 invalida su descarga en Setups internos antiguos, aunque estos siguen pudiendo instalar Kiosk.
 
 En el primer arranque con `ServerUrl`, el agente empareja ese origen HTTPS en

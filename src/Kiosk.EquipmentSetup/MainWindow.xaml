@@ -53,6 +53,7 @@
                         <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Visibility="{Binding Visibility, ElementName=ComponentsPanel}">
                             <StackPanel x:Name="ComponentsPanel">
                                 <TextBlock Text="Elige qué quieres instalar" FontSize="22" FontWeight="Bold" Margin="0,0,0,18"/>
+                                <TextBlock x:Name="EditionNotice" TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}" FontSize="13" Margin="0,0,0,16"/>
                                 <Border Background="{StaticResource InsetBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="9" Padding="16" Margin="0,0,0,12">
                                     <StackPanel>
                                         <CheckBox x:Name="PackCheck" IsChecked="True" Margin="0" Checked="ComponentsChanged" Unchecked="ComponentsChanged"><TextBlock Text="Pack de aplicaciones del panel" FontWeight="Bold"/></CheckBox>

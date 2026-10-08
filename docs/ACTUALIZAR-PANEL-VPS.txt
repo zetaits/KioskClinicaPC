@@ -34,6 +34,17 @@ recibidos durante el intento.
 
 El procedimiento de actualización no cambia Caddy ni los ajustes de los kioscos.
 
+ENTREGA DEL ASISTENTE 1.5.0 (ONLINE Y COMPLETO PARA USB)
+
+Actualizar primero el servidor y comprobar en /health/ready los encabezados
+X-Setup-Catalog-Version: 3 y X-Setup-Component-Protocol: 1. El despliegue no
+reconstruye asistentes. Ejecutar después Equipment Setup para publicar una
+candidata 1.5.0, probar las dos descargas en equipos piloto y activar desde
+/instalador. La publicación no activa automáticamente. Hasta esa activación
+se conserva la oferta compatible anterior 1.4.0. Para recuperar, restaurar
+una versión validada desde el panel; no eliminar setups ni sus componentes.
+Procedimiento y pruebas de VM: docs/ASISTENTE-EQUIPOS.md.
+
 Si SSH cierra la conexión durante la subida, la activación aún no ha comenzado
 y la versión en servicio se mantiene. El mensaje «Connection closed» no indica
 por sí solo la causa: revisa la autenticación y el registro SSH de la VPS con

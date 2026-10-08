@@ -80,6 +80,29 @@ public sealed class EquipmentExecutionTests
         Assert.Equal(2, result.ExitCode); Assert.True(result.KioskVerified); Assert.True(result.RebootRequired);
     }
     [Fact]
+    public async Task Preparation_follows_selection_validation_and_failure_prevents_every_bootstrap()
+    {
+        var calls = new List<string>();
+        var execution = new EquipmentExecution(_ => { calls.Add("catalog"); return Task.FromResult(Catalog); },
+            () => { calls.Add("create-pack"); return new Pack(calls); }, new Kiosk(calls),
+            (_, _, _) => { calls.Add("prepare"); throw new ComponentPreparationException("Kiosk: reintenta"); });
+        var invalid = await execution.Run(Request() with { CatalogRevision = 99 }, _ => { }, CancellationToken.None);
+        Assert.Equal("review", invalid.Kind); Assert.Equal(new[] { "catalog" }, calls);
+        calls.Clear();
+        var failed = await execution.Run(Request(), _ => { }, CancellationToken.None);
+        Assert.Equal(1, failed.ExitCode); Assert.Contains("Kiosk", failed.Message); Assert.Equal(new[] { "catalog", "prepare" }, calls);
+    }
+    [Theory]
+    [InlineData(true, true)] [InlineData(true, false)] [InlineData(false, true)]
+    public async Task Preparation_receives_only_selected_components(bool packSelected, bool kioskSelected)
+    {
+        var calls = new List<string>();
+        var result = await new EquipmentExecution(_ => Task.FromResult(Catalog), () => new Pack(calls), new Kiosk(calls),
+            (request, _, _) => { Assert.Equal(packSelected, request.Pack); Assert.Equal(kioskSelected, request.Kiosk); calls.Add("prepare"); return Task.CompletedTask; })
+            .Run(Request(packSelected, kioskSelected), _ => { }, CancellationToken.None);
+        Assert.Equal(0, result.ExitCode); Assert.Equal("prepare", calls[0]);
+    }
+    [Fact]
     public void Empty_components_and_duplicate_or_unselected_apps_are_rejected()
     {
         Assert.Throws<ArgumentException>(() => EquipmentPolicy.ValidateRequest(Request(false, false)));

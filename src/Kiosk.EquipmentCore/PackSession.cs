@@ -72,6 +72,10 @@ internal sealed class PackSession(string work, Action<string> diagnostic) : IEqu
         using var registration = ct.Register(Cancel);
         bool complete = await _finished.Task;
         await _process.WaitForExitAsync();
+        // Process exit and a parsed result do not imply the redirected readers have delivered their final callbacks.
+        // Drain them before exposing completion to the coordinator/UI.
+        if (_reader != null) await _reader;
+        if (_errors != null) await _errors;
         return complete && _process.ExitCode == 0;
     }
     public async ValueTask DisposeAsync()

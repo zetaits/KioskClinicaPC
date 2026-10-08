@@ -86,7 +86,8 @@ internal static class Program
                 using var lease = SetupLease.Equipment(MachineState.Root, plan.Job.Profile.Applications.Applications.Count > 0);
                 var selectedPack = plan.Job.Profile.ApplicationDefinition?.ForExecution() ?? plan.Job.Profile.Applications;
                 var execution = new EquipmentExecution(_ => Task.FromResult(selectedPack),
-                    () => new PackSession(work, _ => { }), new KioskPayload(work));
+                    () => new PackSession(work, _ => { }), new KioskPayload(work),
+                    (selection, report, token) => Payload.Prepare(selection, work, http, report, token));
                 var request = new EquipmentRequest(plan.Job.Profile.Applications.Applications.Count > 0, plan.Job.Profile.Kiosk,
                     selectedPack.Revision, selectedPack.Applications.Select(a => new EquipmentSelection(a.Id, a.PinnedVersion)).ToList(), args.Length > 0,
                     AllowPartialPack: selectedPack.Definition is not null, ResolveLatest: selectedPack.Definition is not null);

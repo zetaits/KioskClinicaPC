@@ -15,14 +15,15 @@ internal static class MachineState
     internal static string Prepare()
     {
         RequireElevated();
-        foreach (string path in new[] { Path.GetDirectoryName(Root)!, Root, Path.Combine(Root, "work"), Path.Combine(Root, "logs") })
+        foreach (string path in new[] { Path.GetDirectoryName(Root)!, Root, Path.Combine(Root, "work"), Path.Combine(Root, "logs"), Path.Combine(Root, "cache") })
         {
+            KioskClinicaPC.Equipment.SetupComponentCache.SafePath(path);
             if (Directory.Exists(path) && (File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0) throw new IOException("Carpeta de estado redirigida.");
             var security = new DirectorySecurity(); security.SetAccessRuleProtection(true, false);
             var admins = new SecurityIdentifier(WellKnownSidType.BuiltinAdministratorsSid, null); security.SetOwner(admins);
             foreach (var sid in new[] { admins, new SecurityIdentifier(WellKnownSidType.LocalSystemSid, null) })
                 security.AddAccessRule(new FileSystemAccessRule(sid, FileSystemRights.FullControl, InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit, PropagationFlags.None, AccessControlType.Allow));
-            if (path != Path.Combine(Root, "work")) security.AddAccessRule(new FileSystemAccessRule(new SecurityIdentifier(WellKnownSidType.BuiltinUsersSid, null), FileSystemRights.ReadAndExecute,
+            if (path != Path.Combine(Root, "work") && path != Path.Combine(Root, "cache")) security.AddAccessRule(new FileSystemAccessRule(new SecurityIdentifier(WellKnownSidType.BuiltinUsersSid, null), FileSystemRights.ReadAndExecute,
                 InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit, PropagationFlags.None, AccessControlType.Allow));
             var directory = new DirectoryInfo(path);
             if (directory.Exists) directory.SetAccessControl(security); else directory.Create(security);

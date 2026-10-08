@@ -6,7 +6,7 @@ on:
       version:
         description: Versión independiente del asistente (X.Y.Z)
         required: true
-        default: '1.4.0'
+        default: '1.5.0'
         type: string
       kiosk_version:
         description: Versión de Kiosk incluida (vacía usa la del proyecto)
@@ -35,7 +35,7 @@ jobs:
       - name: Test
         shell: pwsh
         run: dotnet test -c Release
-      - name: Build, diagnose and publish only the private equipment assistant
+      - name: Build both editions, diagnose sizes and publish a private candidate
         shell: pwsh
         env:
           EQUIPMENT_VERSION: ${{ inputs.version }}
@@ -48,5 +48,5 @@ jobs:
           KIOSK_UPDATE_SIGNING_PUBLIC_KEY: ${{ secrets.KIOSK_UPDATE_SIGNING_PUBLIC_KEY }}
         run: |
           $ready = Invoke-WebRequest 'https://panel.clinicapc.es/health/ready'
-          if (($ready.Content | ConvertFrom-Json).status -ne 'ok' -or $ready.Headers['X-Setup-Catalog-Version'] -ne '3') { throw 'Despliega primero el servidor con catálogo v3.' }
+          if (($ready.Content | ConvertFrom-Json).status -ne 'ok' -or $ready.Headers['X-Setup-Catalog-Version'] -ne '3' -or $ready.Headers['X-Setup-Component-Protocol'] -ne '1') { throw 'Despliega primero el servidor con catálogo v3 y protocolo de componentes 1.' }
           .\build-equipment-setup.ps1 -Version $env:EQUIPMENT_VERSION -KioskVersion $env:EQUIPMENT_KIOSK_VERSION -Publish

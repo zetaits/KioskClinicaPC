@@ -1,1 +1,1 @@
-{"schemaVersion":2,"catalogApiVersion":3,"installerKind":"equipment-wpf","assistantVersion":"1.4.0","workerVersion":"1.4.0","kioskVersion":"1.2.0","sourceCommit":"development","workerSha256":"","kioskSha256":""}
+{"schemaVersion":3,"edition":"online","componentProtocolVersion":1,"catalogApiVersion":3,"installerKind":"equipment-wpf","assistantVersion":"1.5.0","workerVersion":"1.5.0","kioskVersion":"1.2.0","sourceCommit":"development","workerSha256":"","kioskSha256":""}

@@ -6,6 +6,7 @@ using KioskClinicaPC.Equipment;
 using Xunit;
 
 namespace Kiosk.EquipmentSetup.Tests;
+[Collection("Equipment resources")]
 public sealed class WizardTests
 {
     private static PackCatalog Catalog => new(7, [new(new string('a', 32), "Vendor.App", "Aplicación del panel", "3.2", true), new(new string('b', 32), "Vendor.Other", "Opcional", "2.0", false)]);

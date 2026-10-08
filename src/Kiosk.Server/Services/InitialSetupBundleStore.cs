@@ -56,7 +56,8 @@ public sealed class InitialSetupBundleStore
         {
             string target = Path.Combine(_root, manifest.FileName);
             string manifestPath = Path.ChangeExtension(target, ".bundle.json");
-            if (File.Exists(target) || File.Exists(manifestPath)) throw new InvalidDataException("Esta versión ya existe; publica una nueva versión.");
+            if (File.Exists(target) || File.Exists(manifestPath) || Directory.Exists(Path.Combine(_root, "v3", "releases", manifest.Version)))
+                throw new InvalidDataException("Esta versión ya existe; publica una nueva versión.");
             await using (var file = File.Create(staging))
             {
                 byte[] buffer = new byte[81920]; long total = 0; int read;

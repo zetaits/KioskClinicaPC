@@ -125,7 +125,8 @@ public interface IEquipmentKiosk
     bool RebootRequired { get; }
 }
 public sealed class EquipmentExecution(Func<CancellationToken, Task<PackCatalog>> loadCatalog,
-    Func<IEquipmentPackSession> createPack, IEquipmentKiosk kiosk)
+    Func<IEquipmentPackSession> createPack, IEquipmentKiosk kiosk,
+    Func<EquipmentRequest, Action<EquipmentEvent>, CancellationToken, Task>? prepare = null)
 {
     public async Task<EquipmentEvent> Run(EquipmentRequest request, Action<EquipmentEvent> progress, CancellationToken ct)
     {
@@ -134,11 +135,17 @@ public sealed class EquipmentExecution(Func<CancellationToken, Task<PackCatalog>
         try
         {
             EquipmentPolicy.ValidateRequest(request);
+            PackCatalog? snapshot = null;
             if (request.Pack)
             {
                 progress(new("phase", "Validando la selección autorizada del pack…"));
                 // Revalidation precedes extraction/bootstrap and every machine change.
-                var snapshot = EquipmentPolicy.Snapshot(request, await loadCatalog(ct));
+                snapshot = EquipmentPolicy.Snapshot(request, await loadCatalog(ct));
+            }
+            if (prepare != null) await prepare(request, progress, ct);
+            ct.ThrowIfCancellationRequested();
+            if (snapshot != null)
+            {
                 pack = createPack();
                 progress(new("phase", "Comprobando todas las aplicaciones seleccionadas…"));
                 if (!await pack.Preflight(snapshot, request.Resume, progress, ct, request.AllowPartialPack))
@@ -167,7 +174,7 @@ public sealed class EquipmentExecution(Func<CancellationToken, Task<PackCatalog>
         catch (Exception ex)
         {
             progress(new("diagnostic", $"{ex.GetType().Name}; HRESULT {ex.HResult:X8}"));
-            return new("result", ex is CatalogException or ArgumentException or NativeStateException ? ex.Message : "La operación falló. Consulta los diagnósticos de Setup.", Run: pack?.LastRun, ExitCode: started ? 2 : 1, KioskVerified: kioskVerified, RebootRequired: reboot);
+            return new("result", ex is CatalogException or ComponentPreparationException or ArgumentException or NativeStateException ? ex.Message : "La operación falló. Consulta los diagnósticos de Setup.", Run: pack?.LastRun, ExitCode: started ? 2 : 1, KioskVerified: kioskVerified, RebootRequired: reboot);
         }
         finally { if (pack != null) await pack.DisposeAsync(); }
     }

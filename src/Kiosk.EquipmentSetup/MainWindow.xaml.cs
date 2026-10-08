@@ -30,6 +30,9 @@ public partial class MainWindow : Window
         _load = load; _start = start; _register = register;
         InitializeComponent();
         VersionLabel.Text = $"Asistente {Payload.Manifest.AssistantVersion} · Windows x64";
+        EditionNotice.Text = Payload.Manifest.Edition == "online"
+            ? "Edición online: descarga los componentes seleccionados. Necesita internet."
+            : "Completo para USB: Kiosk se puede instalar sin conexión. El pack de aplicaciones necesita internet.";
         ShowStep(0);
     }
     private static async Task<PackCatalog> LoadFromPanel(CancellationToken ct)
@@ -91,7 +94,10 @@ public partial class MainWindow : Window
         PartialPackCheck.Visibility = PackCheck.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
         string components = PackCheck.IsChecked == true ? $"Pack: {_applications.Count(a => a.Selected)} aplicaciones · revisión {_catalog!.Revision}. " : "";
         SummaryLabel.Text = components + (KioskCheck.IsChecked == true ? $"Kiosk {Payload.Manifest.KioskVersion}." : "");
-        Activity.Text = "Se actualizará el origen oficial WinGet y se resolverá la última versión compatible de cada aplicación antes de instalar. Si eliges ambos, Kiosk se instala después de la comprobación y antes de las aplicaciones.\n\nLas aplicaciones disponibles se instalarán aunque alguna falle: las que fallen conservarán su diagnóstico y el pack quedará incompleto.\n\nAl reanudar se verificará lo ya instalado y se comprobarán de nuevo los pendientes. Nunca se reiniciará automáticamente.";
+        Activity.Text = "Se prepararán y verificarán todos los componentes seleccionados antes de iniciar la instalación. " +
+            (Payload.Manifest.Edition == "online" ? "Se descargarán los que falten en la caché.\n\n" : "Los componentes están incluidos en este asistente.\n\n") +
+            (PackCheck.IsChecked == true ? "Se actualizará el origen oficial WinGet y se resolverá la última versión compatible de cada aplicación antes de instalar. Si eliges ambos, Kiosk se instala después de la comprobación y antes de las aplicaciones.\n\nLas aplicaciones disponibles se instalarán aunque alguna falle: las que fallen conservarán su diagnóstico y el pack quedará incompleto.\n\n" : "") +
+            "Al reanudar se verificará lo ya instalado y se comprobarán de nuevo los pendientes. Nunca se reiniciará automáticamente.";
         StatusLabel.Text = "Windows pedirá permisos al comenzar.";
     }
     internal async Task LoadCatalog()

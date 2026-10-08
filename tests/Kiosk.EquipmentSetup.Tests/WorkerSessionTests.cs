@@ -28,6 +28,33 @@ public sealed class WorkerSessionTests
         Assert.Contains(events, e => e.Kind == "preflight-ready"); Assert.Empty(logs);
     }
     [Fact]
+    public async Task Completion_waits_for_final_progress_callback_even_after_worker_process_exits()
+    {
+        const string script = "[Console]::ReadLine() | Out-Null; [Console]::WriteLine(('{\"kind\":\"preflight-ready\",\"message\":\"' + $PID + '\"}')); " +
+            "[Console]::ReadLine() | Out-Null; [Console]::WriteLine('{\"kind\":\"result\",\"message\":\"Done\",\"exitCode\":0}'); exit 0";
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        int pid = 0;
+        void Progress(EquipmentEvent value)
+        {
+            if (value.Kind == "preflight-ready") pid = int.Parse(value.Message);
+            if (value.Kind == "pack-result") { entered.SetResult(); release.Task.GetAwaiter().GetResult(); }
+        }
+        await using var worker = new PackSession("unused", _ => { }, _ => Fake(script));
+        Assert.True(await worker.Preflight(Catalog, false, Progress, default));
+        Task<bool> installing = worker.Install(Progress, default);
+        try
+        {
+            await entered.Task.WaitAsync(TimeSpan.FromSeconds(20));
+            try { using var process = Process.GetProcessById(pid); await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(20)); }
+            catch (ArgumentException) { } // Worker has already exited.
+            await Task.WhenAny(installing, Task.Delay(1000));
+            Assert.False(installing.IsCompleted);
+        }
+        finally { release.TrySetResult(); }
+        Assert.True(await installing.WaitAsync(TimeSpan.FromSeconds(20)));
+    }
+    [Fact]
     public async Task Unexpected_worker_exit_is_detected_instead_of_waiting_forever()
     {
         await using var worker = new PackSession("unused", _ => { }, _ => Fake("[Console]::ReadLine() | Out-Null; exit 1"));

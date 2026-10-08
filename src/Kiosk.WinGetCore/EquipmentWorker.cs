@@ -21,14 +21,14 @@ internal static class EquipmentWorker
         try
         {
             LocalState.Prepare();
-            await using var lease = SetupLease.Pack(Program.StateRoot);
+            await using var lease = SetupLease.Pack(PackState.StateRoot);
             string line = await Console.In.ReadLineAsync() ?? throw new InvalidDataException();
             if (line.Length > 1024 * 1024) throw new InvalidDataException();
             var start = JsonSerializer.Deserialize<PackWorkerStart>(line, Json) ?? throw new InvalidDataException();
             EquipmentCatalogClient.Validate(start.Snapshot);
             if (start.Snapshot.Applications.Count == 0) throw new InvalidDataException();
-            var run = PackResumePolicy.Create(start.Snapshot, Program.ReadLastRun(), start.Resume);
-            string logs = Path.Combine(Program.StateRoot, "logs", "pack-" + DateTime.UtcNow.ToString("yyyyMMdd-HHmmss-fff"));
+            var run = PackResumePolicy.Create(start.Snapshot, PackState.ReadLastRun(), start.Resume);
+            string logs = Path.Combine(PackState.StateRoot, "logs", "pack-" + DateTime.UtcNow.ToString("yyyyMMdd-HHmmss-fff"));
             Directory.CreateDirectory(logs);
             _ = Task.Run(async () =>
             {
@@ -47,15 +47,15 @@ internal static class EquipmentWorker
             var engine = await Bootstrap.CreateEngine(message => Emit(new("phase", message)), cancel.Token);
             if (start.Snapshot.Definition is not null)
             {
-                Emit(new("phase", "Actualizando el catálogo oficial WinGet y resolviendo versiones compatibles…"));
+                Emit(new("phase", "Actualizando el catÃ¡logo oficial WinGet y resolviendo versiones compatiblesâ€¦"));
                 await engine.PrepareLatest(cancel.Token);
             }
             bool ready = false;
             bool complete = await PackExecution.Run(run, engine, logs,
-                changed => Emit(new("applications", "Estado de las aplicaciones", changed)), Program.Save, false, cancel.Token,
+                changed => Emit(new("applications", "Estado de las aplicaciones", changed)), PackState.Save, false, cancel.Token,
                 async () => { ready = true; Emit(new("preflight-ready", run.Items.Any(x => x.State == PackItemState.Failed)
-                    ? "Se instalarán las aplicaciones disponibles. Las que fallaron quedan pendientes." : "Todas las aplicaciones comprobadas.", run)); return await proceed.Task; }, start.AllowPartial);
-            if (!ready) Emit(new("preflight-failed", "Hay aplicaciones que no superan la comprobación previa.", run));
+                    ? "Se instalarÃ¡n las aplicaciones disponibles. Las que fallaron quedan pendientes." : "Todas las aplicaciones comprobadas.", run)); return await proceed.Task; }, start.AllowPartial);
+            if (!ready) Emit(new("preflight-failed", "Hay aplicaciones que no superan la comprobaciÃ³n previa.", run));
             Emit(new("result", run.Summary, run, complete ? 0 : 2, RebootRequired: run.RebootRequired));
             return complete ? 0 : 2;
         }
@@ -63,7 +63,7 @@ internal static class EquipmentWorker
         {
             // Diagnostics deliberately exclude exception text/stack and request data.
             Console.Error.WriteLine($"Pack worker: {ex.GetType().Name}; HRESULT {ex.HResult:X8}");
-            Emit(new("result", ex is NativeStateException ? ex.Message : ex is IOException ? "Otra instalación puede estar activa. Revisa los diagnósticos." : "No se pudo completar el trabajador WinGet.", ExitCode: ex is OperationCanceledException ? 2 : 1));
+            Emit(new("result", ex is NativeStateException ? ex.Message : ex is IOException ? "Otra instalaciÃ³n puede estar activa. Revisa los diagnÃ³sticos." : "No se pudo completar el trabajador WinGet.", ExitCode: ex is OperationCanceledException ? 2 : 1));
             return ex is OperationCanceledException ? 2 : 1;
         }
     }

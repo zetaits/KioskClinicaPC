@@ -1,9 +1,14 @@
 # Asistente WPF para preparar equipos
 
-`Setup-EquipoClinicaPC-1.4.0.exe` es una descarga privada del panel autenticado
+`Setup-EquipoClinicaPC-1.5.0.exe` es una descarga privada del panel autenticado
 `/instalador`. Su versión es independiente de la de Kiosk incluida. No se publica
 en GitHub Releases ni como artifact público. Contiene credenciales limitadas de
 aprovisionamiento; no contiene claves privadas de firma ni claves de publicación.
+
+La edición **Online** descarga únicamente los componentes seleccionados. La edición
+**Completo para USB**, `Setup-EquipoClinicaPC-1.5.0-Completo.exe`, incluye los mismos
+componentes y permite instalar solo Kiosk sin conexión. El pack de aplicaciones
+necesita internet en ambas. WPF y .NET viajan en el EXE: no hay que instalar .NET.
 
 ## Uso
 
@@ -21,7 +26,7 @@ aprovisionamiento; no contiene claves privadas de firma ni claves de publicació
    permite omitir las que fallen y continuar con las demás. Está marcada inicialmente.
    Si falla la comprobación y hay aplicaciones disponibles, el resultado también ofrece
    **Instalar aplicaciones disponibles**, que repite la comprobación antes de continuar.
-5. El orden es comprobación de todas las aplicaciones, Kiosk y pack. Inno actúa
+5. Se preparan y verifican primero todos los componentes seleccionados. Después, el orden es comprobación de todas las aplicaciones, Kiosk y pack. Inno actúa
    únicamente como motor silencioso de Kiosk. El frontend registra el autostart
    mediante `--register-autostart-only` bajo el usuario original, incluso si UAC
    usó otra cuenta administradora. No abre Kiosk automáticamente: la opción final
@@ -58,7 +63,7 @@ El servidor migra automáticamente la configuración a `pack-definition-v3.json`
 preservando IDs, orden, selección y revisión, con copia `pack-applications.json.before-v3.bak`.
 El índice diario actualiza una proyección concreta `/api/setup/v2/catalog` para los
 asistentes antiguos sin cambiar la revisión v3. Estos conservan su política estricta;
-para obtener toda la recuperación automática es necesario descargar el EXE 1.4.0 nuevo.
+para obtener toda la recuperación automática es necesario descargar el EXE 1.5.0 nuevo.
 
 La ventana usa los colores y la tipografía Space Grotesk del panel, controles
 propios y el icono de Clínica PC en el EXE y la barra de tareas. La barra superior
@@ -76,6 +81,23 @@ extraen si se eligieron, a rutas internas, y se verifica SHA-256. WinGet y su
 frontend WPF. Se conservan el exportador `export-index` y los comandos antiguos
 del helper para compatibilidad.
 
+El trabajador se publica desde `Kiosk.PackWorker`, sin WPF, con nombre físico
+`KioskSetupHelper.exe`, DLL, runtimeconfig y WinMD. `Kiosk.WinGetCore` comparte
+motor, bootstrap, protocolo, persistencia y exportación con el helper WPF antiguo.
+El origen local `Payload.UseDirectory` utilizado por instalación por red se conserva
+y prepara sus archivos locales sin depender de las descargas de componentes de la VPS.
+
+La caché `%ProgramData%\ClinicaPC\Setup\cache` solo permite escritura a
+administradores/SYSTEM y rechaza reparse points en archivos y antecesores. Cada uso
+verifica tamaño y SHA-256. Las descargas se escriben en `.part`; solo se promueven
+tras validar. Se reanudan con el ETag esperado y Range correcto; una respuesta 200
+reinicia el parcial. Un hash incorrecto elimina el parcial. Hay tres intentos para
+fallos transitorios, dos minutos sin progreso y treinta minutos por componente.
+Se muestra progreso y se permite cancelar también desde la consola silenciosa.
+La limpieza limita la caché a 1 GiB, retira primero archivos antiguos disponibles y
+parciales abandonados de más de siete días; no toca estados, registros ni archivos
+bloqueados por operaciones activas.
+
 ## Compilación local ficticia
 
 Desde la raíz, con .NET 10 SDK e Inno Setup 6 disponibles:
@@ -85,13 +107,13 @@ Desde la raíz, con .NET 10 SDK e Inno Setup 6 disponibles:
 ```
 
 Detecta el SDK compatible siguiendo `global.json` y los candidatos del usuario
-y de `%TEMP%\clinicapc-dotnet`. Genera `installer\Output\Setup-EquipoClinicaPC-1.4.0.exe`
-y `.bundle.json`. Usa `https://setup.invalid` y claves ficticias aunque haya
+y de `%TEMP%\clinicapc-dotnet`. Genera `installer\Output\Setup-EquipoClinicaPC-1.5.0.exe`
+, `Setup-EquipoClinicaPC-1.5.0-Completo.exe` y `.bundle.json` esquema 3. Usa `https://setup.invalid` y claves ficticias aunque haya
 credenciales reales en el entorno. No instala nada. El build verifica el EXE
 final en modo diagnóstico, comprobando versión, compatibilidad y hashes.
 
 Los artefactos internos son inmutables: si ya existe esa versión local, elegir
-otra con `-Version 1.4.1` o retirar manualmente **solo** el build ficticio anterior.
+otra con `-Version 1.5.1` o retirar manualmente **solo** el build ficticio anterior.
 `-KioskVersion 1.2.0` fija la versión incluida sin crear tags ni releases de Kiosk.
 El build genera ese payload desde el código del checkout; no descarga una release
 histórica por su número. Publicar siempre desde un commit que se haya probado.
@@ -99,13 +121,13 @@ histórica por su número. Publicar siempre desde un commit que se haya probado.
 Diagnóstico sin instalación:
 
 ```powershell
-& .\installer\Output\Setup-EquipoClinicaPC-1.4.0.exe --diagnose
+& .\installer\Output\Setup-EquipoClinicaPC-1.5.0.exe --diagnose
 # Para capturar JSON, ejecutar --diagnose-json con stdout redirigido.
 ```
 
 El diagnóstico muestra únicamente versiones, commit, compatibilidad y estado
 de recursos; no muestra claves ni configuración incrustada. Devuelve 0 si todo
-es compatible y supera los hashes; 1 si falta un recurso o hay incompatibilidad.
+es compatible. Online comprueba manifiesto/configuración y ausencia de binarios incrustados, sin descargarlos ni afirmar sus hashes verificados. Completo verifica realmente SHA-256 y compatibilidad de ambos recursos.
 
 ## Modo completamente silencioso
 
@@ -113,9 +135,9 @@ Exige una consola **ya elevada**, bajo un usuario interactivo, nunca SYSTEM.
 No abre WPF ni solicita UAC adicional. No lanza la pantalla fullscreen de Kiosk.
 
 ```powershell
-& .\Setup-EquipoClinicaPC-1.4.0.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /COMPONENTS=pack
-& .\Setup-EquipoClinicaPC-1.4.0.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /COMPONENTS=kiosk
-& .\Setup-EquipoClinicaPC-1.4.0.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /COMPONENTS=pack,kiosk /RESUME
+& .\Setup-EquipoClinicaPC-1.5.0.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /COMPONENTS=pack
+& .\Setup-EquipoClinicaPC-1.5.0.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /COMPONENTS=kiosk
+& .\Setup-EquipoClinicaPC-1.5.0.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /COMPONENTS=pack,kiosk /RESUME
 ```
 
 Sin `/COMPONENTS`, usa solo pack; selecciona las apps marcadas inicialmente en
@@ -130,30 +152,44 @@ instalado se omite. No se aceptan URLs, comandos, rutas ni argumentos de fabrica
 | 2 | Incompleto, cancelado o sin verificación final |
 | 64 | Argumentos no válidos |
 
-## Publicación independiente y orden de entrega
+## Publicación candidata, activación y recuperación
 
-1. Implementar, probar y subir el commit. No ejecutar publicación o despliegue
-   automáticamente al subirlo.
-2. Desplegar el servidor desde la raíz: `& .\deploy-server-vps.ps1`. Comprobar
-   `https://panel.clinicapc.es/health/ready` debe anunciar `X-Setup-Catalog-Version: 3`.
-   Admite manifiestos de paquete v2 con
-   `InstallerKind=equipment-wpf`, `CatalogApiVersion=3`, `SourceCommit` y versiones
-   del asistente, trabajador y Kiosk, además de nombre, tamaño, hash y servidor.
-   Los artefactos antiguos permanecen guardados, pero no se ofrecen como fallback.
-3. En GitHub Actions, abrir **Equipment Setup**, **Run workflow**, rama `master`,
-   versión `1.4.0`. Usa el entorno `production` y los secrets existentes
-   `KIOSK_SERVER_API_KEY`, `KIOSK_INITIAL_SETUP_KEY`, `KIOSK_RELEASE_PUBLISH_KEY`
-   y la clave pública de updates. No requiere la clave privada de firma. Prueba,
-   empaqueta, diagnostica y publica exclusivamente con `POST /api/releases/setup`.
-4. Descargar **ese nuevo EXE desde el panel**, comprobar versión y SHA-256 contra
-   el manifiesto del almacén privado y probar en VMs limpias antes de distribuirlo.
+1. Probar y guardar el código en un commit. Desplegar primero el servidor mediante
+   `deploy-server-vps.ps1` según `ACTUALIZAR-PANEL-VPS.txt`. `/health/ready` debe devolver
+   200, `{"status":"ok"}`, `X-Setup-Catalog-Version: 3` y `X-Setup-Component-Protocol: 1`.
+   El despliegue del servidor no reconstruye ni activa asistentes.
+2. Ejecutar el workflow **Equipment Setup**, versión `1.5.0`, desde el commit probado.
+   Conserva los secretos de `production` y la separación de `X-Release-Publish-Key`
+   para publicar y `X-Setup-Key` para descargar. No publicar estos EXE como assets
+   públicos: contienen aprovisionamiento limitado. No necesitan la clave privada de firma.
+3. El build construye Kiosk y el trabajador una vez, y genera dos EXE autónomos y
+   comprimidos del mismo conjunto. Importa con `POST /api/releases/setup/v3` un
+   manifiesto esquema 3, campos multipart `manifest`, `online`, `complete`, `kiosk`
+   y `worker`. El límite agregado sigue siendo 1 GiB más margen multipart. Valida
+   tamaños, hashes, nombres, protocolo y ZIP en disco. Un reintento con los mismos
+   archivos y manifiesto es idempotente; cambiar contenido exige otra versión.
+4. La publicación queda como **candidata**. En `/instalador`, descargar online y
+   completo de esa versión y probar los equipos piloto. Antes de la primera activación,
+   continúa disponible el asistente compatible anterior 1.4.0. Ambas ediciones usan
+   las mismas versiones fijadas; no resuelven componentes a «latest».
+5. Tras aprobar las pruebas de VM/piloto, pulsar **Activar / restaurar 1.5.0**.
+   Requiere cookie administrativa y antiforgery. Se verifican de nuevo los dos EXE
+   y los dos componentes antes de sustituir atómicamente `setups/v3/active.json`.
+   La importación fallida nunca modifica ese puntero.
+6. Recuperación: activar otra versión validada o **Restaurar asistente anterior 1.4.0**.
+   Se conservan publicaciones, almacén antiguo y todos los componentes referenciados.
+   Descargar una candidata no cambia la versión activa ni asigna trabajos a la flota.
 
-Actualizar la VPS cambia el panel, **no reconstruye el EXE descargable**.
-El workflow público **Release Kiosk** conserva su publicación de Kiosk y ya no
-genera el asistente interno. Equipment Setup no importa updates de Kiosk, no
-activa versiones, no crea tags/releases públicas y no asigna trabajos a la flota.
-La organización `/aplicaciones`, `/instalador` y `/ordenadores/instalaciones`
-se conserva.
+`/panel/setup/download` sirve online de la versión activa; `?edition=complete` sirve
+USB de esa misma versión. `?version=1.5.0&edition=online` permite probar candidatas;
+`?version=legacy` permite recuperar el asistente anterior. La API antigua de
+publicación `/api/releases/setup` sigue operativa para manifiestos esquema 2.
+
+Los componentes publicados son inmutables y se descargan desde
+`GET /api/setup/v3/components/{kind}/{sha256}` (`kind`: `kiosk` o `worker`) con
+`X-Setup-Key`, ETag fuerte basado en SHA-256 y Range. No se exponen archivos
+huérfanos de importaciones interrumpidas. El protocolo de componentes 1 es
+independiente del catálogo de aplicaciones 3.
 
 ## Verificación y aceptación
 
@@ -184,6 +220,15 @@ existentes siguen comprobando exportación WinGet y APIs de la flota.
 - Forzar un fallo ordinario en una app: verificar las demás y Kiosk, resultado parcial
   y código 2; forzar todas indisponibles: comprobar que Kiosk independiente continúa.
 - Ejecutar el modo totalmente silencioso desde consola elevada interactiva.
+- Online: probar solo Kiosk, solo pack y ambos, comprobar que no se solicitan componentes
+  desmarcados; interrumpir una descarga y comprobar reanudación con ETag/Range.
+- Completo: desconectar la red, desmarcar pack e instalar solo Kiosk; volver a conectar
+  y probar pack. Confirmar que el pack no se presenta como un repositorio offline.
+- Windows sin .NET y sin WinGet: comprobar el frontend autónomo y el bootstrap oficial.
+- Usar UAC con otra cuenta, reiniciar y reanudar; comprobar registro HKCU del usuario original.
+- Publicar en servidor de laboratorio con claves ficticias, probar ambas candidatas,
+  activar, reiniciar el servidor y restaurar 1.4.0; verificar que ninguna prueba cambia
+  el panel de producción. No ejecutar estos comandos de instalación en el PC de desarrollo.
 
 La compilación y los tests no validan instaladores reales. No ejecutar estas
 instalaciones ni el cliente fullscreen en el escritorio de desarrollo.

@@ -2,6 +2,7 @@
 @attribute [Authorize]
 @rendermode InteractiveServer
 @inject InitialSetupBundleStore Bundles
+@inject SetupReleaseStore SetupReleases
 @inject DeploymentReleaseStore DeploymentReleases
 
 <div class="setup-page">
@@ -12,7 +13,18 @@
             <span class="badge accent">Windows x64</span>
         </div>
         <p>Un único instalador: solo pack, solo Kiosk o ambos. El pack está seleccionado por defecto; puedes marcar o desmarcar aplicaciones. Configura la lista en <a href="/aplicaciones">Aplicaciones</a>.</p>
-        @if (_bundle is not null)
+        @if (_active is not null)
+        {
+            @foreach (var edition in _active.Editions.OrderBy(e => e.Edition == "online" ? 0 : 1))
+            {
+                <div class="setup-download-row">
+                    <div class="setup-file"><strong>@(edition.Edition == "online" ? "Online" : "Completo para USB") · @_active.Version</strong><span>@Size(edition.SizeBytes)</span></div>
+                    <a class="btn primary button-link" href="@($"/panel/setup/download?edition={edition.Edition}")">Descargar</a>
+                </div>
+            }
+            <p class="muted">Online descarga únicamente los componentes seleccionados. Completo incluye Kiosk y trabajador; Kiosk se puede instalar sin conexión. El pack necesita internet en ambas ediciones.</p>
+        }
+        else if (_bundle is not null && SetupReleases.ActiveVersion is null)
         {
             <div class="setup-download-row">
                 <div class="setup-file"><div><strong>@_bundle.Manifest.FileName</strong><span>Pack, Kiosk o ambos</span></div></div>
@@ -25,17 +37,47 @@
             </div>
         }
         else { <p class="alert error">@(_bundleError ?? "Todavía no se ha publicado el instalador interno.")</p> }
-        <p class="muted">Windows 10 22H2 / Windows 11 x64 · Internet · Administrador. El progreso y el resultado se muestran solo en ese ordenador. Nunca reinicia automáticamente.</p>
-        <p class="muted">Asistente WPF · catálogo v2. Actualizar el servidor no reconstruye esta descarga: publícala con el workflow Equipment Setup. Descargarlo no activa actualizaciones en la flota.</p>
+        <p class="muted">Windows 10 22H2 / Windows 11 x64 · Administrador. El pack requiere internet; Kiosk online también. El progreso y el resultado se muestran solo en ese ordenador. Nunca reinicia automáticamente.</p>
+        <p class="muted">Asistente WPF · catálogo v3 · componentes fijados por versión. Actualizar el servidor no reconstruye esta descarga. La publicación crea una candidata; la activación se realiza aquí tras las pruebas piloto.</p>
+    </section>
+    <section class="card">
+        <h2>Versiones y recuperación</h2>
+        @foreach (var release in _releases)
+        {
+            <p><strong>@release.Version</strong> · @(release.Version == SetupReleases.ActiveVersion ? "Activa" : "Candidata / anterior")</p>
+            @foreach (var edition in release.Editions)
+            {
+                <p><a href="@($"/panel/setup/download?version={release.Version}&edition={edition.Edition}")">@(edition.Edition == "online" ? "Online" : "Completo para USB") · @Size(edition.SizeBytes)</a></p>
+            }
+            @if (release.Version != SetupReleases.ActiveVersion)
+            {
+                <form method="post" action="/panel/setup/activate">
+                    <AntiforgeryToken />
+                    <input type="hidden" name="version" value="@release.Version" />
+                    <button class="btn" type="submit">Activar / restaurar @release.Version</button>
+                </form>
+            }
+        }
+        @if (_bundle is not null)
+        {
+            <p><a href="/panel/setup/download?version=legacy">Descargar asistente anterior @_bundle.Manifest.Version</a></p>
+            @if (SetupReleases.ActiveVersion is not null)
+            {
+                <form method="post" action="/panel/setup/activate">
+                    <AntiforgeryToken /><input type="hidden" name="version" value="legacy" />
+                    <button class="btn" type="submit">Restaurar asistente anterior @_bundle.Manifest.Version</button>
+                </form>
+            }
+        }
     </section>
     <section class="card setup-hero">
         <h2>Instalar sistemas por red</h2>
         <p>ClínicaPC · Instalación por red. Instálalo en el PC del encargado para preparar otros equipos por Ethernet. Importa una ISO oficial y gestiona los perfiles en <a href="/despliegue">Instalación de sistemas</a>.</p>
-        @if (_deployment is { } release)
+        @if (_deployment is { } deploymentRelease)
         {
             <div class="setup-download-action">
                 <a class="btn primary button-link setup-download-button" href="/panel/deployment/download" data-setup-download data-download-cookie="kioskDeploymentDownload">
-                    <span class="setup-spinner" aria-hidden="true"></span><span data-setup-download-label>Descargar instalación por red @release.Release.Version</span>
+                    <span class="setup-spinner" aria-hidden="true"></span><span data-setup-download-label>Descargar instalación por red @deploymentRelease.Release.Version</span>
                 </a>
                 <p class="setup-download-status" data-setup-download-status hidden role="status"></p>
             </div>
@@ -49,6 +91,9 @@
 @code {
     private string? _bundleError;
     private ValidatedInitialSetupBundle? _bundle;
+    private KioskClinicaPC.Equipment.SetupRelease? _active;
+    private List<KioskClinicaPC.Equipment.SetupRelease> _releases = [];
+    private static string Size(long bytes) => $"{bytes / 1024d / 1024:F1} MiB";
     private (Kiosk.Deployment.DeploymentRelease Release, string Path)? _deployment;
-    protected override void OnInitialized() { _bundle = Bundles.Latest(out _bundleError); _deployment = DeploymentReleases.Latest(); }
+    protected override void OnInitialized() { _bundle = Bundles.Latest(out _bundleError); _active = SetupReleases.Active(); _releases = SetupReleases.List(); _deployment = DeploymentReleases.Latest(); }
 }

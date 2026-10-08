@@ -27,7 +27,8 @@ internal static class Coordinator
             // Pack worker holds the legacy lock throughout preflight, Kiosk and pack installation.
             using var http = CreateHttp();
             var catalog = new EquipmentCatalogClient(http, Payload.Configuration);
-            var execution = new EquipmentExecution(catalog.Load, () => new PackSession(work, Diagnostic), new KioskPayload(work));
+            var execution = new EquipmentExecution(catalog.Load, () => new PackSession(work, Diagnostic), new KioskPayload(work),
+                (selection, report, token) => Payload.Prepare(selection, work, http, report, token));
             var result = await execution.Run(request, Report, ct);
             Diagnostic($"Result {result.ExitCode}; kiosk verified {result.KioskVerified}; reboot {result.RebootRequired}");
             return result;

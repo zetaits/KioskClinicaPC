@@ -1,13 +1,13 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <OutputType>Exe</OutputType>
+
     <TargetFramework>net10.0-windows10.0.26100.0</TargetFramework>
     <SupportedOSPlatformVersion>10.0.19041.0</SupportedOSPlatformVersion>
-    <UseWPF>true</UseWPF>
+
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <AssemblyName>KioskSetupHelper</AssemblyName>
-    <Version>1.2.0</Version>
+    <AssemblyName>Kiosk.WinGetCore</AssemblyName>
+    <Version>1.5.0</Version>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
     <!-- WinRT metadata/activation needs physical files, including the SDK's .winmd. -->
@@ -16,7 +16,6 @@
     <MicrosoftManagementDeployment-OutputWinMD>false</MicrosoftManagementDeployment-OutputWinMD>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="../Kiosk.WinGetCore/Kiosk.WinGetCore.csproj" />
     <PackageReference Include="Microsoft.WindowsPackageManager.ComInterop" Version="$(WinGetInteropVersion)" />
     <!-- Windows' COM marshaler searches beside the process EXE, not .NET's extraction directory. -->
     <Content Include="$(NuGetPackageRoot)microsoft.windowspackagemanager.cominterop/$(WinGetInteropVersion)/lib/uap10.0/Microsoft.Management.Deployment.winmd"

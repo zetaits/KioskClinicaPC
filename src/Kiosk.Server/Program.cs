@@ -106,6 +106,7 @@ builder.Services.AddSingleton(new InstallerCatalog(dataDir, installersDir, maxIn
 builder.Services.AddSingleton(new InstallationJobStore(dataDir));
 builder.Services.AddSingleton(new InitialSetupSessionStore(dataDir));
 builder.Services.AddSingleton(new InitialSetupBundleStore(setupDir));
+builder.Services.AddSingleton(new SetupReleaseStore(setupDir));
 builder.Services.AddSingleton(new PackCatalogStore(dataDir));
 builder.Services.AddSingleton(new DeploymentStore(dataDir));
 builder.Services.AddSingleton(new DeploymentReleaseStore(setupDir));
@@ -242,12 +243,15 @@ app.MapGet("/health/ready", (HttpContext ctx) =>
             !Directory.Exists(assetsDir) || !Directory.Exists(installersDir) ||
             !Directory.Exists(setupDir) || !Directory.Exists(updatesDir))
             return Results.Json(new { status = "unavailable" }, statusCode: 503);
+        if (!app.Services.GetRequiredService<SetupReleaseStore>().Ready())
+            return Results.Json(new { status = "unavailable" }, statusCode: 503);
         string deploymentStatePath = Path.Combine(dataDir, "deployment-v1.json");
         if (File.Exists(deploymentStatePath) && (JToken.Parse(File.ReadAllText(deploymentStatePath)) is not JObject deploymentState || deploymentState.Value<int>("schemaVersion") != 1))
             return Results.Json(new { status = "unavailable" }, statusCode: 503);
         ctx.Response.Headers["X-Deployment-Protocol"] = "1";
         ctx.Response.Headers["X-Deployment-Component-Policy"] = "2";
         ctx.Response.Headers["X-Setup-Catalog-Version"] = "3";
+        ctx.Response.Headers["X-Setup-Component-Protocol"] = "1";
         return Results.Ok(new { status = "ok" });
     }
     catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or Newtonsoft.Json.JsonException or FormatException or InvalidCastException)
@@ -358,6 +362,42 @@ app.MapPost("/api/releases/winget-index", async (HttpContext ctx, PackCatalogSto
     catch (Exception ex) when (ex is InvalidDataException or System.Text.Json.JsonException)
     { return Results.BadRequest(new { error = ex.Message }); }
 });
+
+app.MapGet("/api/setup/v3/components/{kind}/{sha256}", (string kind, string sha256, SetupReleaseStore releases) =>
+{
+    var file = releases.PublishedComponent(kind, sha256);
+    return file is null ? Results.NotFound() : Results.File(file.Value.Path, "application/octet-stream",
+        entityTag: new Microsoft.Net.Http.Headers.EntityTagHeaderValue("\"" + sha256 + "\""), enableRangeProcessing: true);
+});
+
+app.MapPost("/api/releases/setup/v3", async (HttpContext ctx, SetupReleaseStore releases) =>
+{
+    if (!SecretEquals(releasePublishKey, ctx.Request.Headers["X-Release-Publish-Key"].FirstOrDefault()))
+        return string.IsNullOrWhiteSpace(releasePublishKey) ? Results.StatusCode(503) : Results.Unauthorized();
+    var streams = new List<Stream>();
+    try
+    {
+        var form = await ctx.Request.ReadFormAsync(ctx.RequestAborted);
+        if (form.Files.Count != 5 || form.Files.Select(f => f.Name).Distinct().Count() != 5)
+            throw new InvalidDataException("Se necesitan manifiesto, ambas ediciones y ambos componentes.");
+        var manifest = form.Files.GetFile("manifest") ?? throw new InvalidDataException("Falta el manifiesto.");
+        if (manifest.Length is <= 0 or > 128 * 1024) throw new InvalidDataException("Manifiesto demasiado grande.");
+        using var reader = new StreamReader(manifest.OpenReadStream());
+        var parsed = System.Text.Json.JsonSerializer.Deserialize<KioskClinicaPC.Equipment.SetupRelease>(await reader.ReadToEndAsync(ctx.RequestAborted),
+            new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web)) ?? throw new InvalidDataException("Manifiesto vacío.");
+        var files = new Dictionary<string, (string Name, Stream Stream)>();
+        foreach (string key in new[] { "online", "complete", "kiosk", "worker" })
+        {
+            var file = form.Files.GetFile(key) ?? throw new InvalidDataException("Publicación incompleta.");
+            var stream = file.OpenReadStream(); streams.Add(stream); files.Add(key, (file.FileName, stream));
+        }
+        await releases.Import(parsed, files, ctx.RequestAborted);
+        return Results.Ok(new { parsed.Version, candidate = true });
+    }
+    catch (Exception ex) when (ex is InvalidDataException or IOException or System.Text.Json.JsonException)
+    { return Results.BadRequest(new { error = ex.Message }); }
+    finally { foreach (var stream in streams) await stream.DisposeAsync(); }
+}).DisableAntiforgery();
 
 app.MapPost("/api/releases/setup", async (HttpContext ctx, InitialSetupBundleStore bundles) =>
 {
@@ -613,10 +653,33 @@ app.MapGet("/panel/assets/{category}/{file}", (string category, string file, Ass
     return Results.File(full, mime);
 }).RequireAuthorization();
 
-app.MapGet("/panel/setup/download", (HttpContext ctx, InitialSetupBundleStore bundles) =>
+app.MapPost("/panel/setup/activate", async (HttpContext ctx, SetupReleaseStore releases, InitialSetupBundleStore legacy, IAntiforgery antiforgery) =>
 {
-    var bundle = bundles.Latest(out _);
-    if (bundle is null) return Results.NotFound();
+    try
+    {
+        await antiforgery.ValidateRequestAsync(ctx);
+        var form = await ctx.Request.ReadFormAsync(ctx.RequestAborted);
+        string version = form["version"].ToString();
+        if (version == "legacy" && legacy.Latest(out _) == null) return Results.BadRequest("No hay asistente anterior válido.");
+        await releases.Activate(version == "legacy" ? null : version, ctx.RequestAborted);
+        return Results.Redirect("/instalador");
+    }
+    catch (Exception ex) when (ex is AntiforgeryValidationException or InvalidDataException or IOException)
+    { return Results.BadRequest("No se pudo activar la versión. Comprueba los archivos y vuelve a cargar el panel."); }
+}).RequireAuthorization();
+
+app.MapGet("/panel/setup/download", (HttpContext ctx, InitialSetupBundleStore bundles, SetupReleaseStore releases) =>
+{
+    if (!releases.Ready()) return Results.StatusCode(503);
+    string edition = ctx.Request.Query["edition"].FirstOrDefault() ?? "online";
+    if (edition is not ("online" or "complete")) return Results.BadRequest();
+    string? version = ctx.Request.Query["version"].FirstOrDefault();
+    var release = version is null ? releases.Active() : version == "legacy" ? null : releases.Find(version);
+    if (release == null && (version is not (null or "legacy") || version == null && releases.ActiveVersion != null)) return Results.NotFound();
+    var bundle = release == null ? bundles.Latest(out _) : null;
+    if (release == null && bundle == null) return Results.NotFound();
+    string path = release != null ? releases.EditionPath(release, edition) : bundle!.FullPath;
+    string name = release != null ? release.Editions.Single(e => e.Edition == edition).FileName : bundle!.Manifest.FileName;
     ctx.Response.Headers.CacheControl = "private, no-store";
 
     // La página usa este marcador para retirar el indicador cuando empieza la respuesta.
@@ -634,8 +697,7 @@ app.MapGet("/panel/setup/download", (HttpContext ctx, InitialSetupBundleStore bu
         });
     }
 
-    return Results.File(bundle.FullPath, "application/vnd.microsoft.portable-executable",
-        bundle.Manifest.FileName, enableRangeProcessing: true);
+    return Results.File(path, "application/vnd.microsoft.portable-executable", name, enableRangeProcessing: true);
 }).RequireAuthorization();
 
 // Subida desde formulario SSR para no transportar binarios grandes por el circuito de Blazor.
