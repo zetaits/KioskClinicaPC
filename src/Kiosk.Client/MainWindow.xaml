@@ -784,12 +784,12 @@
                                             </BeginStoryboard>
                                         </EventTrigger>
                                     </Grid.Triggers>
-                                    <Ellipse Stroke="{Binding AccentBrush, FallbackValue={DynamicResource CyanBrush}}" StrokeThickness="1" StrokeDashArray="2 4"/>
-                                    <Ellipse Margin="26" Stroke="{Binding AccentBrush, FallbackValue={DynamicResource CyanBrush}}" StrokeThickness="1" Opacity="0.5"/>
-                                    <Ellipse Width="8" Height="8" Fill="{Binding AccentBrush, FallbackValue={DynamicResource CyanBrush}}" HorizontalAlignment="Center" VerticalAlignment="Top"    Margin="0,-4,0,0"/>
-                                    <Ellipse Width="8" Height="8" Fill="{Binding AccentBrush, FallbackValue={DynamicResource CyanBrush}}" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,-4"/>
-                                    <Ellipse Width="8" Height="8" Fill="{Binding AccentBrush, FallbackValue={DynamicResource CyanBrush}}" HorizontalAlignment="Left"   VerticalAlignment="Center" Margin="-4,0,0,0"/>
-                                    <Ellipse Width="8" Height="8" Fill="{Binding AccentBrush, FallbackValue={DynamicResource CyanBrush}}" HorizontalAlignment="Right"  VerticalAlignment="Center" Margin="0,0,-4,0"/>
+                                    <Ellipse Stroke="{Binding AccentBrush, FallbackValue={StaticResource CyanBrush}}" StrokeThickness="1" StrokeDashArray="2 4"/>
+                                    <Ellipse Margin="26" Stroke="{Binding AccentBrush, FallbackValue={StaticResource CyanBrush}}" StrokeThickness="1" Opacity="0.5"/>
+                                    <Ellipse Width="8" Height="8" Fill="{Binding AccentBrush, FallbackValue={StaticResource CyanBrush}}" HorizontalAlignment="Center" VerticalAlignment="Top"    Margin="0,-4,0,0"/>
+                                    <Ellipse Width="8" Height="8" Fill="{Binding AccentBrush, FallbackValue={StaticResource CyanBrush}}" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,-4"/>
+                                    <Ellipse Width="8" Height="8" Fill="{Binding AccentBrush, FallbackValue={StaticResource CyanBrush}}" HorizontalAlignment="Left"   VerticalAlignment="Center" Margin="-4,0,0,0"/>
+                                    <Ellipse Width="8" Height="8" Fill="{Binding AccentBrush, FallbackValue={StaticResource CyanBrush}}" HorizontalAlignment="Right"  VerticalAlignment="Center" Margin="0,0,-4,0"/>
                                 </Grid>
 
                                 <!-- Haz de barrido: banda horizontal (90px) que cae de arriba abajo (3.4s) con
@@ -814,12 +814,12 @@
                                         <Rectangle.Fill>
                                             <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
                                                 <GradientStop Color="#00000000" Offset="0"/>
-                                                <GradientStop Color="{Binding AccentColor, FallbackValue={DynamicResource CyanColor}}" Offset="0.5"/>
+                                                <GradientStop Color="{Binding AccentColor, FallbackValue={StaticResource CyanColor}}" Offset="0.5"/>
                                                 <GradientStop Color="#00000000" Offset="1"/>
                                             </LinearGradientBrush>
                                         </Rectangle.Fill>
                                     </Rectangle>
-                                    <Rectangle Height="1" VerticalAlignment="Top" Fill="{Binding AccentBrush, FallbackValue={DynamicResource CyanBrush}}" Opacity="0.5"/>
+                                    <Rectangle Height="1" VerticalAlignment="Top" Fill="{Binding AccentBrush, FallbackValue={StaticResource CyanBrush}}" Opacity="0.5"/>
                                 </Grid>
                             </Grid>
 
@@ -851,7 +851,7 @@
                                      NotifyOnTargetUpdated en el icono mantiene vivo el fade+slide del bloque entero. -->
                                 <Grid x:Name="SpotlightIcon" Grid.Row="0" Margin="0,0,0,22">
                                     <Path Data="{Binding IconData, FallbackValue='M 0,0', NotifyOnTargetUpdated=True}"
-                                          Fill="{Binding AccentBrush, FallbackValue={DynamicResource CyanBrush}}"
+                                          Fill="{Binding AccentBrush, FallbackValue={StaticResource CyanBrush}}"
                                           Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center"
                                           MaxHeight="230"
                                           Visibility="{Binding HasImage, Converter={StaticResource InverseBoolToVis}}">
@@ -1138,13 +1138,13 @@
                       <StackPanel>
                         <!-- header rail: accent bar + icon + "01 / 10 · Procesador" -->
                         <StackPanel Orientation="Horizontal" Margin="0,0,0,26">
-                          <Rectangle Width="46" Height="3" Fill="{Binding AccentBrush, FallbackValue={DynamicResource CyanBrush}}" VerticalAlignment="Center" Margin="0,0,18,0">
+                          <Rectangle Width="46" Height="3" Fill="{Binding AccentBrush, FallbackValue={StaticResource CyanBrush}}" VerticalAlignment="Center" Margin="0,0,18,0">
                             <Rectangle.Effect>
-                              <DropShadowEffect Color="{Binding AccentColor, FallbackValue={DynamicResource CyanColor}}" BlurRadius="14" ShadowDepth="0" Opacity="0.9"/>
+                              <DropShadowEffect Color="{Binding AccentColor, FallbackValue={StaticResource CyanColor}}" BlurRadius="14" ShadowDepth="0" Opacity="0.9"/>
                             </Rectangle.Effect>
                           </Rectangle>
-                          <Path Data="{Binding IconData, FallbackValue='M 0,0'}" Fill="{Binding AccentBrush, FallbackValue={DynamicResource CyanBrush}}" Height="34" Width="34" Stretch="Uniform" VerticalAlignment="Center"/>
-                          <TextBlock Text="{Binding IndexLabelFull}" edit:Editable.IsOn="False" Style="{StaticResource MonoFont}" FontSize="18" Foreground="{Binding AccentBrush, FallbackValue={DynamicResource CyanBrush}}" VerticalAlignment="Center" Margin="14,0,0,0"/>
+                          <Path Data="{Binding IconData, FallbackValue='M 0,0'}" Fill="{Binding AccentBrush, FallbackValue={StaticResource CyanBrush}}" Height="34" Width="34" Stretch="Uniform" VerticalAlignment="Center"/>
+                          <TextBlock Text="{Binding IndexLabelFull}" edit:Editable.IsOn="False" Style="{StaticResource MonoFont}" FontSize="18" Foreground="{Binding AccentBrush, FallbackValue={StaticResource CyanBrush}}" VerticalAlignment="Center" Margin="14,0,0,0"/>
                         </StackPanel>
 
                         <!-- family eyebrow -->
@@ -1152,9 +1152,9 @@
 
                         <!-- hero: modelo concreto (DetailTitle). Auto-encoge si es largo (nunca se corta ni empuja la navegación). -->
                         <Viewbox StretchDirection="DownOnly" Stretch="Uniform" HorizontalAlignment="Left" MaxWidth="980" MaxHeight="240" Margin="0,0,0,12">
-                          <TextBlock Text="{Binding DetailTitle}" edit:Editable.IsOn="False" Style="{StaticResource DisplayFont}" FontSize="116" LineHeight="110" Foreground="{Binding AccentBrush, FallbackValue={DynamicResource CyanBrush}}" TextWrapping="Wrap" Width="980">
+                          <TextBlock Text="{Binding DetailTitle}" edit:Editable.IsOn="False" Style="{StaticResource DisplayFont}" FontSize="116" LineHeight="110" Foreground="{Binding AccentBrush, FallbackValue={StaticResource CyanBrush}}" TextWrapping="Wrap" Width="980">
                             <TextBlock.Effect>
-                              <DropShadowEffect Color="{Binding AccentColor, FallbackValue={DynamicResource CyanColor}}" BlurRadius="42" ShadowDepth="0" Opacity="0.55"/>
+                              <DropShadowEffect Color="{Binding AccentColor, FallbackValue={StaticResource CyanColor}}" BlurRadius="42" ShadowDepth="0" Opacity="0.55"/>
                             </TextBlock.Effect>
                           </TextBlock>
                         </Viewbox>
@@ -1174,7 +1174,7 @@
                                 <Border BorderBrush="{DynamicResource Line1Brush}" BorderThickness="1,0,0,0" Padding="22,14" MinWidth="118">
                                   <StackPanel>
                                     <Rectangle Width="22" Height="2" Margin="0,0,0,8" HorizontalAlignment="Left"
-                                               Fill="{Binding DataContext.AccentBrush, RelativeSource={RelativeSource AncestorType=ItemsControl}, FallbackValue={DynamicResource CyanBrush}}"/>
+                                               Fill="{Binding DataContext.AccentBrush, RelativeSource={RelativeSource AncestorType=ItemsControl}, FallbackValue={StaticResource CyanBrush}}"/>
                                     <TextBlock Text="{Binding}" edit:Editable.IsOn="False" Style="{StaticResource DisplayFont}" FontSize="19" Foreground="{DynamicResource Text0Brush}" TextWrapping="NoWrap"/>
                                   </StackPanel>
                                 </Border>
@@ -1189,14 +1189,14 @@
                           <StackPanel Orientation="Horizontal">
                             <edit:RadialGauge Value="{Binding BenchScore}" AccentColor="{Binding AccentColor}" GaugeSize="196" VerticalAlignment="Center" Margin="0,0,38,0"/>
                             <StackPanel Width="640" VerticalAlignment="Center">
-                              <TextBlock Text="// RENDIMIENTO MEDIDO" Style="{StaticResource MonoFont}" FontSize="18" Foreground="{Binding AccentBrush, FallbackValue={DynamicResource CyanBrush}}" Margin="0,0,0,14"/>
+                              <TextBlock Text="// RENDIMIENTO MEDIDO" Style="{StaticResource MonoFont}" FontSize="18" Foreground="{Binding AccentBrush, FallbackValue={StaticResource CyanBrush}}" Margin="0,0,0,14"/>
                               <TextBlock Text="{Binding Tier}" edit:Editable.IsOn="False" Style="{StaticResource DisplayFont}" FontSize="34" Foreground="{DynamicResource Text0Brush}" Margin="0,0,0,8"/>
                               <TextBlock Text="{Binding BenchPercentLabel}" edit:Editable.IsOn="False" Style="{StaticResource MonoFont}" FontSize="16" Foreground="{DynamicResource Text2Brush}" Margin="0,0,0,20"/>
                               <!-- honest position scale (0–640px = 0–100) -->
                               <Grid Height="10" Width="640" Background="#10FFFFFF" HorizontalAlignment="Left">
-                                <Rectangle HorizontalAlignment="Left" Width="{Binding BenchBarWidth}" Fill="{Binding AccentBrush, FallbackValue={DynamicResource CyanBrush}}">
+                                <Rectangle HorizontalAlignment="Left" Width="{Binding BenchBarWidth}" Fill="{Binding AccentBrush, FallbackValue={StaticResource CyanBrush}}">
                                   <Rectangle.Effect>
-                                    <DropShadowEffect Color="{Binding AccentColor, FallbackValue={DynamicResource CyanColor}}" BlurRadius="16" ShadowDepth="0" Opacity="0.8"/>
+                                    <DropShadowEffect Color="{Binding AccentColor, FallbackValue={StaticResource CyanColor}}" BlurRadius="16" ShadowDepth="0" Opacity="0.8"/>
                                   </Rectangle.Effect>
                                 </Rectangle>
                                 <Rectangle Width="2" Height="20" Fill="{DynamicResource Text0Brush}" HorizontalAlignment="Left" VerticalAlignment="Center"
@@ -1214,7 +1214,7 @@
                         <Border Margin="0,28,0,0" Padding="26,22" Background="#120A0A1A" BorderBrush="{DynamicResource Line1Brush}" BorderThickness="1"
                                 HorizontalAlignment="Left" Visibility="{Binding HasBench, Converter={StaticResource InverseBoolToVis}}">
                           <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                            <Path Data="{Binding IconData, FallbackValue='M 0,0'}" Fill="{Binding AccentBrush, FallbackValue={DynamicResource CyanBrush}}" Height="28" Width="28" Stretch="Uniform" VerticalAlignment="Center"/>
+                            <Path Data="{Binding IconData, FallbackValue='M 0,0'}" Fill="{Binding AccentBrush, FallbackValue={StaticResource CyanBrush}}" Height="28" Width="28" Stretch="Uniform" VerticalAlignment="Center"/>
                             <TextBlock Text="Componente verificado · operativo" Style="{StaticResource MonoFont}" FontSize="18" Foreground="{DynamicResource Text1Brush}" VerticalAlignment="Center" Margin="18,0,32,0"/>
                             <Ellipse Width="9" Height="9" Fill="{DynamicResource OkBrush}" VerticalAlignment="Center">
                               <Ellipse.Effect>
@@ -1247,7 +1247,7 @@
                             <Rectangle Opacity="0.14">
                               <Rectangle.Fill>
                                 <RadialGradientBrush Center="0.5,0.3" GradientOrigin="0.5,0.3" RadiusX="0.7" RadiusY="0.9">
-                                  <GradientStop Color="{Binding AccentColor, FallbackValue={DynamicResource CyanColor}}" Offset="0"/>
+                                  <GradientStop Color="{Binding AccentColor, FallbackValue={StaticResource CyanColor}}" Offset="0"/>
                                   <GradientStop Color="#00000000" Offset="0.7"/>
                                 </RadialGradientBrush>
                               </Rectangle.Fill>
@@ -1257,17 +1257,17 @@
                             <Border Width="160" Height="160" HorizontalAlignment="Center" VerticalAlignment="Center"
                                     BorderThickness="1" Visibility="{Binding HasImage, Converter={StaticResource InverseBoolToVis}}">
                               <Border.BorderBrush>
-                                <SolidColorBrush Color="{Binding AccentColor, FallbackValue={DynamicResource CyanColor}}" Opacity="0.38"/>
+                                <SolidColorBrush Color="{Binding AccentColor, FallbackValue={StaticResource CyanColor}}" Opacity="0.38"/>
                               </Border.BorderBrush>
                               <Border.Background>
                                 <RadialGradientBrush>
-                                  <GradientStop Color="{Binding AccentColor, FallbackValue={DynamicResource CyanColor}}" Offset="0"/>
+                                  <GradientStop Color="{Binding AccentColor, FallbackValue={StaticResource CyanColor}}" Offset="0"/>
                                   <GradientStop Color="#00000000" Offset="0.72"/>
                                 </RadialGradientBrush>
                               </Border.Background>
-                              <Path Data="{Binding IconData, FallbackValue='M 0,0'}" Fill="{Binding AccentBrush, FallbackValue={DynamicResource CyanBrush}}"
+                              <Path Data="{Binding IconData, FallbackValue='M 0,0'}" Fill="{Binding AccentBrush, FallbackValue={StaticResource CyanBrush}}"
                                     Width="84" Height="84" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center">
-                                <Path.Effect><DropShadowEffect Color="{Binding AccentColor, FallbackValue={DynamicResource CyanColor}}" BlurRadius="16" ShadowDepth="0" Opacity="0.9"/></Path.Effect>
+                                <Path.Effect><DropShadowEffect Color="{Binding AccentColor, FallbackValue={StaticResource CyanColor}}" BlurRadius="16" ShadowDepth="0" Opacity="0.9"/></Path.Effect>
                               </Path>
                             </Border>
 
@@ -1280,14 +1280,14 @@
                             </Image>
 
                             <!-- corchetes de esquina (24×24 acento, inset 10) -->
-                            <Path Data="M 0,24 L 0,0 L 24,0" Stroke="{Binding AccentBrush, FallbackValue={DynamicResource CyanBrush}}" StrokeThickness="2" HorizontalAlignment="Left"  VerticalAlignment="Top"    Margin="10"/>
-                            <Path Data="M 0,0 L 24,0 L 24,24" Stroke="{Binding AccentBrush, FallbackValue={DynamicResource CyanBrush}}" StrokeThickness="2" HorizontalAlignment="Right" VerticalAlignment="Top"    Margin="10"/>
-                            <Path Data="M 0,0 L 0,24 L 24,24" Stroke="{Binding AccentBrush, FallbackValue={DynamicResource CyanBrush}}" StrokeThickness="2" HorizontalAlignment="Left"  VerticalAlignment="Bottom" Margin="10"/>
-                            <Path Data="M 0,24 L 24,24 L 24,0" Stroke="{Binding AccentBrush, FallbackValue={DynamicResource CyanBrush}}" StrokeThickness="2" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="10"/>
+                            <Path Data="M 0,24 L 0,0 L 24,0" Stroke="{Binding AccentBrush, FallbackValue={StaticResource CyanBrush}}" StrokeThickness="2" HorizontalAlignment="Left"  VerticalAlignment="Top"    Margin="10"/>
+                            <Path Data="M 0,0 L 24,0 L 24,24" Stroke="{Binding AccentBrush, FallbackValue={StaticResource CyanBrush}}" StrokeThickness="2" HorizontalAlignment="Right" VerticalAlignment="Top"    Margin="10"/>
+                            <Path Data="M 0,0 L 0,24 L 24,24" Stroke="{Binding AccentBrush, FallbackValue={StaticResource CyanBrush}}" StrokeThickness="2" HorizontalAlignment="Left"  VerticalAlignment="Bottom" Margin="10"/>
+                            <Path Data="M 0,24 L 24,24 L 24,0" Stroke="{Binding AccentBrush, FallbackValue={StaticResource CyanBrush}}" StrokeThickness="2" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="10"/>
 
                             <!-- etiqueta: COMPONENTE REAL (foto) / ESQUEMA · {family} (icono) -->
                             <Border HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="16,0,0,14"
-                                    Background="#990A0716" BorderBrush="{Binding AccentBrush, FallbackValue={DynamicResource CyanBrush}}" BorderThickness="2,0,0,0" Padding="9,5">
+                                    Background="#990A0716" BorderBrush="{Binding AccentBrush, FallbackValue={StaticResource CyanBrush}}" BorderThickness="2,0,0,0" Padding="9,5">
                               <Grid>
                                 <TextBlock Style="{StaticResource MonoFont}" FontSize="16" Foreground="{DynamicResource Text2Brush}" Text="COMPONENTE REAL"
                                            edit:Editable.IsOn="False" Visibility="{Binding HasImage, Converter={StaticResource BoolToVis}}"/>
@@ -1300,10 +1300,10 @@
 
                         <Border Background="#120A0A1A" BorderBrush="{DynamicResource Line1Brush}" BorderThickness="1" Padding="36" CornerRadius="0">
                           <StackPanel>
-                            <TextBlock Text="// QUÉ SIGNIFICA" Style="{StaticResource MonoFont}" FontSize="18" Foreground="{Binding AccentBrush, FallbackValue={DynamicResource CyanBrush}}" Margin="0,0,0,18"/>
+                            <TextBlock Text="// QUÉ SIGNIFICA" Style="{StaticResource MonoFont}" FontSize="18" Foreground="{Binding AccentBrush, FallbackValue={StaticResource CyanBrush}}" Margin="0,0,0,18"/>
                             <TextBlock Text="{Binding Summary}" edit:Editable.Multiline="True" FontSize="22" LineHeight="33" Foreground="{DynamicResource Text0Brush}" TextWrapping="Wrap"/>
                     
-                            <TextBlock Text="// PARA QUÉ TE SIRVE" Style="{StaticResource MonoFont}" FontSize="18" Foreground="{Binding AccentBrush, FallbackValue={DynamicResource CyanBrush}}" Margin="0,38,0,18"/>
+                            <TextBlock Text="// PARA QUÉ TE SIRVE" Style="{StaticResource MonoFont}" FontSize="18" Foreground="{Binding AccentBrush, FallbackValue={StaticResource CyanBrush}}" Margin="0,38,0,18"/>
                             
                             <ItemsControl ItemsSource="{Binding Pros}">
                               <ItemsControl.ItemTemplate>
@@ -1341,9 +1341,9 @@
                                                 </Border>
                                                 <ControlTemplate.Triggers>
                                                     <DataTrigger Binding="{Binding IsCurrentDetail}" Value="True">
-                                                        <Setter TargetName="NavBorder" Property="BorderBrush" Value="{Binding AccentBrush, FallbackValue={DynamicResource CyanBrush}}"/>
+                                                        <Setter TargetName="NavBorder" Property="BorderBrush" Value="{Binding AccentBrush, FallbackValue={StaticResource CyanBrush}}"/>
                                                         <Setter TargetName="NavBorder" Property="Background" Value="#14FFFFFF"/>
-                                                        <Setter TargetName="NavIcon" Property="Fill" Value="{Binding AccentBrush, FallbackValue={DynamicResource CyanBrush}}"/>
+                                                        <Setter TargetName="NavIcon" Property="Fill" Value="{Binding AccentBrush, FallbackValue={StaticResource CyanBrush}}"/>
                                                         <Setter TargetName="NavLbl" Property="Foreground" Value="{DynamicResource Text0Brush}"/>
                                                     </DataTrigger>
                                                     <Trigger Property="IsMouseOver" Value="True">

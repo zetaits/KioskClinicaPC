@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <!-- net10.0-windows + UseWPF: el proyecto principal es WPF, así que la referencia lo exige.
-         Los tests solo tocan lógica pura de Core (no instancian la App ni la UI). -->
+         Los tests cubren Core y carga de XAML sin mostrar ventanas ni iniciar el kiosko. -->
     <TargetFramework>net10.0-windows</TargetFramework>
     <UseWPF>true</UseWPF>
     <Nullable>enable</Nullable>

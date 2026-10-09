@@ -1,5 +1,12 @@
 # Asistente WPF para preparar equipos
 
+La candidata 1.5.5 incluye Kiosk 1.2.2 y corrige el error al abrir la ventana
+principal después de guardar el precio: los colores de respaldo de los bindings
+usan recursos estáticos válidos para WPF. Los colores enlazados al componente
+siguen actualizándose normalmente. El precio y los ajustes locales se conservan.
+La prueba de carga de la ventana y sus plantillas se ejecuta sin mostrarla ni
+activar protecciones, servicios de red o detección real de hardware.
+
 `Setup-EquipoClinicaPC-1.5.4.exe` es una descarga privada del panel autenticado
 `/instalador`. Su versión es independiente de la de Kiosk incluida. No se publica
 en GitHub Releases ni como artifact público. Contiene credenciales limitadas de
