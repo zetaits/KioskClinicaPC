@@ -31,7 +31,7 @@ internal sealed class KioskPayload(string work) : IEquipmentKiosk
         DateTime boot = DateTime.UtcNow - TimeSpan.FromMilliseconds(Environment.TickCount64);
         var previous = File.Exists(StatePath) ? JsonSerializer.Deserialize<KioskState>(await File.ReadAllTextAsync(StatePath, ct), Payload.Json) : null;
         RebootRequired = previous?.RebootRequired == true && Math.Abs((boot - previous.BootTime).TotalMinutes) < 1;
-        if (Verified()) { await Save(new(false, boot, RebootRequired)); progress(new("phase", "Kiosk ya está instalado y verificado.")); return true; }
+        if (Verified()) { await ProvisionPanelPassword(InstallDirectory, progress); await Save(new(false, boot, RebootRequired)); progress(new("phase", "Kiosk ya está instalado y verificado.")); return true; }
         if (previous?.Active == true && Math.Abs((boot - previous.BootTime).TotalMinutes) < 1)
             throw new NativeStateException("El instalador anterior de Kiosk puede seguir activo. Reinicia manualmente antes de reintentar.");
         string exe = await Payload.Extract("kiosk.exe", Payload.Manifest.KioskSha256, work, progress, ct);
@@ -44,9 +44,26 @@ internal sealed class KioskPayload(string work) : IEquipmentKiosk
         await process.WaitForExitAsync();
         RebootRequired |= process.ExitCode == 3010;
         bool verified = process.ExitCode is 0 or 3010 && Verified();
+        if (verified) await ProvisionPanelPassword(InstallDirectory, progress);
         await Save(new(!verified, boot, RebootRequired));
         progress(new("phase", verified ? "Kiosk instalado y verificado." : "No se puede confirmar la instalación de Kiosk."));
         return verified;
+    }
+    internal static async Task ProvisionPanelPassword(string directory, Action<EquipmentEvent> progress)
+    {
+        var seed = Payload.PanelPassword();
+        if (seed is null) return;
+        string target = Path.Combine(directory, PanelPasswordProvisioning.FileName);
+        string temporary = target + "." + Guid.NewGuid().ToString("N") + ".tmp";
+        SetupComponentCache.SafePath(target);
+        SetupComponentCache.SafePath(temporary);
+        try
+        {
+            await File.WriteAllTextAsync(temporary, JsonSerializer.Serialize(seed, Payload.Json));
+            File.Move(temporary, target, true);
+        }
+        finally { if (File.Exists(temporary)) File.Delete(temporary); }
+        progress(new("phase", "Contraseña inicial preparada. Kiosk usará la del panel si aún no tiene una contraseña local."));
     }
     private static async Task Save(KioskState state)
     {

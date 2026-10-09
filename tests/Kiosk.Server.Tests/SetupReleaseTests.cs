@@ -72,6 +72,34 @@ public sealed class SetupReleaseTests : IDisposable
     private async Task Publish(HttpClient client, SetupRelease release, Dictionary<string, byte[]> bytes)
     { using var form = Form(release, bytes); Assert.Equal(HttpStatusCode.OK, (await client.PostAsync("/api/releases/setup/v3", form)).StatusCode); }
     [Fact]
+    public async Task Panel_password_default_requires_the_private_publisher_key_and_is_not_cached()
+    {
+        const string route = "/api/releases/setup/kiosk-password";
+        using var client = _factory.CreateClient();
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync(route)).StatusCode);
+        client.DefaultRequestHeaders.Add("X-Setup-Key", Key);
+        client.DefaultRequestHeaders.Add("X-Api-Key", Key);
+        client.DefaultRequestHeaders.Add("X-Test-Admin", "1");
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync(route)).StatusCode);
+        client.DefaultRequestHeaders.Add("X-Release-Publish-Key", "incorrect-publisher");
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync(route)).StatusCode);
+        client.DefaultRequestHeaders.Remove("X-Release-Publish-Key");
+        client.DefaultRequestHeaders.Add("X-Release-Publish-Key", "publisher");
+        using var response = await client.GetAsync(route);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.True(response.Headers.CacheControl!.NoStore);
+        Assert.Equal("1", (await client.GetAsync("/health/ready")).Headers.GetValues("X-Kiosk-Password-Provisioning").Single());
+        string body = await response.Content.ReadAsStringAsync();
+        var seed = JsonSerializer.Deserialize<PanelPasswordProvisioning>(body, Json)!;
+        Assert.True(seed.IsCompatible());
+        Assert.True(KioskClinicaPC.Core.PasswordService.Verify("test-password", seed.PasswordHash));
+        Assert.DoesNotContain("test-password", body);
+        _factory.Services.GetRequiredService<PanelAuthStore>().SetPassword("changed-panel-test-password");
+        var changed = JsonSerializer.Deserialize<PanelPasswordProvisioning>(await client.GetStringAsync(route), Json)!;
+        Assert.True(KioskClinicaPC.Core.PasswordService.Verify("changed-panel-test-password", changed.PasswordHash));
+        Assert.False(KioskClinicaPC.Core.PasswordService.Verify("test-password", changed.PasswordHash));
+    }
+    [Fact]
     public async Task Import_requires_distinct_key_is_atomic_idempotent_and_does_not_activate()
     {
         using var client = _factory.CreateClient(); var (release, bytes) = Bundle();

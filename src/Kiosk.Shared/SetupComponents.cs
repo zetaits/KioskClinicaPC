@@ -10,7 +10,7 @@ public sealed record SetupComponent(string Kind, string Version, long SizeBytes,
     public bool Compatible => Kind is "kiosk" or "worker" && System.Version.TryParse(Version, out _) &&
         SizeBytes is > 0 and <= 512L * 1024 * 1024 && Regex.IsMatch(Sha256 ?? "", "^[a-f0-9]{64}$");
 }
-public sealed class ComponentPreparationException(string message) : Exception(message);
+public sealed class ComponentPreparationException(string message, Exception? innerException = null) : Exception(message, innerException);
 
 /// <summary>Hash-addressed files. The caller creates an administrator-owned cache before use.</summary>
 public sealed class SetupComponentCache(string root, HttpClient http, EquipmentConfiguration configuration,
@@ -24,7 +24,7 @@ public sealed class SetupComponentCache(string root, HttpClient http, EquipmentC
             try
             {
                 if ((File.GetAttributes(current) & FileAttributes.ReparsePoint) != 0)
-                    throw new IOException("Ruta de componentes redirigida.");
+                    throw EquipmentDiagnostics.IOError("Ruta de componentes redirigida.");
             }
             catch (FileNotFoundException) { }
             catch (DirectoryNotFoundException) { }
@@ -39,7 +39,7 @@ public sealed class SetupComponentCache(string root, HttpClient http, EquipmentC
     }
     public async Task CopyTo(SetupComponent component, string target, Action<int> progress, CancellationToken ct)
     {
-        if (!component.Compatible) throw new InvalidDataException("Descriptor incompatible.");
+        if (!component.Compatible) throw EquipmentDiagnostics.InvalidData("Descriptor incompatible.");
         SafePath(root); Directory.CreateDirectory(root);
         string path = Path.Combine(root, component.Sha256);
         foreach (string item in new[] { path, path + ".part", path + ".etag", path + ".lock", target }) SafePath(item);
@@ -80,14 +80,14 @@ public sealed class SetupComponentCache(string root, HttpClient http, EquipmentC
             }
             catch (IOException) { } // Active operation: leave its files alone.
         }
-        if (total + required > MaxBytes) throw new IOException("La caché está ocupada por otras operaciones.");
+        if (total + required > MaxBytes) throw EquipmentDiagnostics.IOError("La caché está ocupada por otras operaciones.");
     }
     private async Task Download(SetupComponent component, string path, Action<int> progress, CancellationToken ct)
     {
         if (!Uri.TryCreate(configuration.ServerUrl.TrimEnd('/') + "/", UriKind.Absolute, out var server) ||
             (server.Scheme != "https" && !(server.Scheme == "http" && server.IsLoopback)) ||
             server.UserInfo.Length != 0 || server.Query.Length != 0 || server.Fragment.Length != 0 || string.IsNullOrWhiteSpace(configuration.SetupKey))
-            throw new InvalidDataException("Servidor de componentes incompatible.");
+            throw EquipmentDiagnostics.InvalidData("Servidor de componentes incompatible.");
         string partial = path + ".part", metadata = path + ".etag";
         string expectedTag = "\"" + component.Sha256 + "\"";
         using var overall = CancellationTokenSource.CreateLinkedTokenSource(ct);
@@ -107,17 +107,18 @@ public sealed class SetupComponentCache(string root, HttpClient http, EquipmentC
                 idle.CancelAfter(idleTimeout ?? TimeSpan.FromMinutes(2));
                 using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, idle.Token);
                 if (response.StatusCode is HttpStatusCode.RequestTimeout or HttpStatusCode.TooManyRequests || (int)response.StatusCode >= 500)
-                    throw new HttpRequestException("Fallo transitorio.");
+                    throw new HttpRequestException("Fallo transitorio.", null, response.StatusCode);
                 if (response.StatusCode is not (HttpStatusCode.OK or HttpStatusCode.PartialContent))
-                    throw new InvalidDataException($"El servidor rechazó el componente ({(int)response.StatusCode}).");
+                    throw EquipmentDiagnostics.InvalidData($"El servidor rechazó el componente ({(int)response.StatusCode}).",
+                        new HttpRequestException("Componente rechazado.", null, response.StatusCode));
                 if (response.Headers.ETag?.ToString() != expectedTag)
-                { File.Delete(partial); File.Delete(metadata); throw new InvalidDataException("ETag del componente incompatible."); }
+                { File.Delete(partial); File.Delete(metadata); throw EquipmentDiagnostics.InvalidData("ETag del componente incompatible."); }
                 if (response.StatusCode == HttpStatusCode.OK) offset = 0;
                 else if (offset == 0 || response.Content.Headers.ContentRange is not { Unit: "bytes" } range ||
                     range.From != offset || range.To != component.SizeBytes - 1 || range.Length != component.SizeBytes)
-                { File.Delete(partial); File.Delete(metadata); throw new InvalidDataException("Respuesta Range incompatible."); }
+                { File.Delete(partial); File.Delete(metadata); throw EquipmentDiagnostics.InvalidData("Respuesta Range incompatible."); }
                 if (response.Content.Headers.ContentLength is { } length && length != component.SizeBytes - offset)
-                    throw new InvalidDataException("Tamaño de descarga incorrecto.");
+                    throw EquipmentDiagnostics.InvalidData("Tamaño de descarga incorrecto.");
                 await File.WriteAllTextAsync(metadata, expectedTag, overall.Token);
                 await using (var output = new FileStream(partial, offset == 0 ? FileMode.Create : FileMode.Append, FileAccess.Write, FileShare.None, 81920, true))
                 await using (var input = await response.Content.ReadAsStreamAsync(idle.Token))
@@ -129,20 +130,20 @@ public sealed class SetupComponentCache(string root, HttpClient http, EquipmentC
                         read = await input.ReadAsync(buffer, idle.Token);
                         if (read == 0) break;
                         done += read;
-                        if (done > component.SizeBytes) throw new InvalidDataException("El componente excede su tamaño.");
+                        if (done > component.SizeBytes) throw EquipmentDiagnostics.InvalidData("El componente excede su tamaño.");
                         await output.WriteAsync(buffer.AsMemory(0, read), idle.Token);
                         int percent = (int)(100 * done / component.SizeBytes);
                         if (percent != lastPercent) { lastPercent = percent; progress(percent); }
                     }
-                    if (done != component.SizeBytes) throw new IOException("Descarga interrumpida.");
+                    if (done != component.SizeBytes) throw EquipmentDiagnostics.IOError("Descarga interrumpida.");
                 }
                 if (!await Verify(partial, component, overall.Token))
-                { File.Delete(partial); File.Delete(metadata); throw new InvalidDataException("SHA-256 del componente incorrecto."); }
+                { File.Delete(partial); File.Delete(metadata); throw EquipmentDiagnostics.InvalidData("SHA-256 del componente incorrecto."); }
                 File.Move(partial, path); File.Delete(metadata); return;
             }
             catch (Exception ex) when (ex is HttpRequestException or IOException || ex is OperationCanceledException && !overall.IsCancellationRequested)
             {
-                if (attempt == 2) throw new IOException("Descarga fallida tras tres intentos.", ex);
+                if (attempt == 2) throw EquipmentDiagnostics.IOError("Descarga fallida tras tres intentos.", ex);
                 await (delay ?? Task.Delay)(TimeSpan.FromSeconds(attempt + 1), overall.Token);
             }
             catch (InvalidDataException) { File.Delete(partial); File.Delete(metadata); throw; }

@@ -19,16 +19,29 @@ internal static class Payload
     internal static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
     internal static Stream Open(string name)
     {
-        if (name != Path.GetFileName(name)) throw new InvalidDataException("Nombre de recurso no válido.");
+        if (name != Path.GetFileName(name)) throw EquipmentDiagnostics.InvalidData("Nombre de recurso no válido.");
         if (_directory != null) SetupComponentCache.SafePath(Path.Combine(_directory, name));
         return _directory is null ? _source.GetManifestResourceStream("Equipment." + name)
-            ?? throw new InvalidDataException("Falta un recurso del asistente.") : File.OpenRead(Path.Combine(_directory, name));
+            ?? throw EquipmentDiagnostics.InvalidData("Falta un recurso del asistente.") : File.OpenRead(Path.Combine(_directory, name));
     }
-    internal static T Read<T>(string name) { using var stream = Open(name); return JsonSerializer.Deserialize<T>(stream, Json) ?? throw new InvalidDataException("Recurso incompatible."); }
+    internal static T Read<T>(string name) { using var stream = Open(name); return JsonSerializer.Deserialize<T>(stream, Json) ?? throw EquipmentDiagnostics.InvalidData("Recurso incompatible."); }
     internal static EquipmentConfiguration Configuration => Read<EquipmentConfiguration>("config.json");
     internal static PayloadManifest Manifest => Read<PayloadManifest>("payload.json");
     internal static bool Included(string name) => _directory is not null ? File.Exists(Path.Combine(_directory, name)) :
         _source.GetManifestResourceNames().Contains("Equipment." + name);
+    internal static PanelPasswordProvisioning? PanelPassword()
+    {
+        if (!Included("kiosk-password.json")) return null; // Older/local assistants remain compatible.
+        using var stream = Open("kiosk-password.json");
+        using var reader = new StreamReader(stream);
+        char[] buffer = new char[4097];
+        int length = reader.ReadBlock(buffer, 0, buffer.Length);
+        if (length > 4096) throw EquipmentDiagnostics.InvalidData("Aprovisionamiento de contraseña demasiado grande.");
+        PanelPasswordProvisioning? seed;
+        try { seed = JsonSerializer.Deserialize<PanelPasswordProvisioning>(new string(buffer, 0, length), Json); }
+        catch (JsonException) { throw EquipmentDiagnostics.InvalidData("Formato del aprovisionamiento de contraseña inválido."); }
+        return seed?.IsCompatible() == true ? seed : throw EquipmentDiagnostics.InvalidData("Aprovisionamiento de contraseña incompatible.");
+    }
     internal static bool ConfigurationCompatible()
     {
         var config = Configuration;
@@ -78,7 +91,7 @@ internal static class Payload
         {
             await using var prepared = File.OpenRead(target);
             if (!Convert.ToHexString(await SHA256.HashDataAsync(prepared, ct)).Equals(hash, StringComparison.OrdinalIgnoreCase))
-                throw new InvalidDataException("El componente preparado no supera SHA-256.");
+                throw EquipmentDiagnostics.InvalidData("El componente preparado no supera SHA-256.");
             return target;
         }
         using var resource = Open(name);
@@ -93,8 +106,16 @@ internal static class Payload
             }
         }
         await using var file = File.OpenRead(target);
-        if (!Convert.ToHexString(await SHA256.HashDataAsync(file, ct)).Equals(hash, StringComparison.OrdinalIgnoreCase)) throw new InvalidDataException("El recurso no supera SHA-256.");
+        if (!Convert.ToHexString(await SHA256.HashDataAsync(file, ct)).Equals(hash, StringComparison.OrdinalIgnoreCase)) throw EquipmentDiagnostics.InvalidData("El recurso no supera SHA-256.");
         return target;
+    }
+    internal static void ValidateKioskVersion(string? actual, string expected)
+    {
+        if (string.Equals(actual?.Trim(), expected, StringComparison.Ordinal)) return;
+        // Log only parsed version numbers, never arbitrary strings from executable metadata.
+        string observed = Version.TryParse(actual?.Trim(), out var version) ? version.ToString() : "ausente o no válida";
+        string required = Version.TryParse(expected, out var wanted) ? wanted.ToString() : "no válida";
+        throw EquipmentDiagnostics.InvalidData($"Versión del instalador Kiosk incompatible; esperada {required}; detectada {observed}.");
     }
     internal static async Task Prepare(EquipmentRequest request, string work, HttpClient http, Action<EquipmentEvent> progress, CancellationToken ct)
     {
@@ -105,49 +126,78 @@ internal static class Payload
         {
             if (!selected) continue;
             string label = name == "worker.zip" ? "trabajador WinGet" : "Kiosk";
+            string stage = "extracción";
+            void Stage(string value)
+            {
+                stage = value;
+                progress(new("prepare-stage", $"{label}; fase: {stage}"));
+            }
             try
             {
+                if (name == "kiosk.exe")
+                {
+                    Stage("validación del aprovisionamiento inicial");
+                    if (PanelPassword() != null && (!Version.TryParse(manifest.KioskVersion, out var kioskVersion) || kioskVersion < new Version(1, 2, 1)))
+                        throw EquipmentDiagnostics.InvalidData("La contraseña inicial del panel requiere Kiosk 1.2.1 o posterior.");
+                }
                 string path = Path.Combine(work, name);
                 if (_directory is not null || manifest.Edition == "complete")
+                {
+                    Stage("extracción del recurso");
                     await Extract(name, hash, work, progress, ct);
+                }
                 else
                 {
-                    if (descriptor is null) throw new InvalidDataException();
+                    Stage("descarga y copia desde caché");
+                    if (descriptor is null) throw EquipmentDiagnostics.InvalidData("Falta el descriptor del componente.");
                     progress(new("prepare", "Descargando " + label));
                     await new SetupComponentCache(Path.Combine(MachineState.Root, "cache"), http, Configuration)
-                        .CopyTo(descriptor, path, p => progress(new("prepare", "Preparando " + label, Percent: p)), ct);
+                        .CopyTo(descriptor, path, p => progress(new("prepare", "Descarga de " + label, Percent: p)), ct);
                 }
-                if (descriptor != null && !await SetupComponentCache.Verify(path, descriptor, ct)) throw new InvalidDataException();
+                Stage("verificación de tamaño y SHA-256");
+                if (descriptor != null && !await SetupComponentCache.Verify(path, descriptor, ct))
+                    throw EquipmentDiagnostics.InvalidData("El componente preparado no supera la comprobación de tamaño o SHA-256.");
                 if (name == "worker.zip")
                 {
+                    Stage("verificación del archivo y metadatos WinGet");
                     using var archive = File.OpenRead(path);
                     if (!ValidateWorkerArchive(archive) || manifest.SchemaVersion == 3 && !PackWorkerCompatibility.Matches(archive, manifest.WorkerVersion, manifest.SourceCommit))
-                        throw new InvalidDataException();
+                        throw EquipmentDiagnostics.InvalidData("Archivo o metadatos del trabajador WinGet incompatibles con el manifiesto.");
                 }
-                else if (manifest.SchemaVersion == 3 && System.Diagnostics.FileVersionInfo.GetVersionInfo(path).ProductVersion != manifest.KioskVersion)
-                    throw new InvalidDataException("Versión del instalador Kiosk incompatible.");
+                else if (manifest.SchemaVersion == 3)
+                {
+                    Stage("verificación de versión del instalador");
+                    ValidateKioskVersion(System.Diagnostics.FileVersionInfo.GetVersionInfo(path).ProductVersion, manifest.KioskVersion);
+                }
+                Stage("componente preparado y verificado");
             }
-            catch (OperationCanceledException) when (!ct.IsCancellationRequested)
-            { throw new ComponentPreparationException($"La preparación de {label} agotó su tiempo. Comprueba la conexión y reintenta."); }
-            catch (OperationCanceledException) { throw; }
-            catch (Exception ex) when (ex is IOException or HttpRequestException or InvalidDataException)
-            { throw new ComponentPreparationException($"No se pudo preparar {label}. Comprueba la conexión y los archivos del asistente y reintenta."); }
+            catch (OperationCanceledException ex)
+            {
+                progress(new("diagnostic", $"{label}; fase: {stage}; {(ct.IsCancellationRequested ? "cancelación solicitada" : "tiempo agotado")}; {EquipmentDiagnostics.Describe(ex)}"));
+                if (ct.IsCancellationRequested) throw;
+                throw new ComponentPreparationException($"La preparación de {label} agotó su tiempo. Comprueba la conexión y reintenta.", ex);
+            }
+            catch (Exception ex)
+            {
+                progress(new("diagnostic", $"{label}; fase: {stage}; {EquipmentDiagnostics.Describe(ex)}"));
+                throw new ComponentPreparationException($"No se pudo preparar {label}. Comprueba la conexión y los archivos del asistente y reintenta.", ex);
+            }
         }
     }
     internal static async Task<string> ExtractWorker(string work, Action<EquipmentEvent> progress, CancellationToken ct)
     {
         var zip = await Extract("worker.zip", Manifest.WorkerSha256, work, progress, ct);
         string directory = Path.Combine(work, "worker"); SetupComponentCache.SafePath(directory); Directory.CreateDirectory(directory);
-        using (var stream = File.OpenRead(zip)) if (!ValidateWorkerArchive(stream)) throw new InvalidDataException("Archivo del trabajador incompatible.");
+        using (var stream = File.OpenRead(zip)) if (!ValidateWorkerArchive(stream)) throw EquipmentDiagnostics.InvalidData("Archivo del trabajador incompatible.");
         using var archive = ZipFile.OpenRead(zip);
         long total = archive.Entries.Sum(e => e.Length), written = 0;
-        if (total > 1024L * 1024 * 1024 || archive.Entries.Count > 2000) throw new InvalidDataException("Archivo del trabajador incompatible.");
+        if (total > 1024L * 1024 * 1024 || archive.Entries.Count > 2000) throw EquipmentDiagnostics.InvalidData("Archivo del trabajador incompatible.");
         foreach (var entry in archive.Entries)
         {
             string path = Path.GetFullPath(Path.Combine(directory, entry.FullName));
             SetupComponentCache.SafePath(path);
             if (!path.StartsWith(directory + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) || !SafeEntry(entry))
-                throw new InvalidDataException("Ruta interna incompatible.");
+                throw EquipmentDiagnostics.InvalidData("Ruta interna incompatible.");
             if (entry.FullName.EndsWith('/')) { Directory.CreateDirectory(path); continue; }
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
             using var input = entry.Open(); await using var output = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None, 81920, true);
@@ -155,15 +205,15 @@ internal static class Payload
             while ((read = await input.ReadAsync(buffer, ct)) != 0)
             {
                 entryWritten += read;
-                if (entryWritten > entry.Length) throw new InvalidDataException("El ZIP excede su tamaño declarado.");
+                if (entryWritten > entry.Length) throw EquipmentDiagnostics.InvalidData("El ZIP excede su tamaño declarado.");
                 await output.WriteAsync(buffer.AsMemory(0, read), ct);
             }
-            if (entryWritten != entry.Length) throw new InvalidDataException("Entrada ZIP incompleta.");
+            if (entryWritten != entry.Length) throw EquipmentDiagnostics.InvalidData("Entrada ZIP incompleta.");
             written += entryWritten;
             progress(new("extract", "Extrayendo trabajador WinGet", Percent: total == 0 ? 100 : (int)(100 * written / total)));
         }
         if (!File.Exists(Path.Combine(directory, "KioskSetupHelper.exe")) || !File.Exists(Path.Combine(directory, "Microsoft.Management.Deployment.winmd")))
-            throw new InvalidDataException("Faltan el trabajador o sus metadatos WinGet.");
+            throw EquipmentDiagnostics.InvalidData("Faltan el trabajador o sus metadatos WinGet.");
         return Path.Combine(directory, "KioskSetupHelper.exe");
     }
 }

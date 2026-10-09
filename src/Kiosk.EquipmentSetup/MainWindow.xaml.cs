@@ -14,7 +14,7 @@ public partial class MainWindow : Window
         public string VersionDescription => string.IsNullOrWhiteSpace(Application.PinnedVersion) ? "Última versión compatible al instalar" : "Versión " + Application.PinnedVersion;
     }
     private int _step;
-    private bool _loading, _running, _closeRequested;
+    private bool _loading, _running, _closeRequested, _canLaunch;
     private PackCatalog? _catalog;
     private PackRun? _lastRun;
     private List<ApplicationRow> _applications = [];
@@ -22,12 +22,18 @@ public partial class MainWindow : Window
     private readonly Func<CancellationToken, Task<PackCatalog>> _load;
     private readonly Func<EquipmentRequest, Action<EquipmentEvent>, CancellationToken, Task<EquipmentEvent>> _start;
     private readonly Func<Task> _register;
+    private readonly Action _launch;
     public MainWindow() : this(LoadFromPanel, WorkerPipe.Start, KioskPayload.RegisterAutostart) { }
     internal MainWindow(Func<CancellationToken, Task<PackCatalog>> load,
-        Func<EquipmentRequest, Action<EquipmentEvent>, CancellationToken, Task<EquipmentEvent>> start, Func<Task> register)
+        Func<EquipmentRequest, Action<EquipmentEvent>, CancellationToken, Task<EquipmentEvent>> start, Func<Task> register, Action? launch = null)
     {
         Payload.UseAssembly(typeof(MainWindow).Assembly);
         _load = load; _start = start; _register = register;
+        _launch = launch ?? (() =>
+        {
+            using var process = Process.Start(new ProcessStartInfo(KioskPayload.ClientExe) { UseShellExecute = true })
+                ?? throw new InvalidOperationException("No se pudo iniciar Kiosk.");
+        });
         InitializeComponent();
         VersionLabel.Text = $"Asistente {Payload.Manifest.AssistantVersion} · Windows x64";
         EditionNotice.Text = Payload.Manifest.Edition == "online"
@@ -53,7 +59,8 @@ public partial class MainWindow : Window
         BackButton.IsEnabled = !_running;
         RetryButton.Visibility = Visibility.Collapsed;
         InstallAvailableButton.Visibility = Visibility.Collapsed;
-        NextButton.Content = step == 2 ? "Instalar" : step == 3 ? "Cerrar" : "Continuar";
+        NextButton.Content = step == 2 ? "Instalar" : step == 3 ? "Finalizar" : "Continuar";
+        UpdateFinishButton();
         NextButton.IsEnabled = CanContinue();
         CancelButton.Visibility = step == 3 ? Visibility.Collapsed : Visibility.Visible;
         CancelButton.IsEnabled = true;
@@ -76,15 +83,28 @@ public partial class MainWindow : Window
         }
         else if (_step == 1) Confirm();
         else if (_step == 2) await Install();
-        else
+        else Finish();
+    }
+    private void LaunchChanged(object sender, RoutedEventArgs e) => UpdateFinishButton();
+    private void UpdateFinishButton()
+    {
+        if (_step == 3 && NextButton != null)
+            NextButton.Content = _canLaunch && LaunchCheck.IsChecked == true ? "Finalizar y abrir Kiosk" : "Finalizar";
+    }
+    internal void Finish()
+    {
+        if (_step != 3 || _running || _loading) return;
+        if (_canLaunch && LaunchCheck.IsChecked == true)
         {
-            if (LaunchCheck.IsChecked == true)
+            try { _launch(); _canLaunch = false; }
+            catch
             {
-                try { Process.Start(new ProcessStartInfo(KioskPayload.ClientExe) { UseShellExecute = true }); }
-                catch { ResultLabel.Text = "No se pudo abrir Kiosk. Puedes iniciarlo desde su acceso directo."; LaunchCheck.IsChecked = false; return; }
+                ResultLabel.Text = "Kiosk está instalado, pero no se pudo abrir. Puedes iniciarlo desde su acceso directo.";
+                LaunchCheck.IsChecked = false;
+                return;
             }
-            Close();
         }
+        Close();
     }
     internal void Confirm()
     {
@@ -131,6 +151,9 @@ public partial class MainWindow : Window
     }
     internal async Task Install()
     {
+        _canLaunch = false;
+        LaunchCheck.IsChecked = false;
+        LaunchCheck.Visibility = Visibility.Collapsed;
         _cancel?.Dispose(); _cancel = new CancellationTokenSource();
         var request = new EquipmentRequest(PackCheck.IsChecked == true, KioskCheck.IsChecked == true, _catalog?.Revision ?? 0,
             PackCheck.IsChecked == true ? _applications.Where(a => a.Selected).Select(a => new EquipmentSelection(a.Application.Id, a.Application.PinnedVersion)).ToList() : [], ResumeCheck.IsChecked == true,
@@ -168,8 +191,13 @@ public partial class MainWindow : Window
         InstallAvailableButton.Visibility = result.ExitCode == 1 && !request.AllowPartialPack && _lastRun is { } run &&
             run.Items.Any(i => i.State == PackItemState.Failed) && run.Items.Any(i => i.State == PackItemState.Pending || i.Verified) &&
             !run.Items.Any(i => i.RequiresRebootBeforeRetry) ? Visibility.Visible : Visibility.Collapsed;
-        LaunchCheck.IsChecked = false;
-        LaunchCheck.Visibility = result.KioskVerified ? Visibility.Visible : Visibility.Collapsed;
+        // WorkerPipe returns only after the elevated worker has exited. A successful combined
+        // run also waits for the pack session and its final callbacks before offering launch.
+        _canLaunch = request.Kiosk && result.KioskVerified && result.ExitCode == 0 && !result.RebootRequired &&
+            !_cancel.IsCancellationRequested && !_closeRequested;
+        LaunchCheck.Visibility = _canLaunch ? Visibility.Visible : Visibility.Collapsed;
+        LaunchCheck.IsChecked = _canLaunch;
+        UpdateFinishButton();
         StatusLabel.Text = $"Resultado: {result.ExitCode}";
         if (_closeRequested) StatusLabel.Text += " · La operación ha terminado; ya puedes cerrar.";
     }

@@ -24,6 +24,8 @@ namespace KioskClinicaPC.Tests
         [InlineData("")]
         [InlineData("sin-dos-puntos")]
         [InlineData("no-base64:tampoco")]
+        [InlineData(":")]
+        [InlineData("AA==:")]
         public void Verify_ConAlmacenadoInvalido_EsFalse(string? stored)
         {
             Assert.False(PasswordService.Verify("loquesea", stored));

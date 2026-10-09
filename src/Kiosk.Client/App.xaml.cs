@@ -105,10 +105,12 @@ namespace KioskClinicaPC
             _protected = true;
 
             // Carga el perfil y aplica el aprovisionamiento del instalador antes de pedir la contraseña.
-            // Ya no existe una clave compartida: perfiles nuevos y anteriores a la política actual deben
-            // elegir una propia. Si el encargado cancela, OnExit libera la protección del escritorio.
+            // El asistente privado puede inicializar perfiles nuevos con el verificador del panel.
+            // Sin aprovisionamiento válido se pide una clave local; cancelar libera el escritorio.
             var settings = KioskSettings.Load(SettingsFilePath);
             bool seeded = settings.ApplyProvisioningIfMissingServer(ProvisioningFilePath);
+            seeded |= settings.ApplyPanelPasswordIfMissing(Path.Combine(AppContext.BaseDirectory,
+                KioskClinicaPC.Equipment.PanelPasswordProvisioning.FileName));
             if (settings.RequiresPasswordSetup())
             {
                 var passwordSetup = new PasswordSetupWindow(settings);

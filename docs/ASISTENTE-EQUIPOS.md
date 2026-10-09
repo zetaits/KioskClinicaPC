@@ -1,12 +1,12 @@
 # Asistente WPF para preparar equipos
 
-`Setup-EquipoClinicaPC-1.5.0.exe` es una descarga privada del panel autenticado
+`Setup-EquipoClinicaPC-1.5.3.exe` es una descarga privada del panel autenticado
 `/instalador`. Su versión es independiente de la de Kiosk incluida. No se publica
 en GitHub Releases ni como artifact público. Contiene credenciales limitadas de
 aprovisionamiento; no contiene claves privadas de firma ni claves de publicación.
 
 La edición **Online** descarga únicamente los componentes seleccionados. La edición
-**Completo para USB**, `Setup-EquipoClinicaPC-1.5.0-Completo.exe`, incluye los mismos
+**Completo para USB**, `Setup-EquipoClinicaPC-1.5.3-Completo.exe`, incluye los mismos
 componentes y permite instalar solo Kiosk sin conexión. El pack de aplicaciones
 necesita internet en ambas. WPF y .NET viajan en el EXE: no hay que instalar .NET.
 
@@ -29,8 +29,33 @@ necesita internet en ambas. WPF y .NET viajan en el EXE: no hay que instalar .NE
 5. Se preparan y verifican primero todos los componentes seleccionados. Después, el orden es comprobación de todas las aplicaciones, Kiosk y pack. Inno actúa
    únicamente como motor silencioso de Kiosk. El frontend registra el autostart
    mediante `--register-autostart-only` bajo el usuario original, incluso si UAC
-   usó otra cuenta administradora. No abre Kiosk automáticamente: la opción final
-   está desmarcada. Los reinicios son manuales.
+   usó otra cuenta administradora. Al finalizar correctamente, **Abrir Kiosk al finalizar**
+   aparece marcado y el botón muestra **Finalizar y abrir Kiosk**. Se puede desmarcar
+   para cerrar sin abrirlo. Si se eligieron ambos componentes, esta opción solo aparece
+   cuando termina también el pack y sale el trabajador. No se ofrece ante cancelaciones,
+   resultados incompletos o reinicios pendientes. Los reinicios son manuales.
+
+Desde el asistente 1.5.3 con Kiosk 1.2.1, los perfiles sin contraseña local usan
+automáticamente la contraseña del panel vigente al generar el EXE. El asistente
+privado contiene su verificador PBKDF2 y lo instala como `KioskPanelPassword.json`;
+no contiene la contraseña en claro. Kiosk puede validarla sin conexión y omite
+el diálogo inicial. Las contraseñas locales existentes se conservan, incluso
+las de perfiles anteriores. Se puede cambiar la contraseña del equipo desde
+Ajustes, indicando la actual, sin cambiar la del panel. Cambiar la contraseña
+del panel posteriormente no actualiza perfiles ni asistentes ya generados.
+
+El verificador se obtiene durante la publicación desde
+`GET /api/releases/setup/kiosk-password`, exclusivamente con
+`X-Release-Publish-Key` y sin caché. Ni la clave API pública, ni `X-Setup-Key`,
+ni la sesión administrativa habilitan esa ruta. No se incluye en el instalador
+público de Kiosk ni en el manifiesto de publicación. El diagnóstico del asistente
+solo muestra `panelPasswordProvisioned`, nunca el verificador. Si no se encuentra
+un aprovisionamiento válido, el cliente conserva el diálogo de contraseña local.
+El pack solo no instala el archivo. Los logs de errores detallan fase, porcentaje,
+causa interna y código de error, sin copiar mensajes que puedan contener claves.
+
+Los comandos para desplegar y generar esta versión están en
+[PUBLICAR-ASISTENTE-1.5.3.md](PUBLICAR-ASISTENTE-1.5.3.md).
 
 La interfaz permanece abierta al cancelar una instalación: espera al trabajador.
 No mata instaladores nativos ni borra sus archivos. Un resultado ambiguo detiene
@@ -63,7 +88,7 @@ El servidor migra automáticamente la configuración a `pack-definition-v3.json`
 preservando IDs, orden, selección y revisión, con copia `pack-applications.json.before-v3.bak`.
 El índice diario actualiza una proyección concreta `/api/setup/v2/catalog` para los
 asistentes antiguos sin cambiar la revisión v3. Estos conservan su política estricta;
-para obtener toda la recuperación automática es necesario descargar el EXE 1.5.0 nuevo.
+para obtener toda la recuperación automática es necesario descargar el EXE 1.5.3 nuevo.
 
 La ventana usa los colores y la tipografía Space Grotesk del panel, controles
 propios y el icono de Clínica PC en el EXE y la barra de tareas. La barra superior
@@ -107,21 +132,23 @@ Desde la raíz, con .NET 10 SDK e Inno Setup 6 disponibles:
 ```
 
 Detecta el SDK compatible siguiendo `global.json` y los candidatos del usuario
-y de `%TEMP%\clinicapc-dotnet`. Genera `installer\Output\Setup-EquipoClinicaPC-1.5.0.exe`
-, `Setup-EquipoClinicaPC-1.5.0-Completo.exe` y `.bundle.json` esquema 3. Usa `https://setup.invalid` y claves ficticias aunque haya
-credenciales reales en el entorno. No instala nada. El build verifica el EXE
+y de `%TEMP%\clinicapc-dotnet`. Genera `installer\Output\Setup-EquipoClinicaPC-1.5.3.exe`
+, `Setup-EquipoClinicaPC-1.5.3-Completo.exe` y `.bundle.json` esquema 3. Usa `https://setup.invalid` y claves ficticias aunque haya
+credenciales reales en el entorno. No incorpora el verificador del panel: el
+primer arranque mantiene el diálogo de contraseña local en este build ficticio.
+No instala nada. El build verifica el EXE
 final en modo diagnóstico, comprobando versión, compatibilidad y hashes.
 
 Los artefactos internos son inmutables: si ya existe esa versión local, elegir
-otra con `-Version 1.5.1` o retirar manualmente **solo** el build ficticio anterior.
-`-KioskVersion 1.2.0` fija la versión incluida sin crear tags ni releases de Kiosk.
+otra con `-Version 1.5.4` o retirar manualmente **solo** el build ficticio anterior.
+`-KioskVersion 1.2.1` fija la versión incluida sin crear tags ni releases de Kiosk.
 El build genera ese payload desde el código del checkout; no descarga una release
 histórica por su número. Publicar siempre desde un commit que se haya probado.
 
 Diagnóstico sin instalación:
 
 ```powershell
-& .\installer\Output\Setup-EquipoClinicaPC-1.5.0.exe --diagnose
+& .\installer\Output\Setup-EquipoClinicaPC-1.5.3.exe --diagnose
 # Para capturar JSON, ejecutar --diagnose-json con stdout redirigido.
 ```
 
@@ -135,9 +162,9 @@ Exige una consola **ya elevada**, bajo un usuario interactivo, nunca SYSTEM.
 No abre WPF ni solicita UAC adicional. No lanza la pantalla fullscreen de Kiosk.
 
 ```powershell
-& .\Setup-EquipoClinicaPC-1.5.0.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /COMPONENTS=pack
-& .\Setup-EquipoClinicaPC-1.5.0.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /COMPONENTS=kiosk
-& .\Setup-EquipoClinicaPC-1.5.0.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /COMPONENTS=pack,kiosk /RESUME
+& .\Setup-EquipoClinicaPC-1.5.3.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /COMPONENTS=pack
+& .\Setup-EquipoClinicaPC-1.5.3.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /COMPONENTS=kiosk
+& .\Setup-EquipoClinicaPC-1.5.3.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /COMPONENTS=pack,kiosk /RESUME
 ```
 
 Sin `/COMPONENTS`, usa solo pack; selecciona las apps marcadas inicialmente en
@@ -158,7 +185,8 @@ instalado se omite. No se aceptan URLs, comandos, rutas ni argumentos de fabrica
    `deploy-server-vps.ps1` según `ACTUALIZAR-PANEL-VPS.txt`. `/health/ready` debe devolver
    200, `{"status":"ok"}`, `X-Setup-Catalog-Version: 3` y `X-Setup-Component-Protocol: 1`.
    El despliegue del servidor no reconstruye ni activa asistentes.
-2. Ejecutar el workflow **Equipment Setup**, versión `1.5.0`, desde el commit probado.
+2. Ejecutar el workflow **Equipment Setup**, versión `1.5.3`, con Kiosk `1.2.1`, desde el commit probado.
+   `/health/ready` debe anunciar también `X-Kiosk-Password-Provisioning: 1`.
    Conserva los secretos de `production` y la separación de `X-Release-Publish-Key`
    para publicar y `X-Setup-Key` para descargar. No publicar estos EXE como assets
    públicos: contienen aprovisionamiento limitado. No necesitan la clave privada de firma.
@@ -173,7 +201,7 @@ instalado se omite. No se aceptan URLs, comandos, rutas ni argumentos de fabrica
    incluso antes de activarla. Descargar ambas y probar los equipos piloto. El asistente
    antiguo 1.4.0 no aparece en la página. Ambas ediciones usan las mismas versiones
    fijadas; no resuelven componentes a «latest».
-5. Tras aprobar las pruebas de VM/piloto, pulsar **Activar versión 1.5.0**.
+5. Tras aprobar las pruebas de VM/piloto, pulsar **Activar versión 1.5.3**.
    Requiere cookie administrativa y antiforgery. Se verifican de nuevo los dos EXE
    y los dos componentes antes de sustituir atómicamente `setups/v3/active.json`.
    La importación fallida nunca modifica ese puntero.
@@ -183,7 +211,7 @@ instalado se omite. No se aceptan URLs, comandos, rutas ni argumentos de fabrica
    Descargar una candidata no cambia la versión activa ni asigna trabajos a la flota.
 
 `/panel/setup/download` sirve online de la versión activa; `?edition=complete` sirve
-USB de esa misma versión. `?version=1.5.0&edition=online` permite probar candidatas;
+USB de esa misma versión. `?version=1.5.3&edition=online` permite probar candidatas;
 `?version=legacy` permite recuperar el asistente anterior. La API antigua de
 publicación `/api/releases/setup` sigue operativa para manifiestos esquema 2.
 

@@ -100,7 +100,7 @@
                                 <TextBox x:Name="ResultDetails" MaxHeight="150" IsReadOnly="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" FontSize="13"/>
                                 <Button x:Name="InstallAvailableButton" Content="Instalar aplicaciones disponibles" Click="InstallAvailable" Visibility="Collapsed" HorizontalAlignment="Left" Margin="0,12,0,0"/>
                                 <TextBlock Text="Diagnósticos: %ProgramData%\ClinicaPC\Setup\logs. Los reinicios son siempre manuales." Foreground="{StaticResource MutedBrush}" FontSize="13" Margin="0,12,0,8"/>
-                                <CheckBox x:Name="LaunchCheck" IsChecked="False" Visibility="Collapsed"><TextBlock Text="Abrir Kiosk al cerrar el asistente"/></CheckBox>
+                                <CheckBox x:Name="LaunchCheck" IsChecked="False" Visibility="Collapsed" Checked="LaunchChanged" Unchecked="LaunchChanged"><TextBlock Text="Abrir Kiosk al finalizar"/></CheckBox>
                             </StackPanel>
                         </ScrollViewer>
                     </Grid>

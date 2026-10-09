@@ -1,5 +1,6 @@
 using KioskClinicaPC.Core;
 using Newtonsoft.Json;
+using KioskClinicaPC.Equipment;
 
 namespace Kiosk.Server.Services;
 
@@ -28,6 +29,13 @@ public sealed class PanelAuthStore
     }
 
     public bool Verify(string password) => PasswordService.Verify(password, ReadHash());
+
+    public PanelPasswordProvisioning? ExportKioskPassword()
+    {
+        string? hash = ReadHash();
+        return PasswordService.IsValidHash(hash)
+            ? new(1, hash!, PanelPasswordProvisioning.CurrentPasswordPolicyVersion) : null;
+    }
 
     public void SetPassword(string newPassword)
     {

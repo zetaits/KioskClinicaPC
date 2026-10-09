@@ -11,6 +11,20 @@ namespace KioskClinicaPC.Core
         private const int HashSize = 32;
         private const int Iterations = 100_000;
 
+        public static bool IsValidHash(string? stored)
+        {
+            if (stored is null || stored.Length != 69) return false;
+            var parts = stored.Split(':');
+            if (parts.Length != 2) return false;
+            try
+            {
+                byte[] salt = Convert.FromBase64String(parts[0]), hash = Convert.FromBase64String(parts[1]);
+                return salt.Length == SaltSize && hash.Length == HashSize &&
+                    Convert.ToBase64String(salt) == parts[0] && Convert.ToBase64String(hash) == parts[1];
+            }
+            catch (FormatException) { return false; }
+        }
+
         public static string Hash(string password)
         {
             byte[] salt = RandomNumberGenerator.GetBytes(SaltSize);
@@ -22,8 +36,8 @@ namespace KioskClinicaPC.Core
 
         public static bool Verify(string password, string? stored)
         {
-            if (string.IsNullOrEmpty(stored)) return false;
-            var parts = stored.Split(':');
+            if (!IsValidHash(stored)) return false;
+            var parts = stored!.Split(':');
             if (parts.Length != 2) return false;
 
             try

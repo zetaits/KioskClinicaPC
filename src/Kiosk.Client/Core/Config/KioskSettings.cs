@@ -2,13 +2,14 @@ using System;
 using System.IO;
 using Newtonsoft.Json;
 using Serilog;
+using KioskClinicaPC.Equipment;
 
 namespace KioskClinicaPC.Core.Config
 {
     /// <summary>Ajustes de comportamiento del kiosko (separados del contenido en KioskConfig.json).</summary>
     public class KioskSettings
     {
-        public const int CurrentPasswordPolicyVersion = 1;
+        public const int CurrentPasswordPolicyVersion = PanelPasswordProvisioning.CurrentPasswordPolicyVersion;
         public const int MinimumPasswordLength = 12;
 
         public string? PasswordHash { get; set; }
@@ -100,6 +101,31 @@ namespace KioskClinicaPC.Core.Config
         {
             public string? ServerUrl { get; set; }
             public string? ServerApiKey { get; set; }
+        }
+
+        public bool ApplyPanelPasswordIfMissing(string provisioningPath)
+        {
+            // A local password (including an older profile) always belongs to its owner.
+            if (!string.IsNullOrWhiteSpace(PasswordHash) || !File.Exists(provisioningPath)) return false;
+            try
+            {
+                if (new FileInfo(provisioningPath).Length > 4096) return false;
+                var seed = JsonConvert.DeserializeObject<PanelPasswordProvisioning>(File.ReadAllText(provisioningPath));
+                if (seed?.IsCompatible() != true)
+                {
+                    Log.Warning("El aprovisionamiento de contraseña no es compatible; se solicitará una contraseña local.");
+                    return false;
+                }
+                PasswordHash = seed.PasswordHash;
+                PasswordPolicyVersion = seed.PasswordPolicyVersion;
+                return true;
+            }
+            catch (Exception ex)
+            {
+                // JSON parser messages can contain the verifier. Never log their text.
+                Log.Warning("No se pudo leer el aprovisionamiento de contraseña ({ErrorType}).", ex.GetType().Name);
+                return false;
+            }
         }
 
         public void Save(string path)

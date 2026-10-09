@@ -84,7 +84,9 @@ public sealed class SetupComponentCacheTests : IDisposable
             if (kind == "range") response.Content.Headers.ContentRange = new ContentRangeHeaderValue(1, 5, 6);
             return response;
         });
-        await Assert.ThrowsAsync<InvalidDataException>(() => Copy(handler));
+        var error = await Assert.ThrowsAsync<InvalidDataException>(() => Copy(handler));
+        string reason = kind switch { "hash" => "SHA-256", "size" => "Tamaño de descarga", "etag" => "ETag", _ => "Range" };
+        Assert.Contains(reason, EquipmentDiagnostics.Describe(error));
         Assert.False(File.Exists(Target)); Assert.False(File.Exists(Cached)); Assert.False(File.Exists(Cached + ".part"));
     }
     [Theory]
@@ -93,7 +95,12 @@ public sealed class SetupComponentCacheTests : IDisposable
     public async Task Definitive_errors_and_transient_retry_are_bounded(int status, int attempts)
     {
         var handler = new Handler((_, _) => new((HttpStatusCode)status));
-        await Assert.ThrowsAnyAsync<Exception>(() => Copy(handler)); Assert.Equal(attempts, handler.Attempts); Assert.False(File.Exists(Target));
+        var error = await Assert.ThrowsAnyAsync<Exception>(() => Copy(handler));
+        string log = EquipmentDiagnostics.Describe(error);
+        Assert.Contains($"HTTP status {status}", log);
+        Assert.DoesNotContain("test-key", log);
+        if (attempts == 3) Assert.Contains("tres intentos", log);
+        Assert.Equal(attempts, handler.Attempts); Assert.False(File.Exists(Target));
     }
     [Fact]
     public async Task Network_errors_retry_three_times_and_can_recover()

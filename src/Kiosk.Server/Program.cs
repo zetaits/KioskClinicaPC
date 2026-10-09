@@ -252,6 +252,7 @@ app.MapGet("/health/ready", (HttpContext ctx) =>
         ctx.Response.Headers["X-Deployment-Component-Policy"] = "2";
         ctx.Response.Headers["X-Setup-Catalog-Version"] = "3";
         ctx.Response.Headers["X-Setup-Component-Protocol"] = "1";
+        ctx.Response.Headers["X-Kiosk-Password-Provisioning"] = "1";
         return Results.Ok(new { status = "ok" });
     }
     catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or Newtonsoft.Json.JsonException or FormatException or InvalidCastException)
@@ -368,6 +369,18 @@ app.MapGet("/api/setup/v3/components/{kind}/{sha256}", (string kind, string sha2
     var file = releases.PublishedComponent(kind, sha256);
     return file is null ? Results.NotFound() : Results.File(file.Value.Path, "application/octet-stream",
         entityTag: new Microsoft.Net.Http.Headers.EntityTagHeaderValue("\"" + sha256 + "\""), enableRangeProcessing: true);
+});
+
+// Only the private release builder can obtain the initial local verifier. Neither the
+// public Kiosk API key nor the limited setup download key grants access to panel credentials.
+app.MapGet("/api/releases/setup/kiosk-password", (HttpContext ctx, PanelAuthStore auth) =>
+{
+    ctx.Response.Headers.CacheControl = "no-store";
+    ctx.Response.Headers.Pragma = "no-cache";
+    if (!SecretEquals(releasePublishKey, ctx.Request.Headers["X-Release-Publish-Key"].FirstOrDefault()))
+        return string.IsNullOrWhiteSpace(releasePublishKey) ? Results.StatusCode(503) : Results.Unauthorized();
+    var seed = auth.ExportKioskPassword();
+    return seed is null ? Results.StatusCode(503) : Results.Json(seed);
 });
 
 app.MapPost("/api/releases/setup/v3", async (HttpContext ctx, SetupReleaseStore releases) =>

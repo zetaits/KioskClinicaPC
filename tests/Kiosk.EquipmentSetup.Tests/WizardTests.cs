@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Windows;
 using System.Windows.Threading;
 using Kiosk.EquipmentSetup;
@@ -78,7 +79,8 @@ public sealed class WizardTests
         window.ShowStep(0); window.PackCheck.IsChecked = false; Assert.False(window.NextButton.IsEnabled);
         window.KioskCheck.IsChecked = true; Assert.True(window.NextButton.IsEnabled);
         window.Confirm(); await window.Install();
-        Assert.Equal(1, loads); Assert.Equal(1, registration); Assert.False(window.LaunchCheck.IsChecked);
+        Assert.Equal(1, loads); Assert.Equal(1, registration); Assert.True(window.LaunchCheck.IsChecked);
+        Assert.Equal("Finalizar y abrir Kiosk", window.NextButton.Content);
         window.Close();
     });
     [Fact]
@@ -100,6 +102,97 @@ public sealed class WizardTests
         window.ShowStep(1); await window.LoadCatalog(); window.Confirm(); await window.Install();
         Assert.Equal(2, loads); Assert.Equal(Visibility.Visible, window.ApplicationsPanel.Visibility);
         Assert.Contains("cambió", window.CatalogLabel.Text); window.Close();
+    });
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public Task Successful_kiosk_offers_launch_by_default_and_respects_unchecking(bool launch) => Sta(async () =>
+    {
+        int launches = 0;
+        var window = new MainWindow(_ => throw new Exception("Solo Kiosk no consulta el pack"),
+            (_, _, _) => Task.FromResult(new EquipmentEvent("result", "Instalado", ExitCode: 0, KioskVerified: true)),
+            () => Task.CompletedTask, () => launches++);
+        window.PackCheck.IsChecked = false; window.KioskCheck.IsChecked = true;
+        window.Confirm(); await window.Install();
+        Assert.True(window.LaunchCheck.IsChecked);
+        Assert.Equal(Visibility.Visible, window.LaunchCheck.Visibility);
+        Assert.Equal(0, launches);
+        window.LaunchCheck.IsChecked = launch;
+        Assert.Equal(launch ? "Finalizar y abrir Kiosk" : "Finalizar", window.NextButton.Content);
+        window.Finish();
+        Assert.Equal(launch ? 1 : 0, launches);
+    });
+    [Fact]
+    public Task Combined_run_cannot_launch_kiosk_while_the_pack_worker_is_still_running() => Sta(async () =>
+    {
+        var completed = new TaskCompletionSource<EquipmentEvent>(); var calls = new List<string>();
+        var window = new MainWindow(_ => Task.FromResult(Catalog), (request, progress, _) =>
+        {
+            Assert.True(request.Kiosk); Assert.True(request.Pack);
+            calls.Add("worker-started");
+            progress(new("phase", "Kiosk instalado; instalando pack"));
+            return completed.Task;
+        }, () => { calls.Add("autostart"); return Task.CompletedTask; }, () => calls.Add("launch"));
+        window.KioskCheck.IsChecked = true;
+        window.ShowStep(1); await window.LoadCatalog(); window.Confirm();
+        Task installing = window.Install();
+        Assert.False(installing.IsCompleted);
+        Assert.Equal(Visibility.Collapsed, window.LaunchCheck.Visibility);
+        window.LaunchCheck.IsChecked = true; window.Finish();
+        Assert.Equal(new[] { "worker-started" }, calls);
+        calls.Add("pack-finished");
+        completed.SetResult(new("result", "Kiosk y pack verificados", ExitCode: 0, KioskVerified: true));
+        await installing;
+        Assert.True(window.LaunchCheck.IsChecked);
+        Assert.Equal(new[] { "worker-started", "pack-finished", "autostart" }, calls);
+        window.Finish();
+        Assert.Equal(new[] { "worker-started", "pack-finished", "autostart", "launch" }, calls);
+    });
+    [Theory]
+    [InlineData(true, 2, true, false)]
+    [InlineData(true, 0, true, true)]
+    [InlineData(true, 1, false, false)]
+    [InlineData(false, 0, false, false)]
+    public Task Incomplete_reboot_failed_and_pack_only_runs_do_not_offer_or_launch_kiosk(bool selected, int exitCode, bool verified, bool reboot) => Sta(async () =>
+    {
+        int launches = 0;
+        var window = new MainWindow(_ => Task.FromResult(Catalog), (_, _, _) =>
+            Task.FromResult(new EquipmentEvent("result", "Resultado", ExitCode: exitCode, KioskVerified: verified, RebootRequired: reboot)),
+            () => Task.CompletedTask, () => launches++);
+        window.KioskCheck.IsChecked = selected;
+        window.ShowStep(1); await window.LoadCatalog(); window.Confirm(); await window.Install();
+        Assert.Equal(Visibility.Collapsed, window.LaunchCheck.Visibility);
+        Assert.False(window.LaunchCheck.IsChecked);
+        window.LaunchCheck.IsChecked = true; window.Finish();
+        Assert.Equal(0, launches);
+    });
+    [Fact]
+    public Task Cancelled_run_does_not_offer_launch_even_if_the_worker_returns_success() => Sta(async () =>
+    {
+        var completed = new TaskCompletionSource<EquipmentEvent>(); int launches = 0;
+        var window = new MainWindow(_ => Task.FromResult(Catalog), (_, _, _) => completed.Task,
+            () => Task.CompletedTask, () => launches++);
+        window.PackCheck.IsChecked = false; window.KioskCheck.IsChecked = true; window.Confirm();
+        Task installing = window.Install(); window.Close();
+        completed.SetResult(new("result", "Instalado antes de cancelar", ExitCode: 0, KioskVerified: true));
+        await installing;
+        Assert.False(window.LaunchCheck.IsChecked);
+        Assert.Equal(Visibility.Collapsed, window.LaunchCheck.Visibility);
+        window.Finish(); Assert.Equal(0, launches);
+    });
+    [Fact]
+    public Task Launch_failure_keeps_the_installation_result_and_allows_finishing_without_launch() => Sta(async () =>
+    {
+        var window = new MainWindow(_ => throw new Exception("No pack"), (_, _, _) =>
+            Task.FromResult(new EquipmentEvent("result", "Instalado", ExitCode: 0, KioskVerified: true)),
+            () => Task.CompletedTask, () => throw new Win32Exception("Launch failed"));
+        window.PackCheck.IsChecked = false; window.KioskCheck.IsChecked = true; window.Confirm(); await window.Install();
+        window.Finish();
+        Assert.Contains("Kiosk está instalado", window.ResultLabel.Text);
+        Assert.Contains("no se pudo abrir", window.ResultLabel.Text);
+        Assert.False(window.LaunchCheck.IsChecked);
+        Assert.Equal("Finalizar", window.NextButton.Content);
+        window.Finish();
     });
     [Fact]
     public Task Failed_preflight_offers_available_apps_and_rechecks_original_selection() => Sta(async () =>

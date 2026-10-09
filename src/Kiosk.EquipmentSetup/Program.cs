@@ -55,29 +55,31 @@ internal static class Program
                 var catalog = await new EquipmentCatalogClient(http, Payload.Configuration).Load(cancellation.Token);
                 request = request with { CatalogRevision = catalog.Revision, Applications = catalog.Applications.Where(a => a.SelectedByDefault).Select(a => new EquipmentSelection(a.Id, a.PinnedVersion)).ToList() };
             }
-            var result = await Coordinator.Run(request, e => log.WriteLine($"{DateTime.UtcNow:O} {e.Message} {e.Percent}"), cancellation.Token);
+            var result = await Coordinator.Run(request, e => log.WriteLine($"{DateTime.UtcNow:O} {EquipmentDiagnostics.FormatEvent(e)}"), cancellation.Token);
             if (result.KioskVerified)
             {
                 try { await KioskPayload.RegisterAutostart(); }
-                catch { log.WriteLine("Autostart del usuario no verificado."); return 2; }
+                catch (Exception ex) { log.WriteLine($"{DateTime.UtcNow:O} Autostart del usuario no verificado: {EquipmentDiagnostics.Describe(ex)}"); return 2; }
             }
             log.WriteLine($"{DateTime.UtcNow:O} Resultado {result.ExitCode}");
             return result.ExitCode ?? 1;
         }
-        catch (Exception ex) { log.WriteLine($"{DateTime.UtcNow:O} {ex.GetType().Name}; HRESULT {ex.HResult:X8}"); return 1; }
+        catch (Exception ex) { log.WriteLine($"{DateTime.UtcNow:O} {EquipmentDiagnostics.Describe(ex)}"); return 1; }
         finally { Console.CancelKeyPress -= cancel; }
     }
     private static async Task<int> Diagnose(bool showWindow)
     {
         var manifest = Payload.Manifest;
         bool compatible = Payload.Compatible() && Payload.ConfigurationCompatible();
+        bool panelPasswordProvisioned = Payload.PanelPassword() != null;
+        compatible &= !panelPasswordProvisioned || Version.TryParse(manifest.KioskVersion, out var kioskVersion) && kioskVersion >= new Version(1, 2, 1);
         bool online = manifest.SchemaVersion == 3 && manifest.Edition == "online";
         bool binariesAbsent = !Payload.Included("worker.zip") && !Payload.Included("kiosk.exe");
         bool worker = false, kiosk = false;
         try { if (!online) worker = await Payload.Verify("worker.zip", manifest.WorkerSha256, CancellationToken.None); } catch (InvalidDataException) { }
         if (worker) worker = Payload.WorkerMetadataPresent();
         try { if (!online) kiosk = await Payload.Verify("kiosk.exe", manifest.KioskSha256, CancellationToken.None); } catch (InvalidDataException) { }
-        var info = new { manifest.SchemaVersion, manifest.Edition, manifest.ComponentProtocolVersion, manifest.CatalogApiVersion, manifest.InstallerKind, manifest.AssistantVersion, manifest.WorkerVersion, manifest.KioskVersion, manifest.SourceCommit, compatible, binariesAbsent, workerResourceVerified = worker, kioskResourceVerified = kiosk };
+        var info = new { manifest.SchemaVersion, manifest.Edition, manifest.ComponentProtocolVersion, manifest.CatalogApiVersion, manifest.InstallerKind, manifest.AssistantVersion, manifest.WorkerVersion, manifest.KioskVersion, manifest.SourceCommit, compatible, binariesAbsent, panelPasswordProvisioned, workerResourceVerified = worker, kioskResourceVerified = kiosk };
         string text = JsonSerializer.Serialize(info, Payload.Json);
         if (showWindow) MessageBox.Show(text, "Diagnóstico del asistente");
         else Console.WriteLine(text);

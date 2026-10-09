@@ -17,7 +17,7 @@ internal static class Coordinator
         void Report(EquipmentEvent value)
         {
             // Never serialize requests, embedded configuration, HTTP headers or credentials.
-            Diagnostic($"{value.Kind}: {value.Message}"); progress(value);
+            Diagnostic(EquipmentDiagnostics.FormatEvent(value)); progress(value);
         }
         Diagnostic($"Assistant {Payload.Manifest.AssistantVersion}; worker {Payload.Manifest.WorkerVersion}; Kiosk {Payload.Manifest.KioskVersion}; source {Payload.Manifest.SourceCommit}");
         try
@@ -30,12 +30,13 @@ internal static class Coordinator
             var execution = new EquipmentExecution(catalog.Load, () => new PackSession(work, Diagnostic), new KioskPayload(work),
                 (selection, report, token) => Payload.Prepare(selection, work, http, report, token));
             var result = await execution.Run(request, Report, ct);
+            Diagnostic(EquipmentDiagnostics.FormatEvent(result));
             Diagnostic($"Result {result.ExitCode}; kiosk verified {result.KioskVerified}; reboot {result.RebootRequired}");
             return result;
         }
         catch (Exception ex)
         {
-            Diagnostic($"Coordinator: {ex.GetType().Name}; HRESULT {ex.HResult:X8}");
+            Diagnostic($"Coordinator: {EquipmentDiagnostics.Describe(ex)}");
             return new("result", ex is IOException ? "Otra instalación puede estar activa o el estado no es accesible. Consulta los diagnósticos de Setup." : "No se pudo iniciar la operación. Consulta los diagnósticos de Setup.", ExitCode: 1);
         }
     }

@@ -7,6 +7,31 @@ namespace Kiosk.EquipmentSetup.Tests;
 [Collection("Equipment resources")]
 public sealed class PayloadTests
 {
+    [Theory]
+    [InlineData("1.2.0")]
+    [InlineData("1.2.0                                             ")]
+    [InlineData("\t1.2.0\r\n")]
+    public void Kiosk_version_accepts_padding_from_the_installer_resource(string actual)
+    {
+        Payload.ValidateKioskVersion(actual, "1.2.0");
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("1.2.1")]
+    [InlineData("1.2.0.1")]
+    [InlineData("1.2.0+other-build")]
+    [InlineData("untrusted-metadata-secret\r\nforged log line")]
+    public void Kiosk_version_rejects_mismatches_and_logs_only_version_numbers(string? actual)
+    {
+        var error = Assert.Throws<InvalidDataException>(() => Payload.ValidateKioskVersion(actual, "1.2.0"));
+        string diagnostic = EquipmentDiagnostics.Describe(error);
+        Assert.Contains("esperada 1.2.0", diagnostic);
+        Assert.Contains("detectada", diagnostic);
+        Assert.DoesNotContain("untrusted-metadata-secret", diagnostic);
+        Assert.DoesNotContain("forged log line", diagnostic);
+    }
     private static MemoryStream Archive(string path, bool winmd = true, int? catalogVersion = 3)
     {
         var stream = new MemoryStream();
@@ -75,6 +100,7 @@ public sealed class PayloadTests
             var manifest = new PayloadManifest(2, 3, "equipment-wpf", "0.1.0", "0.1.0", "1.2.0", new string('0', 40), Hash("worker.zip"), Hash("kiosk.exe"));
             File.WriteAllText(Path.Combine(root, "payload.json"), System.Text.Json.JsonSerializer.Serialize(manifest, Payload.Json));
             Payload.UseDirectory(root);
+            if (!kiosk) File.WriteAllText(Path.Combine(root, "kiosk-password.json"), "invalid-unselected-resource");
             using var http = new System.Net.Http.HttpClient(new NoNetwork());
             await Payload.Prepare(new(pack, kiosk, 0, [], false), work, http, _ => { }, default);
             Assert.Equal(pack, File.Exists(Path.Combine(work, "worker.zip"))); Assert.Equal(kiosk, File.Exists(Path.Combine(work, "kiosk.exe")));
@@ -92,8 +118,15 @@ public sealed class PayloadTests
             var manifest = new PayloadManifest(2, 3, "equipment-wpf", "0.1.0", "0.1.0", "1.2.0", new string('0', 40), new string('0', 64), new string('0', 64));
             File.WriteAllText(Path.Combine(root, "payload.json"), System.Text.Json.JsonSerializer.Serialize(manifest, Payload.Json)); Payload.UseDirectory(root);
             using var http = new System.Net.Http.HttpClient(new NoNetwork());
-            var error = await Assert.ThrowsAsync<ComponentPreparationException>(() => Payload.Prepare(new(false, true, 0, [], false), work, http, _ => { }, default));
+            var events = new List<EquipmentEvent>();
+            var error = await Assert.ThrowsAsync<ComponentPreparationException>(() => Payload.Prepare(new(false, true, 0, [], false), work, http, events.Add, default));
             Assert.Contains("Kiosk", error.Message);
+            Assert.IsType<InvalidDataException>(error.InnerException);
+            var diagnostic = Assert.Single(events, e => e.Kind == "diagnostic").Message;
+            Assert.Contains("fase: extracción del recurso", diagnostic);
+            Assert.Contains("SHA-256", diagnostic);
+            Assert.Contains("InvalidDataException", diagnostic);
+            Assert.Contains("Payload", diagnostic);
             await Assert.ThrowsAsync<InvalidDataException>(() => Payload.Extract("kiosk.exe", manifest.KioskSha256, work, _ => { }, default));
         }
         finally { Payload.UseAssembly(typeof(MainWindow).Assembly); Directory.Delete(root, true); }
@@ -172,8 +205,34 @@ public sealed class PayloadTests
                 "complete", 1, worker, kiosk);
             File.WriteAllText(Path.Combine(root, "payload.json"), System.Text.Json.JsonSerializer.Serialize(manifest, Payload.Json)); Payload.UseDirectory(root);
             using var http = new System.Net.Http.HttpClient(new NoNetwork());
-            var error = await Assert.ThrowsAsync<ComponentPreparationException>(() => Payload.Prepare(new(true, false, 0, [], false), work, http, _ => { }, default));
+            var events = new List<EquipmentEvent>();
+            var error = await Assert.ThrowsAsync<ComponentPreparationException>(() => Payload.Prepare(new(true, false, 0, [], false), work, http, events.Add, default));
             Assert.Contains("trabajador WinGet", error.Message); Assert.False(File.Exists(Path.Combine(work, "kiosk.exe")));
+            Assert.Contains(events, e => e.Kind == "diagnostic" && e.Message.Contains("fase: verificación del archivo y metadatos WinGet"));
+        }
+        finally { Payload.UseAssembly(typeof(MainWindow).Assembly); Directory.Delete(root, true); }
+    }
+
+    [Fact]
+    public async Task Kiosk_version_failure_is_captured_after_integrity_verification()
+    {
+        string root = Path.Combine(Path.GetTempPath(), "equipment-kiosk-version-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        string work = Path.Combine(root, "work"); Directory.CreateDirectory(work);
+        try
+        {
+            string path = Path.Combine(root, "kiosk.exe"); File.Copy(typeof(PayloadTests).Assembly.Location, path);
+            var kiosk = new SetupComponent("kiosk", "99.0.0", new FileInfo(path).Length,
+                Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(path))).ToLowerInvariant());
+            var manifest = new PayloadManifest(3, 3, "equipment-wpf", "1.5.0", "1.5.0", kiosk.Version, new string('a', 40), new string('0', 64), kiosk.Sha256,
+                "complete", 1, new("worker", "1.5.0", 1, new string('0', 64)), kiosk);
+            File.WriteAllText(Path.Combine(root, "payload.json"), System.Text.Json.JsonSerializer.Serialize(manifest, Payload.Json)); Payload.UseDirectory(root);
+            using var http = new System.Net.Http.HttpClient(new NoNetwork());
+            var events = new List<EquipmentEvent>();
+            var error = await Assert.ThrowsAsync<ComponentPreparationException>(() => Payload.Prepare(new(false, true, 0, [], false), work, http, events.Add, default));
+            Assert.IsType<InvalidDataException>(error.InnerException);
+            Assert.Contains(events, e => e.Kind == "diagnostic" && e.Message.Contains("fase: verificación de versión del instalador") && e.Message.Contains("esperada 99.0.0"));
+            Assert.DoesNotContain(events, e => e.Message.Contains("componente preparado y verificado"));
         }
         finally { Payload.UseAssembly(typeof(MainWindow).Assembly); Directory.Delete(root, true); }
     }

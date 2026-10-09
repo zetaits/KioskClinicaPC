@@ -173,7 +173,7 @@ public sealed class EquipmentExecution(Func<CancellationToken, Task<PackCatalog>
         catch (OperationCanceledException) { return new("result", "Operación cancelada. Un instalador nativo puede seguir activo; comprueba el estado antes de reanudar.", Run: pack?.LastRun, ExitCode: 2, KioskVerified: kioskVerified, RebootRequired: reboot); }
         catch (Exception ex)
         {
-            progress(new("diagnostic", $"{ex.GetType().Name}; HRESULT {ex.HResult:X8}"));
+            progress(new("diagnostic", EquipmentDiagnostics.Describe(ex)));
             return new("result", ex is CatalogException or ComponentPreparationException or ArgumentException or NativeStateException ? ex.Message : "La operación falló. Consulta los diagnósticos de Setup.", Run: pack?.LastRun, ExitCode: started ? 2 : 1, KioskVerified: kioskVerified, RebootRequired: reboot);
         }
         finally { if (pack != null) await pack.DisposeAsync(); }

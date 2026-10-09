@@ -1,5 +1,5 @@
 ﻿param(
-    [string]$Version = '1.5.0',
+    [string]$Version = '1.5.3',
     [string]$KioskVersion,
     [switch]$Publish
 )
@@ -13,6 +13,7 @@ if ($KioskVersion -notmatch '^\d+\.\d+\.\d+$') { throw 'KioskVersion debe tener 
 $serverUrl = 'https://setup.invalid'
 $serverKey = '0' * 64
 $setupKey = '1' * 64
+$passwordSeed = $null
 if ($Publish) {
     if ($PSVersionTable.PSVersion.Major -lt 7) { throw 'La publicación requiere PowerShell 7.' }
     $serverUrl = $env:KIOSK_SERVER_URL
@@ -23,6 +24,23 @@ if ($Publish) {
 $serverUri = $null
 if (-not [Uri]::TryCreate($serverUrl, [UriKind]::Absolute, [ref]$serverUri) -or $serverUri.Scheme -ne 'https' -or $serverUri.UserInfo -or $serverUri.Query -or $serverUri.Fragment) { throw 'Servidor HTTPS no válido.' }
 $serverUrl = $serverUrl.TrimEnd('/')
+if ($Publish) {
+    $ready = Invoke-WebRequest -Uri "$serverUrl/health/ready" -MaximumRedirection 0
+    if (($ready.Content | ConvertFrom-Json).status -ne 'ok' -or $ready.Headers['X-Kiosk-Password-Provisioning'] -ne '1') { throw 'Despliega primero el servidor con aprovisionamiento de contraseña del panel.' }
+    $passwordSeed = Invoke-RestMethod -Uri "$serverUrl/api/releases/setup/kiosk-password" -Headers @{ 'X-Release-Publish-Key' = $env:KIOSK_RELEASE_PUBLISH_KEY } -MaximumRedirection 0
+}
+if ($Publish -and -not $passwordSeed) { throw 'Falta el aprovisionamiento inicial de contraseña del panel.' }
+if ($passwordSeed) {
+    # Validate without echoing the verifier or parser errors into the build log.
+    $validSeed = $false
+    try {
+        $parts = $passwordSeed.passwordHash.Split(':')
+        $validSeed = $passwordSeed.schemaVersion -eq 1 -and $passwordSeed.passwordPolicyVersion -eq 1 -and $parts.Count -eq 2 -and
+            ([Convert]::FromBase64String($parts[0])).Length -eq 16 -and ([Convert]::FromBase64String($parts[1])).Length -eq 32 -and
+            [Convert]::ToBase64String([Convert]::FromBase64String($parts[0])) -ceq $parts[0] -and [Convert]::ToBase64String([Convert]::FromBase64String($parts[1])) -ceq $parts[1]
+    } catch { }
+    if (-not $validSeed -or [Version]$KioskVersion -lt [Version]'1.2.1') { throw 'La contraseña inicial requiere un aprovisionamiento válido y Kiosk 1.2.1 o posterior.' }
+}
 $build = Join-Path $root 'equipment-build'
 $resources = Join-Path $build 'resources'
 $worker = Join-Path $build 'worker'
@@ -95,12 +113,14 @@ try {
         }
         Write-Json (Join-Path $editionResources 'payload.json') $payload
         Write-Json (Join-Path $editionResources 'config.json') @{serverUrl=$serverUrl; setupKey=$setupKey}
+        if ($passwordSeed) { Write-Json (Join-Path $editionResources 'kiosk-password.json') $passwordSeed }
         # Separate intermediate directories prevent one edition's embedded-resource inventory leaking into the other.
         & $dotnet publish (Join-Path $root 'src\Kiosk.EquipmentSetup\Kiosk.EquipmentSetup.csproj') -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:EnableCompressionInSingleFile=true -p:Version=$Version "-p:EquipmentResourcesDir=$editionResources" -p:DebugType=None -p:DebugSymbols=false -o $frontend -nologo @buildArgs
         if ($LASTEXITCODE -ne 0) { throw "No se pudo publicar el asistente $edition." }
         Copy-Item -LiteralPath (Join-Path $frontend 'Setup-EquipoClinicaPC.exe') -Destination $setups[$edition]
         $diagnostic = Diagnose $setups[$edition]
         if (-not $diagnostic.compatible -or $diagnostic.edition -ne $edition -or $diagnostic.componentProtocolVersion -ne 1 -or $diagnostic.assistantVersion -ne $Version) { throw 'Diagnóstico de manifiesto incompatible.' }
+        if ($passwordSeed -and -not $diagnostic.panelPasswordProvisioned) { throw 'El asistente no contiene el aprovisionamiento inicial de contraseña.' }
         if ($edition -eq 'online') {
             if (-not $diagnostic.binariesAbsent -or $diagnostic.workerResourceVerified -or $diagnostic.kioskResourceVerified) { throw 'Online contiene binarios o afirma verificarlos.' }
             if ((Get-Item -LiteralPath $setups[$edition]).Length -ge 100000000) { throw 'Online debe ser menor de 100 MB.' }
@@ -136,7 +156,9 @@ try {
     Write-Host "Ambas ediciones $Version generadas y comprobadas: $output"
 } finally {
     foreach ($edition in @('online','complete')) {
-        $config = Join-Path $build "resources-$edition\config.json"
-        if (Test-Path -LiteralPath $config) { Remove-Item -LiteralPath $config -Force }
+        foreach ($resourceName in @('config.json','kiosk-password.json')) {
+            $config = Join-Path $build "resources-$edition\$resourceName"
+            if (Test-Path -LiteralPath $config) { Remove-Item -LiteralPath $config -Force }
+        }
     }
 }
