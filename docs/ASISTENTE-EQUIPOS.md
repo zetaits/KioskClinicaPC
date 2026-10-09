@@ -1,5 +1,14 @@
 # Asistente WPF para preparar equipos
 
+La 1.5.7 limpia la protección de una instalación anterior después de un reinicio
+antes de comprobar las aplicaciones. Un fallo ordinario de ámbito o versión no
+conserva esa marca antigua ni impide instalar IZArc, VLC u otras aplicaciones
+comprobadas cuando se permite un pack parcial. Una instalación activa detectada
+en la comprobación actual y una instalación pendiente del mismo arranque siguen
+deteniendo la cola. Las consultas de manifiestos respetan `Retry-After` y muestran
+un motivo claro ante HTTP 429; un límite prolongado deja esa aplicación pendiente
+sin bloquear las demás. Se mantiene la comprobación machine-wide de lo instalado.
+
 La corrección preparada para 1.5.6 incluye en el trabajador la DLL nativa
 `Microsoft.Management.Deployment.dll`. Su ausencia en 1.5.5 provocaba
 `COMException 80040154` antes de comprobar las aplicaciones, aunque WinGet

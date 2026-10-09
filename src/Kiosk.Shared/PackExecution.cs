@@ -18,19 +18,27 @@ public static class PackExecution
         {
             ct.ThrowIfCancellationRequested();
             bool uncertain = item.RequiresRebootBeforeRetry || item.State is PackItemState.Installing or PackItemState.VerificationPending;
-            if (uncertain) item.RequiresRebootBeforeRetry = true;
+            var currentBoot = DateTime.UtcNow - TimeSpan.FromMilliseconds(Environment.TickCount64);
+            bool sameBoot = Math.Abs((currentBoot - (item.LastAttemptBootTimeUtc ?? run.HostBootTimeUtc)).TotalMinutes) < 1;
+            // A reboot ends a previous native installer. Clear its stale guard before
+            // checking, even when this new check rejects an unrelated scope/version.
+            // Preflight can still set a fresh guard if it finds an active installer.
+            item.RequiresRebootBeforeRetry = uncertain && sameBoot;
             item.State = PackItemState.Checking; changed?.Invoke(run);
             try
             {
                 await engine.Preflight(item, Path.Combine(logs, item.Application.Id + ".log")).WaitAsync(TimeSpan.FromMinutes(5), ct);
-                var currentBoot = DateTime.UtcNow - TimeSpan.FromMilliseconds(Environment.TickCount64);
-                if (uncertain && !item.Verified && Math.Abs((currentBoot - (item.LastAttemptBootTimeUtc ?? run.HostBootTimeUtc)).TotalMinutes) < 1)
+                if (uncertain && sameBoot && !item.Verified)
                     throw new InvalidOperationException("Instalación anterior interrumpida: puede seguir activa. Reinicia manualmente y reabre el instalador antes de reintentar.");
                 item.RequiresRebootBeforeRetry = false;
             }
             catch (OperationCanceledException) { throw; }
-            catch (TimeoutException ex) { blocked = true; item.RequiresRebootBeforeRetry = true; item.State = PackItemState.Failed; item.Message = ex.Message; }
-            catch (Exception ex) { blocked = true; item.State = PackItemState.Failed; item.Message = ex.Message; }
+            catch (TimeoutException ex) { blocked = true; item.RequiresRebootBeforeRetry = true; item.LastAttemptBootTimeUtc = currentBoot; item.State = PackItemState.Failed; item.Message = ex.Message; }
+            catch (Exception ex)
+            {
+                blocked = true; item.State = PackItemState.Failed; item.Message = ex.Message;
+                if (item.RequiresRebootBeforeRetry) item.LastAttemptBootTimeUtc = currentBoot;
+            }
             changed?.Invoke(run);
         }
         if (!preflight) save(run);

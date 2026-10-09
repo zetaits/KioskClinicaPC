@@ -27,6 +27,17 @@ public sealed class PackResumePolicyTests
         var item = Assert.Single(run.Items);
         Assert.Equal("2", item.Application.PinnedVersion); Assert.Equal(PackItemState.Pending, item.State); Assert.True(item.RequiresRebootBeforeRetry);
     }
+    [Theory]
+    [InlineData(false)] [InlineData(true)]
+    public void Reboot_clears_previous_native_guard_before_a_new_preflight_even_when_resuming(bool resume)
+    {
+        var previous = new PackRun { Items = [new() { Application = App, State = PackItemState.VerificationPending,
+            RequiresRebootBeforeRetry = true }] };
+        previous.Items[0].LastAttemptBootTimeUtc = previous.HostBootTimeUtc.AddDays(-1);
+        var item = Assert.Single(PackResumePolicy.Create(new(7, [App]), previous, resume).Items);
+        Assert.False(item.RequiresRebootBeforeRetry);
+        Assert.True(previous.Items[0].RequiresRebootBeforeRetry);
+    }
     [Fact]
     public void New_selection_does_not_bypass_a_native_installer_outside_the_selection()
     {

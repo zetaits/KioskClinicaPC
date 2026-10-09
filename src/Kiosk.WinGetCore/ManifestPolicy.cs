@@ -48,7 +48,10 @@ internal static class ManifestPolicy
         });
     }
     private static YamlNode? Node(YamlMappingNode map, string key) => map.Children.TryGetValue(new YamlScalarNode(key), out var value) ? value : null;
-    public static async Task ValidateOnline(string id, string version, string architecture, string type, CancellationToken ct = default)
+    public static Task ValidateOnline(string id, string version, string architecture, string type, CancellationToken ct = default)
+        => ValidateOnline(id, version, architecture, type, Http, Task.Delay, ct);
+    internal static async Task ValidateOnline(string id, string version, string architecture, string type,
+        HttpClient http, Func<TimeSpan, CancellationToken, Task> delay, CancellationToken ct = default)
     {
         string directory = RelativeDirectory(id, version);
         foreach (string name in new[] { id + ".installer.yaml", id + ".yaml" })
@@ -58,18 +61,32 @@ internal static class ManifestPolicy
             {
                 try
                 {
-                    using var response = await Http.GetAsync(url, ct);
+                    using var response = await http.GetAsync(url, ct);
                     if (response.StatusCode == HttpStatusCode.NotFound) break;
+                    if (response.StatusCode is HttpStatusCode.RequestTimeout or HttpStatusCode.TooManyRequests || (int)response.StatusCode >= 500)
+                    {
+                        string reason = response.StatusCode == HttpStatusCode.TooManyRequests
+                            ? "GitHub ha limitado temporalmente la consulta del manifiesto oficial (HTTP 429). Reintenta esta aplicación más tarde."
+                            : $"El repositorio de manifiestos oficiales no está disponible temporalmente (HTTP {(int)response.StatusCode}). Reintenta esta aplicación más tarde.";
+                        if (attempt >= 2) throw new IOException(reason);
+                        var retry = response.Headers.RetryAfter;
+                        var wait = retry?.Delta ?? (retry?.Date is { } date ? date - DateTimeOffset.UtcNow : TimeSpan.FromSeconds(5 * (attempt + 1)));
+                        // Do not retry earlier than the server allows or stall the entire pack
+                        // for an extended rate-limit window. Other applications can continue.
+                        if (wait > TimeSpan.FromMinutes(1)) throw new IOException(reason);
+                        await delay(wait > TimeSpan.Zero ? wait : TimeSpan.Zero, ct);
+                        continue;
+                    }
                     response.EnsureSuccessStatusCode();
                     if (!SupportsSilentMachine(await response.Content.ReadAsStringAsync(ct), architecture, type))
                         throw new InvalidDataException("El manifiesto oficial no declara instalación silenciosa machine-wide para el instalador aplicable.");
                     return;
                 }
-                catch (HttpRequestException ex) when (attempt < 2 && (ex.StatusCode == null || ex.StatusCode is HttpStatusCode.RequestTimeout or HttpStatusCode.TooManyRequests || (int)ex.StatusCode >= 500)) { await Task.Delay(1000 * (attempt + 1), ct); }
+                catch (HttpRequestException ex) when (attempt < 2 && (ex.StatusCode == null || ex.StatusCode is HttpStatusCode.RequestTimeout or HttpStatusCode.TooManyRequests || (int)ex.StatusCode >= 500)) { await delay(TimeSpan.FromSeconds(attempt + 1), ct); }
                 catch (OperationCanceledException) when (!ct.IsCancellationRequested)
                 {
                     if (attempt >= 2) throw new IOException("El manifiesto oficial no respondió después de tres intentos.");
-                    await Task.Delay(1000 * (attempt + 1), ct);
+                    await delay(TimeSpan.FromSeconds(attempt + 1), ct);
                 }
             }
         }

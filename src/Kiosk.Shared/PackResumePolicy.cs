@@ -20,7 +20,7 @@ public static class PackResumePolicy
                 ResolvedChannel = keepVerified ? old!.ResolvedChannel : null,
                 InstalledVersion = keepVerified ? old!.InstalledVersion : null,
                 State = keepVerified ? old!.State : resume && sameVersion ? old!.State : PackItemState.Pending,
-                RequiresRebootBeforeRetry = old != null && Uncertain(old),
+                RequiresRebootBeforeRetry = old != null && Uncertain(old) && SameBoot(old),
                 RebootRequired = old != null && SameBoot(old) && old.RebootRequired,
                 LastAttemptBootTimeUtc = old?.LastAttemptBootTimeUtc ?? previous?.HostBootTimeUtc };
         }).ToList() };

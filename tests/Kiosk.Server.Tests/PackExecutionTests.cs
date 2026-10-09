@@ -9,10 +9,11 @@ public sealed class PackExecutionTests
     private sealed class Backend : IPackBackend
     {
         public List<string> Calls = [];
-        public string? Reject, Fail, Cancel, Already, Unverified;
+        public string? Reject, Fail, Cancel, Already, Unverified, Active;
         public Task Preflight(PackItemResult item, string log)
         {
             Calls.Add("check" + item.Application.Id);
+            if (item.Application.Id == Active) { item.RequiresRebootBeforeRetry = true; throw new InvalidOperationException("Instalador activo"); }
             if (item.Application.Id == Reject) throw new InvalidDataException("No compatible");
             item.State = item.Application.Id == Already ? PackItemState.AlreadyInstalled : PackItemState.Pending;
             return Task.CompletedTask;
@@ -57,6 +58,38 @@ public sealed class PackExecutionTests
         Assert.Equal(1, gates); Assert.Same(run, saved); Assert.False(run.Complete);
         Assert.Equal(PackItemState.Failed, run.Items[1].State); Assert.Equal("No compatible", run.Items[1].Message);
         Assert.Equal(PackItemState.Succeeded, run.Items[0].State); Assert.Equal(PackItemState.Succeeded, run.Items[2].State);
+    }
+    [Theory]
+    [InlineData(false)] [InlineData(true)]
+    public async Task Partial_pack_skips_ordinary_failure_after_reboot_but_preserves_same_boot_guard(bool rebooted)
+    {
+        var run = Run(); var backend = new Backend { Reject = "1" }; int gates = 0;
+        run.Items[1].RequiresRebootBeforeRetry = true;
+        run.Items[1].LastAttemptBootTimeUtc = run.HostBootTimeUtc.AddDays(rebooted ? -1 : 0);
+        Assert.False(await PackExecution.Run(run, backend, ".", null, _ => { }, false, CancellationToken.None,
+            () => { gates++; return Task.FromResult(true); }, allowPartial: true));
+        Assert.Equal(!rebooted, run.Items[1].RequiresRebootBeforeRetry);
+        Assert.Equal(rebooted ? 1 : 0, gates);
+        Assert.Equal("No compatible", run.Items[1].Message);
+        Assert.Equal(rebooted ? PackItemState.Succeeded : PackItemState.Pending, run.Items[0].State);
+        Assert.Equal(rebooted ? PackItemState.Succeeded : PackItemState.Pending, run.Items[2].State);
+    }
+    [Fact]
+    public async Task Reboot_does_not_override_a_new_active_installer_found_by_preflight()
+    {
+        var run = Run(); var backend = new Backend { Active = "1" };
+        run.Items[1].RequiresRebootBeforeRetry = true;
+        run.Items[1].LastAttemptBootTimeUtc = run.HostBootTimeUtc.AddDays(-1);
+        Assert.False(await PackExecution.Run(run, backend, ".", null, _ => { }, false, CancellationToken.None,
+            () => throw new Exception("Must not start Kiosk"), allowPartial: true));
+        Assert.True(run.Items[1].RequiresRebootBeforeRetry);
+        Assert.True(Math.Abs((run.HostBootTimeUtc - run.Items[1].LastAttemptBootTimeUtc!.Value).TotalMinutes) < 1);
+        Assert.DoesNotContain(backend.Calls, x => x.StartsWith("install"));
+        var nextCheck = new Backend { Reject = "1" };
+        Assert.False(await PackExecution.Run(run, nextCheck, ".", null, _ => { }, false, CancellationToken.None,
+            () => throw new Exception("Must retain the new same-boot guard"), allowPartial: true));
+        Assert.True(run.Items[1].RequiresRebootBeforeRetry);
+        Assert.DoesNotContain(nextCheck.Calls, x => x.StartsWith("install"));
     }
     [Fact]
     public async Task Partial_option_does_not_override_preflight_only_or_active_native_install()
