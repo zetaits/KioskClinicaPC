@@ -1,5 +1,17 @@
 # Asistente WPF para preparar equipos
 
+La 1.5.8 corrige el contrato de ámbito de la API COM de WinGet: los metadatos de
+una instalación para todo el equipo usan `System`, mientras los manifiestos YAML
+usan `machine`. La política central de verificación ahora usa el contrato COM en
+la detección previa, la omisión de versiones ya instaladas y la comprobación
+posterior a instalar. Una versión System anterior se puede actualizar; las
+instalaciones User y los ámbitos/versiones desconocidos siguen exigiendo revisión.
+Los logs `*.verification.jsonl` registran versión requerida/instalada, ámbito COM,
+comparación nativa y decisión, sin credenciales. Los diagnósticos
+`inspect-installed-json <id> <versión>` y `audit-last-run-json` permiten comprobar
+el caso real sin instalar ni guardar estados. Evidencia y límites de la prueba:
+[VERIFICACION-ASISTENTE-1.5.8.md](VERIFICACION-ASISTENTE-1.5.8.md).
+
 La 1.5.7 limpia la protección de una instalación anterior después de un reinicio
 antes de comprobar las aplicaciones. Un fallo ordinario de ámbito o versión no
 conserva esa marca antigua ni impide instalar IZArc, VLC u otras aplicaciones

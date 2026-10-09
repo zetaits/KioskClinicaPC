@@ -1,4 +1,5 @@
 using System.IO;
+using System.Text.Json;
 using Microsoft.Management.Deployment;
 using KioskClinicaPC.Core.Sync;
 
@@ -105,9 +106,28 @@ internal sealed class WinGetEngine : IPackBackend
             throw new InvalidDataException("Instalador por usuario, autenticación interactiva o tipo no admitido.");
         return options;
     }
-    private static bool Verified(CatalogPackage package, string version) => package.InstalledVersion is { } installed &&
-        installed.GetMetadata(PackageVersionMetadataField.InstalledScope).Equals("machine", StringComparison.OrdinalIgnoreCase) &&
-        installed.CompareToVersion(version) is CompareResult.Equal or CompareResult.Greater;
+    private static PackInstalledEvidence InstalledEvidence(CatalogPackage package, string version)
+    {
+        var installed = package.InstalledVersion;
+        return new(installed is not null, installed?.Version,
+            installed?.GetMetadata(PackageVersionMetadataField.InstalledScope), installed?.CompareToVersion(version) switch
+            { CompareResult.Greater => 1, CompareResult.Equal => 0, CompareResult.Lesser => -1, _ => null });
+    }
+    private static bool Verified(CatalogPackage package, string version) =>
+        InstalledEvidence(package, version).Disposition == PackInstalledDisposition.Verified;
+    private void RecordEvidence(string log, string stage, PackApplication app, PackInstalledEvidence evidence)
+    {
+        if (string.IsNullOrEmpty(log)) return;
+        try
+        {
+            File.AppendAllText(log + ".verification.jsonl", JsonSerializer.Serialize(new { atUtc = DateTime.UtcNow, stage,
+                wingetId = app.WingetId, requiredVersion = app.PinnedVersion, installed = evidence.Installed,
+                installedVersion = evidence.Version, installedScope = evidence.ApiScope, versionComparison = evidence.Comparison,
+                disposition = evidence.Disposition.ToString() }) + Environment.NewLine);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        { _info?.Invoke($"Verification diagnostic could not be written: {ex.GetType().Name}; HRESULT {ex.HResult:X8}"); }
+    }
     public async Task Preflight(PackItemResult item, string log)
     {
         if (_catalogSession is not null) await _catalogSession.Check(() => Check(item, log), _preflightToken);
@@ -122,14 +142,22 @@ internal sealed class WinGetEngine : IPackBackend
             throw new InvalidOperationException("WinGet todavía tiene una instalación activa de esta aplicación. Espera antes de reanudar.");
         }
         if (!item.ResolveLatest && Verified(package, item.Application.PinnedVersion))
-        { item.InstalledVersion = package.InstalledVersion.Version; item.State = PackItemState.AlreadyInstalled; item.Message = "Ya instalada y verificada (todo el equipo)."; return; }
+        { RecordEvidence(log, "preflight-already-installed", item.Application, InstalledEvidence(package, item.Application.PinnedVersion));
+            item.InstalledVersion = package.InstalledVersion.Version; item.State = PackItemState.AlreadyInstalled; item.Message = "Ya instalada y verificada (todo el equipo)."; return; }
         if (_latest) await Resolve(package, item, log);
-        // Never silently replace a user's copy or accept unknown version/scope.
-        if (package.InstalledVersion is { } installed &&
-            (!installed.GetMetadata(PackageVersionMetadataField.InstalledScope).Equals("machine", StringComparison.OrdinalIgnoreCase) ||
-             installed.CompareToVersion(item.Application.PinnedVersion) == CompareResult.Unknown))
-            throw new InvalidDataException("Ya existe una instalación por usuario o de versión desconocida; requiere revisión.");
-        if (Verified(package, item.Application.PinnedVersion))
+        var evidence = InstalledEvidence(package, item.Application.PinnedVersion);
+        RecordEvidence(log, "preflight", item.Application, evidence);
+        // Use the COM API's installed scope (System/User), not the YAML manifest vocabulary.
+        switch (evidence.Disposition)
+        {
+            case PackInstalledDisposition.UserScope:
+                throw new InvalidDataException("Ya existe una instalación por usuario; requiere revisión.");
+            case PackInstalledDisposition.UnknownScope:
+                throw new InvalidDataException("No se puede determinar el ámbito de la instalación existente; requiere revisión.");
+            case PackInstalledDisposition.UnknownVersion:
+                throw new InvalidDataException("No se puede comparar la versión instalada con la requerida; requiere revisión.");
+        }
+        if (evidence.Disposition == PackInstalledDisposition.Verified)
         { item.InstalledVersion = package.InstalledVersion.Version; item.State = PackItemState.AlreadyInstalled; item.Message = "Ya instalada (versión igual o superior, todo el equipo)."; return; }
         var options = Options(package, item.Application, log, item.ResolvedChannel);
         var installer = package.GetPackageVersionInfo(options.PackageVersionId).GetApplicableInstaller(options);
@@ -171,10 +199,22 @@ internal sealed class WinGetEngine : IPackBackend
         var item = new PackItemResult { Application = new("inspect", id, id, version) };
         await Preflight(item, ""); return item;
     }
+    public async Task<object> InspectInstalled(string id, string version)
+    {
+        var package = await Find(id);
+        var installed = package.InstalledVersion;
+        var native = _manager.GetInstallProgress(package, _manager.GetPackageCatalogByName("winget").Info);
+        return new { wingetId = id, requestedVersion = version, installedVersion = installed?.Version,
+            installedScope = installed?.GetMetadata(PackageVersionMetadataField.InstalledScope),
+            versionComparison = installed?.CompareToVersion(version).ToString(),
+            verified = Verified(package, version), nativeInstallActive = native?.Status == Windows.Foundation.AsyncStatus.Started };
+    }
     public async Task Install(PackItemResult item, string log, Action<string> progress, CancellationToken ct)
     {
         var package = await Find(item.Application.WingetId);
-        if (Verified(package, item.Application.PinnedVersion)) { item.InstalledVersion = package.InstalledVersion.Version; item.State = PackItemState.AlreadyInstalled; item.Message = "Ya instalada y verificada."; return; }
+        var beforeInstall = InstalledEvidence(package, item.Application.PinnedVersion);
+        RecordEvidence(log, "before-install", item.Application, beforeInstall);
+        if (beforeInstall.Disposition == PackInstalledDisposition.Verified) { item.InstalledVersion = beforeInstall.Version; item.State = PackItemState.AlreadyInstalled; item.Message = "Ya instalada y verificada."; return; }
         var options = Options(package, item.Application, log, item.ResolvedChannel);
         Windows.Foundation.IAsyncOperationWithProgress<InstallResult, InstallProgress> operation;
         try { operation = package.InstalledVersion == null ? _manager.InstallPackageAsync(package, options) : _manager.UpgradePackageAsync(package, options); }
@@ -207,8 +247,10 @@ internal sealed class WinGetEngine : IPackBackend
             for (int attempt = 0; attempt < 6; attempt++)
             {
                 var installed = await Find(item.Application.WingetId);
-                if (Verified(installed, item.Application.PinnedVersion))
-                { item.InstalledVersion = installed.InstalledVersion.Version; item.State = PackItemState.Succeeded; item.Message = "Instalada y verificada."; return; }
+                var evidence = InstalledEvidence(installed, item.Application.PinnedVersion);
+                RecordEvidence(log, $"post-install-{attempt + 1}", item.Application, evidence);
+                if (evidence.Disposition == PackInstalledDisposition.Verified)
+                { item.InstalledVersion = evidence.Version; item.State = PackItemState.Succeeded; item.Message = "Instalada y verificada."; return; }
                 await Task.Delay(TimeSpan.FromSeconds(5), ct);
             }
         }

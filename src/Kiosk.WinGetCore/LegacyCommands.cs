@@ -40,7 +40,28 @@ internal static class LegacyCommands
             }
         }
         if (args is ["equipment-worker"]) return EquipmentWorker.Run().GetAwaiter().GetResult();
+        if (args is ["audit-last-run-json"])
+        {
+            try
+            {
+                using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(5));
+                var evidence = Task.Run(() => PackAudit.LastRun(timeout.Token)).GetAwaiter().GetResult();
+                Console.WriteLine(JsonSerializer.Serialize(evidence, Json)); return 0;
+            }
+            catch (Exception ex) { Console.Error.WriteLine(KioskClinicaPC.Equipment.EquipmentDiagnostics.Describe(ex)); return 1; }
+        }
         if (args.Length < 2) return 64;
+        if (args[0] == "inspect-installed-json" && args.Length == 3)
+        {
+            // Read-only native evidence, without bootstrap, refresh or installation.
+            try
+            {
+                var evidence = Task.Run(() => new WinGetEngine().InspectInstalled(args[1], args[2]))
+                    .WaitAsync(TimeSpan.FromMinutes(2)).GetAwaiter().GetResult();
+                Console.WriteLine(JsonSerializer.Serialize(evidence, Json)); return 0;
+            }
+            catch (Exception ex) { Console.Error.WriteLine(KioskClinicaPC.Equipment.EquipmentDiagnostics.Describe(ex)); return 1; }
+        }
         if (args[0] == "inspect" && args.Length == 3)
         {
             // Read-only diagnostics: never bootstrap or install applications on the development PC.
