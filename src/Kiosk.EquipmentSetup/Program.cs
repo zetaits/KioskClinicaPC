@@ -26,7 +26,12 @@ internal static class Program
             var app = new Application();
             return app.Run(new MainWindow());
         }
-        catch { return 1; }
+        catch (Exception ex)
+        {
+            AssistantLog.Write("entrada del asistente", ex,
+                args is ["--worker", _] ? Path.Combine(MachineState.Root, "logs") : null);
+            return 1;
+        }
     }
     internal static EquipmentRequest? ParseSilent(string[] args)
     {

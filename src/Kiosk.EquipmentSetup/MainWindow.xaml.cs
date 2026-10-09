@@ -175,11 +175,20 @@ public partial class MainWindow : Window
             if (result.KioskVerified)
             {
                 try { await _register(); }
-                catch { result = result with { ExitCode = 2, Message = result.Message + " No se pudo verificar el inicio automático para el usuario que abrió el asistente." }; }
+                catch (Exception ex)
+                {
+                    AssistantLog.Write("registro del inicio automático", ex);
+                    result = result with { ExitCode = 2, Message = result.Message + " No se pudo verificar el inicio automático para el usuario que abrió el asistente." };
+                }
             }
         }
         catch (Win32Exception ex) when (ex.NativeErrorCode == 1223) { result = new("result", "Se canceló la solicitud de permisos. No se inició la instalación.", ExitCode: 1); }
-        catch { result = new("result", "No se recibió un resultado verificable del trabajador. Puede quedar un instalador activo. Revisa los diagnósticos antes de reanudar.", ExitCode: 2); }
+        catch (Exception ex)
+        {
+            string? log = AssistantLog.Write("resultado del trabajador", ex);
+            result = new("result", "No se recibió un resultado verificable del trabajador. Puede quedar un instalador activo. Revisa los diagnósticos antes de reanudar." +
+                (log is null ? "" : "\nDiagnóstico de la ventana: " + log), ExitCode: 2);
+        }
         _running = false;
         if (result.Run is not null) _lastRun = result.Run;
         if (result.Kind == "review") { ShowStep(1); await LoadCatalog(); CatalogLabel.Text = result.Message; return; }
