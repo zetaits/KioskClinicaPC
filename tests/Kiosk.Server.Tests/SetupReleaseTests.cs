@@ -42,13 +42,14 @@ public sealed class SetupReleaseTests : IDisposable
             : AuthenticateResult.NoResult());
     }
     private static string Hash(byte[] bytes) => Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
-    private static (SetupRelease Release, Dictionary<string, byte[]> Bytes) Bundle(string version = "1.5.0", bool unsafeZip = false)
+    private static (SetupRelease Release, Dictionary<string, byte[]> Bytes) Bundle(string version = "1.5.0", bool unsafeZip = false, bool activationDll = true)
     {
         using var worker = new MemoryStream();
         using (var archive = new ZipArchive(worker, ZipArchiveMode.Create, true))
         {
-            foreach (var name in new[] { "KioskSetupHelper.exe", "KioskSetupHelper.dll", "KioskSetupHelper.runtimeconfig.json", "Microsoft.Management.Deployment.dll", "Microsoft.Management.Deployment.winmd" })
+            foreach (var name in new[] { "KioskSetupHelper.exe", "KioskSetupHelper.dll", "KioskSetupHelper.runtimeconfig.json", "Microsoft.Management.Deployment.winmd" })
             { using var entry = archive.CreateEntry(name).Open(); entry.WriteByte(1); }
+            if (activationDll) { using var entry = archive.CreateEntry("Microsoft.Management.Deployment.dll").Open(); entry.WriteByte(1); }
             using (var metadata = archive.CreateEntry("pack-worker.json").Open())
                 JsonSerializer.Serialize(metadata, new PackWorkerManifest(1, 3, version, new string('a', 40)), Json);
             if (unsafeZip) { using var bad = archive.CreateEntry("../escape.exe").Open(); bad.WriteByte(1); }
@@ -71,6 +72,22 @@ public sealed class SetupReleaseTests : IDisposable
     }
     private async Task Publish(HttpClient client, SetupRelease release, Dictionary<string, byte[]> bytes)
     { using var form = Form(release, bytes); Assert.Equal(HttpStatusCode.OK, (await client.PostAsync("/api/releases/setup/v3", form)).StatusCode); }
+    [Fact]
+    public async Task Historical_worker_without_native_activation_remains_readable_but_new_release_is_rejected()
+    {
+        using var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Add("X-Release-Publish-Key", "publisher");
+        var (historical, historicalBytes) = Bundle("1.5.5", activationDll: false);
+        await Publish(client, historical, historicalBytes);
+        Assert.NotNull(Store.Find("1.5.5"));
+        await Store.Activate("1.5.5", default);
+        Assert.True(Store.Ready());
+        var (current, currentBytes) = Bundle("1.5.6", activationDll: false);
+        using var form = Form(current, currentBytes);
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsync("/api/releases/setup/v3", form)).StatusCode);
+        Assert.Equal("1.5.5", Store.ActiveVersion);
+        Assert.True(Store.Ready());
+    }
     [Fact]
     public async Task Panel_password_default_requires_the_private_publisher_key_and_is_not_cached()
     {

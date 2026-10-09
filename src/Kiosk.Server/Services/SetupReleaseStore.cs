@@ -34,7 +34,10 @@ public sealed class SetupReleaseStore
     private static bool ValidWorker(string path, SetupRelease release)
     {
         using var stream = File.OpenRead(path);
-        return PackWorkerCompatibility.ValidateArchive(stream) && PackWorkerCompatibility.Matches(stream, release.WorkerVersion, release.SourceCommit);
+        // Keep historical publications readable without invalidating the active pointer
+        // during a server update. New releases must include the native activation DLL.
+        bool requireNativeActivation = System.Version.Parse(release.WorkerVersion) >= new Version(1, 5, 6);
+        return PackWorkerCompatibility.ValidateArchive(stream, requireNativeActivation) && PackWorkerCompatibility.Matches(stream, release.WorkerVersion, release.SourceCommit);
     }
     public SetupRelease? Find(string version)
     {

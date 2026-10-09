@@ -6,6 +6,8 @@ La corrección preparada para 1.5.6 incluye en el trabajador la DLL nativa
 estuviera instalado. La compilación y la validación del ZIP ahora exigen esa DLL
 además del WinMD. Es necesario generar y publicar un asistente nuevo para aplicar
 la corrección a las descargas del panel.
+El servidor conserva la lectura de las publicaciones anteriores a 1.5.6 para no
+invalidar la versión activa al desplegar; exige la DLL en las nuevas publicaciones.
 
 El comando `KioskSetupHelper.exe --diagnose-winget-json` comprueba la activación
 de la API y sus opciones sin reparar WinGet, actualizar el catálogo ni instalar

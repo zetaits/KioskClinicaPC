@@ -7,7 +7,7 @@ namespace KioskClinicaPC.Equipment;
 public sealed record PackWorkerManifest(int SchemaVersion, int CatalogApiVersion, string WorkerVersion, string SourceCommit);
 public static class PackWorkerCompatibility
 {
-    public static bool ValidateArchive(Stream resource)
+    public static bool ValidateArchive(Stream resource, bool requireNativeActivation = true)
     {
         try
         {
@@ -22,8 +22,9 @@ public static class PackWorkerCompatibility
                     string[] parts = entry.FullName.TrimEnd('/').Split('/');
                     for (int i = 1; i < parts.Length; i++) if (files.Contains(string.Join('/', parts.Take(i)))) return false;
                 }
-                if (!new[] { "KioskSetupHelper.exe", "KioskSetupHelper.dll", "KioskSetupHelper.runtimeconfig.json", "Microsoft.Management.Deployment.dll", "Microsoft.Management.Deployment.winmd" }
+                if (!new[] { "KioskSetupHelper.exe", "KioskSetupHelper.dll", "KioskSetupHelper.runtimeconfig.json", "Microsoft.Management.Deployment.winmd" }
                     .All(name => archive.Entries.Count(e => e.FullName == name && e.Length > 0) == 1)) return false;
+                if (requireNativeActivation && archive.Entries.Count(e => e.FullName == "Microsoft.Management.Deployment.dll" && e.Length > 0) != 1) return false;
             }
             resource.Position = 0;
             return Validate(resource);
