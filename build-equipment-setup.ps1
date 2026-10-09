@@ -1,5 +1,5 @@
 ﻿param(
-    [string]$Version = '1.5.5',
+    [string]$Version = '1.5.6',
     [string]$KioskVersion,
     [switch]$Publish
 )
@@ -80,7 +80,7 @@ try {
     Copy-Item -LiteralPath (Join-Path $output "Setup-KioskClinicaPC-$KioskVersion.exe") -Destination (Join-Path $resources 'kiosk.exe')
     & $dotnet publish (Join-Path $root 'src\Kiosk.PackWorker\Kiosk.PackWorker.csproj') -c Release -r win-x64 --self-contained true -p:PublishSingleFile=false -p:Version=$Version -p:DebugType=None -p:DebugSymbols=false -o $worker -nologo @buildArgs
     if ($LASTEXITCODE -ne 0) { throw 'No se pudo publicar el trabajador sin WPF.' }
-    foreach ($file in @('KioskSetupHelper.exe','KioskSetupHelper.dll','KioskSetupHelper.runtimeconfig.json','Microsoft.Management.Deployment.winmd')) {
+    foreach ($file in @('KioskSetupHelper.exe','KioskSetupHelper.dll','KioskSetupHelper.runtimeconfig.json','Microsoft.Management.Deployment.dll','Microsoft.Management.Deployment.winmd')) {
         if (-not (Test-Path -LiteralPath (Join-Path $worker $file))) { throw "Falta $file en el trabajador." }
     }
     if (Test-Path -LiteralPath (Join-Path $worker 'PresentationFramework.dll')) { throw 'El trabajador contiene WPF.' }

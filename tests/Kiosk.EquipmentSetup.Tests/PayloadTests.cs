@@ -32,7 +32,7 @@ public sealed class PayloadTests
         Assert.DoesNotContain("untrusted-metadata-secret", diagnostic);
         Assert.DoesNotContain("forged log line", diagnostic);
     }
-    private static MemoryStream Archive(string path, bool winmd = true, int? catalogVersion = 3)
+    private static MemoryStream Archive(string path, bool winmd = true, int? catalogVersion = 3, bool activationDll = true)
     {
         var stream = new MemoryStream();
         using (var archive = new ZipArchive(stream, ZipArchiveMode.Create, true))
@@ -40,6 +40,7 @@ public sealed class PayloadTests
             foreach (string name in new[] { "KioskSetupHelper.exe", "KioskSetupHelper.dll", "KioskSetupHelper.runtimeconfig.json" })
             { using var entry = archive.CreateEntry(name).Open(); entry.WriteByte(1); }
             if (winmd) { using var entry = archive.CreateEntry("Microsoft.Management.Deployment.winmd").Open(); entry.WriteByte(1); }
+            if (activationDll) { using var entry = archive.CreateEntry("Microsoft.Management.Deployment.dll").Open(); entry.WriteByte(1); }
             if (catalogVersion is not null)
             {
                 using var metadata = archive.CreateEntry("pack-worker.json").Open();
@@ -50,7 +51,7 @@ public sealed class PayloadTests
         stream.Position = 0; return stream;
     }
     [Fact]
-    public void Canonical_worker_with_physical_winmd_is_accepted()
+    public void Canonical_worker_with_native_activation_and_physical_winmd_is_accepted()
     {
         using var stream = Archive("es/PresentationCore.resources.dll"); Assert.True(Payload.ValidateWorkerArchive(stream));
     }
@@ -80,6 +81,11 @@ public sealed class PayloadTests
     public void Missing_winmd_is_not_a_usable_worker()
     {
         using var stream = Archive("es/file.dll", false); Assert.False(Payload.ValidateWorkerArchive(stream));
+    }
+    [Fact]
+    public void Missing_native_activation_dll_is_not_a_usable_worker()
+    {
+        using var stream = Archive("es/file.dll", activationDll: false); Assert.False(Payload.ValidateWorkerArchive(stream));
     }
     private sealed class NoNetwork : System.Net.Http.HttpMessageHandler
     {

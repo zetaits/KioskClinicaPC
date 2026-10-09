@@ -47,7 +47,7 @@ public sealed class SetupReleaseTests : IDisposable
         using var worker = new MemoryStream();
         using (var archive = new ZipArchive(worker, ZipArchiveMode.Create, true))
         {
-            foreach (var name in new[] { "KioskSetupHelper.exe", "KioskSetupHelper.dll", "KioskSetupHelper.runtimeconfig.json", "Microsoft.Management.Deployment.winmd" })
+            foreach (var name in new[] { "KioskSetupHelper.exe", "KioskSetupHelper.dll", "KioskSetupHelper.runtimeconfig.json", "Microsoft.Management.Deployment.dll", "Microsoft.Management.Deployment.winmd" })
             { using var entry = archive.CreateEntry(name).Open(); entry.WriteByte(1); }
             using (var metadata = archive.CreateEntry("pack-worker.json").Open())
                 JsonSerializer.Serialize(metadata, new PackWorkerManifest(1, 3, version, new string('a', 40)), Json);

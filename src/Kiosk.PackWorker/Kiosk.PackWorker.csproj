@@ -6,6 +6,13 @@
     <Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>KioskSetupHelper</AssemblyName><Version>1.5.0</Version>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <WinGetInteropVersion>1.29.380</WinGetInteropVersion>
+    <MicrosoftManagementDeployment-OutputWinMD>false</MicrosoftManagementDeployment-OutputWinMD>
   </PropertyGroup>
-  <ItemGroup><ProjectReference Include="../Kiosk.WinGetCore/Kiosk.WinGetCore.csproj" /></ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Kiosk.WinGetCore/Kiosk.WinGetCore.csproj" />
+    <!-- The native activation DLL is copied by this package's build targets, which
+         do not flow through the WinGetCore project reference. -->
+    <PackageReference Include="Microsoft.WindowsPackageManager.ComInterop" Version="$(WinGetInteropVersion)" />
+  </ItemGroup>
 </Project>

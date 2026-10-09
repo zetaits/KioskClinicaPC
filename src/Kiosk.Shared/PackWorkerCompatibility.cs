@@ -22,7 +22,7 @@ public static class PackWorkerCompatibility
                     string[] parts = entry.FullName.TrimEnd('/').Split('/');
                     for (int i = 1; i < parts.Length; i++) if (files.Contains(string.Join('/', parts.Take(i)))) return false;
                 }
-                if (!new[] { "KioskSetupHelper.exe", "KioskSetupHelper.dll", "KioskSetupHelper.runtimeconfig.json", "Microsoft.Management.Deployment.winmd" }
+                if (!new[] { "KioskSetupHelper.exe", "KioskSetupHelper.dll", "KioskSetupHelper.runtimeconfig.json", "Microsoft.Management.Deployment.dll", "Microsoft.Management.Deployment.winmd" }
                     .All(name => archive.Entries.Count(e => e.FullName == name && e.Length > 0) == 1)) return false;
             }
             resource.Position = 0;

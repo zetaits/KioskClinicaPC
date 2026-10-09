@@ -19,6 +19,26 @@ internal static class LegacyCommands
                 componentProtocolVersion = 1, wpf = typeof(LegacyCommands).Assembly.GetReferencedAssemblies().Any(a => a.Name == "PresentationFramework") }, Json));
             return 0;
         }
+        if (args is ["--diagnose-winget-json"])
+        {
+            // Read-only activation check: no bootstrap, catalogue refresh or installation.
+            try
+            {
+                var engine = new WinGetEngine();
+                engine.RequireSupportedRuntime();
+                _ = WinGetActivation.Create<Microsoft.Management.Deployment.FindPackagesOptions>();
+                _ = WinGetActivation.Create<Microsoft.Management.Deployment.PackageMatchFilter>();
+                _ = WinGetActivation.Create<Microsoft.Management.Deployment.InstallOptions>();
+                _ = WinGetActivation.Create<Microsoft.Management.Deployment.CreateCompositePackageCatalogOptions>();
+                Console.WriteLine(JsonSerializer.Serialize(new { wingetActivated = true }, Json));
+                return 0;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(JsonSerializer.Serialize(new { wingetActivated = false, error = ex.GetType().Name, hresult = $"{ex.HResult:X8}" }, Json));
+                return 1;
+            }
+        }
         if (args is ["equipment-worker"]) return EquipmentWorker.Run().GetAwaiter().GetResult();
         if (args.Length < 2) return 64;
         if (args[0] == "inspect" && args.Length == 3)

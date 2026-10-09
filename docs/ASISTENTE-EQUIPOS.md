@@ -1,5 +1,18 @@
 # Asistente WPF para preparar equipos
 
+La corrección preparada para 1.5.6 incluye en el trabajador la DLL nativa
+`Microsoft.Management.Deployment.dll`. Su ausencia en 1.5.5 provocaba
+`COMException 80040154` antes de comprobar las aplicaciones, aunque WinGet
+estuviera instalado. La compilación y la validación del ZIP ahora exigen esa DLL
+además del WinMD. Es necesario generar y publicar un asistente nuevo para aplicar
+la corrección a las descargas del panel.
+
+El comando `KioskSetupHelper.exe --diagnose-winget-json` comprueba la activación
+de la API y sus opciones sin reparar WinGet, actualizar el catálogo ni instalar
+aplicaciones. Debe ejecutarse desde la carpeta completa del trabajador, conservando
+la DLL nativa y el WinMD junto al EXE. Devuelve código 0 y `wingetActivated: true`
+si puede activar WinGet 1.29.380 o superior; en caso contrario muestra tipo y HRESULT.
+
 La candidata 1.5.5 incluye Kiosk 1.2.2 y corrige el error al abrir la ventana
 principal después de guardar el precio: los colores de respaldo de los bindings
 usan recursos estáticos válidos para WPF. Los colores enlazados al componente
