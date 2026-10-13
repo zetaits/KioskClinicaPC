@@ -143,7 +143,7 @@
                                 <Expander x:Name="ResultDetailsExpander" Header="Ver detalles completos" Foreground="{StaticResource MutedBrush}" Visibility="Collapsed" Margin="0,12,0,0">
                                     <TextBox x:Name="ResultDetails" MaxHeight="150" IsReadOnly="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" FontSize="13" Margin="0,8,0,0"/>
                                 </Expander>
-                                <TextBlock Text="Diagnósticos: %ProgramData%\ClinicaPC\Setup\logs. Los reinicios son siempre manuales." Foreground="{StaticResource MutedBrush}" FontSize="12" Margin="0,16,0,8"/>
+                                <TextBlock Text="Diagnósticos: %ProgramData%\ClinicaPC\Setup\logs. El asistente solo reinicia si lo eliges." Foreground="{StaticResource MutedBrush}" FontSize="12" Margin="0,16,0,8"/>
                                 <CheckBox x:Name="LaunchCheck" IsChecked="False" Visibility="Collapsed" Checked="LaunchChanged" Unchecked="LaunchChanged"><TextBlock Text="Abrir Kiosk al finalizar"/></CheckBox>
                             </StackPanel>
                         </ScrollViewer>
@@ -156,6 +156,7 @@
                         <Button x:Name="BackButton" Content="Atrás" Style="{StaticResource SecondaryButton}" Click="Back" Visibility="Collapsed"/>
                         <Button x:Name="RetryButton" Content="Reintentar" Click="Retry" Visibility="Collapsed"/>
                         <Button x:Name="CancelButton" Content="Cancelar" Style="{StaticResource SecondaryButton}" Click="Cancel"/>
+                        <Button x:Name="RestartNowButton" Content="Reiniciar ahora" Style="{StaticResource SecondaryButton}" Click="RestartNowClicked" Visibility="Collapsed"/>
                         <Button x:Name="NextButton" Content="Continuar" Click="Next"/>
                     </StackPanel>
                 </Grid>

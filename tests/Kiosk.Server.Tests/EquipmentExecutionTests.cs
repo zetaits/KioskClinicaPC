@@ -78,6 +78,22 @@ public sealed class EquipmentExecutionTests
         var calls = new List<string>(); var pack = new Pack(calls) { Complete = false, RebootRequired = true };
         var result = await new EquipmentExecution(_ => Task.FromResult(Catalog), () => pack, new Kiosk(calls)).Run(Request(), _ => { }, CancellationToken.None);
         Assert.Equal(2, result.ExitCode); Assert.True(result.KioskVerified); Assert.True(result.RebootRequired);
+        Assert.False(result.KioskRebootRequired);
+    }
+    [Theory]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task Result_identifies_whether_kiosk_itself_needs_reboot(bool kioskReboot, bool packReboot)
+    {
+        var calls = new List<string>();
+        var pack = new Pack(calls) { RebootRequired = packReboot };
+        var kiosk = new Kiosk(calls) { RebootRequired = kioskReboot };
+        var result = await new EquipmentExecution(_ => Task.FromResult(Catalog), () => pack, kiosk)
+            .Run(Request(), _ => { }, CancellationToken.None);
+        Assert.Equal(0, result.ExitCode);
+        Assert.True(result.RebootRequired);
+        Assert.Equal(kioskReboot, result.KioskRebootRequired);
     }
     [Fact]
     public async Task Preparation_follows_selection_validation_and_failure_prevents_every_bootstrap()

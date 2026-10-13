@@ -25,9 +25,10 @@ public partial class MainWindow : Window
     private readonly Func<EquipmentRequest, Action<EquipmentEvent>, CancellationToken, Task<EquipmentEvent>> _start;
     private readonly Func<Task> _register;
     private readonly Action _launch;
+    private readonly Action _restart;
     public MainWindow() : this(LoadFromPanel, WorkerPipe.Start, KioskPayload.RegisterAutostart) { }
     internal MainWindow(Func<CancellationToken, Task<PackCatalog>> load,
-        Func<EquipmentRequest, Action<EquipmentEvent>, CancellationToken, Task<EquipmentEvent>> start, Func<Task> register, Action? launch = null)
+        Func<EquipmentRequest, Action<EquipmentEvent>, CancellationToken, Task<EquipmentEvent>> start, Func<Task> register, Action? launch = null, Action? restart = null)
     {
         Payload.UseAssembly(typeof(MainWindow).Assembly);
         _load = load; _start = start; _register = register;
@@ -35,6 +36,17 @@ public partial class MainWindow : Window
         {
             using var process = Process.Start(new ProcessStartInfo(KioskPayload.ClientExe) { UseShellExecute = true })
                 ?? throw new InvalidOperationException("No se pudo iniciar Kiosk.");
+        });
+        _restart = restart ?? (() =>
+        {
+            string shutdown = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "shutdown.exe");
+            using var process = Process.Start(new ProcessStartInfo(shutdown, "/r /t 0")
+            {
+                UseShellExecute = false,
+                CreateNoWindow = true
+            }) ?? throw new InvalidOperationException("No se pudo iniciar el reinicio de Windows.");
+            if (process.WaitForExit(5000) && process.ExitCode != 0)
+                throw new InvalidOperationException("Windows rechazó la solicitud de reinicio.");
         });
         InitializeComponent();
         VersionLabel.Text = $"Asistente {Payload.Manifest.AssistantVersion} · Windows x64";
@@ -61,6 +73,7 @@ public partial class MainWindow : Window
         BackButton.IsEnabled = !_running;
         RetryButton.Visibility = Visibility.Collapsed;
         InstallAvailableButton.Visibility = Visibility.Collapsed;
+        RestartNowButton.Visibility = Visibility.Collapsed;
         NextButton.Content = step == 2 ? "Instalar" : step == 3 ? "Finalizar" : "Continuar";
         UpdateFinishButton();
         NextButton.IsEnabled = CanContinue();
@@ -107,6 +120,23 @@ public partial class MainWindow : Window
             }
         }
         Close();
+    }
+    private void RestartNowClicked(object sender, RoutedEventArgs e)
+    {
+        bool confirmed = MessageBox.Show(this,
+            "Windows cerrará las aplicaciones abiertas. Guarda tu trabajo antes de continuar. ¿Reiniciar ahora?",
+            "Reiniciar Windows", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) == MessageBoxResult.Yes;
+        RestartNow(confirmed);
+    }
+    internal void RestartNow(bool confirmed)
+    {
+        if (!confirmed || _step != 3 || _running || _loading || RestartNowButton.Visibility != Visibility.Visible || !RestartNowButton.IsEnabled) return;
+        try { _restart(); RestartNowButton.IsEnabled = false; }
+        catch (Exception ex)
+        {
+            AssistantLog.Write("reinicio solicitado", ex);
+            StatusLabel.Text = "No se pudo iniciar el reinicio. Puedes hacerlo desde Windows.";
+        }
     }
     internal void Confirm()
     {
@@ -214,10 +244,13 @@ public partial class MainWindow : Window
         ResultIcon.Text = result.ExitCode == 0 && !rebootPending ? "✓" : stopped || incomplete || rebootPending ? "!" : "×";
         ResultStateBadge.Text = rebootPending ? "REINICIO PENDIENTE" : result.ExitCode == 0 ? "COMPLETADO" :
             stopped ? "DETENIDO" : incomplete ? "INCOMPLETO" : "ERROR";
-        ResultTitle.Text = rebootPending ? "Reinicio pendiente" : result.ExitCode == 0 ? "Preparación completa" : stopped ? "Preparación detenida" :
+        ResultTitle.Text = rebootPending && result.KioskRebootRequired ? "Reinicio pendiente" : result.ExitCode == 0 ? "Preparación completa" : stopped ? "Preparación detenida" :
             hasVerified ? "Preparación parcial" : hasPending ? "Preparación pendiente" : "No se pudo completar";
-        ResultLabel.Text = result.Message + (result.RebootRequired && !result.Message.Contains("reinici", StringComparison.OrdinalIgnoreCase)
-            ? "\nEs necesario reiniciar manualmente." : "");
+        ResultLabel.Text = result.Message + (result.RebootRequired
+            ? result.KioskRebootRequired ? "\nReinicia Windows antes de abrir Kiosk."
+                : request.Kiosk && result.KioskVerified && result.ExitCode == 0 ? "\nPuedes reiniciar Windows ahora o más tarde; Kiosk ya puede abrirse."
+                : "\nPuedes reiniciar Windows ahora o más tarde para aplicar los cambios pendientes."
+            : "");
         ResultDetails.Text = _lastRun == null ? "" : string.Join("\n", _lastRun.Items.Select(ItemDetails));
         ResultDetailsExpander.Visibility = string.IsNullOrWhiteSpace(ResultDetails.Text) ? Visibility.Collapsed : Visibility.Visible;
         ResultDetailsExpander.IsExpanded = false;
@@ -240,12 +273,14 @@ public partial class MainWindow : Window
             !run.Items.Any(i => i.RequiresRebootBeforeRetry) ? Visibility.Visible : Visibility.Collapsed;
         // WorkerPipe returns only after the elevated worker has exited. A successful combined
         // run also waits for the pack session and its final callbacks before offering launch.
-        _canLaunch = request.Kiosk && result.KioskVerified && result.ExitCode == 0 && !result.RebootRequired &&
+        _canLaunch = request.Kiosk && result.KioskVerified && result.ExitCode == 0 && !result.KioskRebootRequired &&
             !_cancel.IsCancellationRequested && !_closeRequested;
+        RestartNowButton.Visibility = result.RebootRequired ? Visibility.Visible : Visibility.Collapsed;
+        RestartNowButton.IsEnabled = true;
         LaunchCheck.Visibility = _canLaunch ? Visibility.Visible : Visibility.Collapsed;
         LaunchCheck.IsChecked = _canLaunch;
         UpdateFinishButton();
-        StatusLabel.Text = rebootPending ? "Reinicia manualmente para terminar." : result.ExitCode == 0 ? "Todo listo." : stopped ? "Revisa el motivo antes de continuar." :
+        StatusLabel.Text = rebootPending && result.KioskRebootRequired ? "Reinicia Windows antes de abrir Kiosk." : rebootPending ? "Reinicia Windows ahora o más tarde." : result.ExitCode == 0 ? "Todo listo." : stopped ? "Revisa el motivo antes de continuar." :
             incomplete ? "Quedan componentes por revisar." : "Revisa el error antes de reintentar.";
         if (_closeRequested) StatusLabel.Text += " · La operación ha terminado; ya puedes cerrar.";
     }

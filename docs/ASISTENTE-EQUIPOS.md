@@ -33,8 +33,9 @@ separado y siguen siendo Kiosk-only.
    todas las aplicaciones, se instala Kiosk si se eligió y se ejecuta el pack.
    Inno actúa como motor silencioso de Kiosk.
 5. Revisar el resultado. **Finalizar y abrir Kiosk** se ofrece cuando los
-   componentes elegidos están verificados, el trabajador ha terminado y no hay
-   reinicio pendiente. Se puede desmarcar la apertura. Los reinicios son manuales.
+   componentes elegidos están verificados, el trabajador ha terminado y Kiosk
+   no ha pedido reinicio. Se puede desmarcar la apertura. Si Windows indica un
+   reinicio pendiente, **Reiniciar ahora** lo solicita solo tras confirmarlo.
 
 Solo Kiosk omite el catálogo de aplicaciones y WinGet. El autostart se registra
 para el usuario original, incluso si UAC utiliza otra cuenta administradora.
@@ -61,8 +62,10 @@ no lo indique: operaciones de archivos aplazadas, mantenimiento de Windows o
 Windows Update. Conserva asimismo los códigos nativos 3010 y 1641. Un reinicio
 pendiente puede proceder de una instalación anterior; no se atribuye únicamente
 a la última aplicación. El aviso no detiene las otras aplicaciones ni convierte
-una versión verificada en fallo. Se muestra al finalizar y evita ofrecer la
-apertura automática de Kiosk. Nunca se reinicia automáticamente.
+una versión verificada en fallo. Se muestra al finalizar, pero permite abrir
+Kiosk si está verificado y su propio instalador no ha pedido reinicio. El
+reinicio se puede hacer ahora o más tarde; solo se inicia al pulsar el botón y
+confirmar. Si el instalador de Kiosk pide reinicio, se espera antes de abrirlo.
 
 ## Aplicaciones y reanudación
 

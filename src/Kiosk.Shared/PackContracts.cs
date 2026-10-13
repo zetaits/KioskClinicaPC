@@ -83,6 +83,6 @@ public sealed class PackRun
     public bool Complete => Items.Count > 0 && Items.All(x => x.Verified);
     public bool RebootRequired => Items.Any(x => x.RebootRequired);
     public string Summary => Complete
-        ? (RebootRequired ? "Todas las aplicaciones verificadas. Solo queda reiniciar manualmente." : "Todas las aplicaciones instaladas y verificadas.")
+        ? (RebootRequired ? "Todas las aplicaciones verificadas. Windows tiene cambios pendientes de reinicio." : "Todas las aplicaciones instaladas y verificadas.")
         : $"Quedan {Items.Count(x => !x.Verified)} aplicaciones pendientes o con errores. No se da el pack por completado.";
 }

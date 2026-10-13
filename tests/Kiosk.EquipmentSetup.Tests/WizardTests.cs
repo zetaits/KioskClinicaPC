@@ -211,17 +211,17 @@ public sealed class WizardTests
     [InlineData(true, 0, true, true)]
     [InlineData(true, 1, false, false)]
     [InlineData(false, 0, false, false)]
-    public Task Incomplete_reboot_failed_and_pack_only_runs_do_not_offer_or_launch_kiosk(bool selected, int exitCode, bool verified, bool reboot) => Sta(async () =>
+    public Task Incomplete_kiosk_reboot_failed_and_pack_only_runs_do_not_offer_or_launch_kiosk(bool selected, int exitCode, bool verified, bool kioskReboot) => Sta(async () =>
     {
         int launches = 0;
         var window = new MainWindow(_ => Task.FromResult(Catalog), (_, _, _) =>
-            Task.FromResult(new EquipmentEvent("result", "Resultado", ExitCode: exitCode, KioskVerified: verified, RebootRequired: reboot)),
+            Task.FromResult(new EquipmentEvent("result", "Resultado", ExitCode: exitCode, KioskVerified: verified, RebootRequired: kioskReboot, KioskRebootRequired: kioskReboot)),
             () => Task.CompletedTask, () => launches++);
         window.KioskCheck.IsChecked = selected;
         window.ShowStep(1); await window.LoadCatalog(); window.Confirm(); await window.Install();
         Assert.Equal(Visibility.Collapsed, window.LaunchCheck.Visibility);
         Assert.False(window.LaunchCheck.IsChecked);
-        if (exitCode == 0 && reboot) Assert.Equal("REINICIO PENDIENTE", window.ResultStateBadge.Text);
+        if (exitCode == 0 && kioskReboot) Assert.Equal("REINICIO PENDIENTE", window.ResultStateBadge.Text);
         window.LaunchCheck.IsChecked = true; window.Finish();
         Assert.Equal(0, launches);
     });
@@ -239,12 +239,49 @@ public sealed class WizardTests
             return Task.FromResult(new EquipmentEvent("result", run.Summary, run, ExitCode: 0, RebootRequired: run.RebootRequired));
         }, () => Task.CompletedTask);
         window.ShowStep(1); await window.LoadCatalog(); window.Confirm(); await window.Install();
-        Assert.Equal("Reinicio pendiente", window.ResultTitle.Text);
-        Assert.Contains("reiniciar manualmente", window.ResultLabel.Text);
+        Assert.Equal("Preparación completa", window.ResultTitle.Text);
+        Assert.Contains("reiniciar Windows ahora o más tarde", window.ResultLabel.Text);
+        Assert.Equal(Visibility.Visible, window.RestartNowButton.Visibility);
         Assert.Equal("1", window.ResultVerifiedCount.Text);
         Assert.Equal("0", window.ResultPendingCount.Text);
         Assert.Equal("0", window.ResultFailedCount.Text);
         Assert.Equal(Visibility.Collapsed, window.LaunchCheck.Visibility);
+        window.Close();
+    });
+    [Fact]
+    public Task Pack_reboot_does_not_block_verified_kiosk_and_restart_requires_an_explicit_choice() => Sta(async () =>
+    {
+        int launches = 0, restarts = 0;
+        var window = new MainWindow(_ => Task.FromResult(Catalog), (_, _, _) =>
+            Task.FromResult(new EquipmentEvent("result", "Kiosk y pack verificados", ExitCode: 0,
+                KioskVerified: true, RebootRequired: true)),
+            () => Task.CompletedTask, () => launches++, () => restarts++);
+        window.KioskCheck.IsChecked = true;
+        window.ShowStep(1); await window.LoadCatalog(); window.Confirm(); await window.Install();
+        Assert.Equal("Preparación completa", window.ResultTitle.Text);
+        Assert.Equal(Visibility.Visible, window.LaunchCheck.Visibility);
+        Assert.True(window.LaunchCheck.IsChecked);
+        Assert.Equal(Visibility.Visible, window.RestartNowButton.Visibility);
+        Assert.Equal(0, restarts);
+        window.RestartNow(false);
+        Assert.Equal(0, restarts);
+        window.Finish();
+        Assert.Equal(1, launches);
+        Assert.Equal(0, restarts);
+    });
+    [Fact]
+    public Task Restart_button_invokes_restart_only_after_confirmation() => Sta(async () =>
+    {
+        int restarts = 0;
+        var window = new MainWindow(_ => Task.FromResult(Catalog), (_, _, _) =>
+            Task.FromResult(new EquipmentEvent("result", "Verificado", ExitCode: 0, RebootRequired: true)),
+            () => Task.CompletedTask, restart: () => restarts++);
+        window.ShowStep(1); await window.LoadCatalog(); window.Confirm(); await window.Install();
+        window.RestartNow(false);
+        Assert.Equal(0, restarts);
+        window.RestartNow(true);
+        window.RestartNow(true);
+        Assert.Equal(1, restarts);
         window.Close();
     });
     [Fact]

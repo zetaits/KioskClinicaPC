@@ -10,7 +10,7 @@ public sealed record EquipmentConfiguration(string ServerUrl, string SetupKey);
 public sealed record EquipmentSelection(string Id, string Version);
 public sealed record EquipmentRequest(bool Pack, bool Kiosk, long CatalogRevision, List<EquipmentSelection> Applications, bool Resume, bool AllowPartialPack = false, bool ResolveLatest = false);
 public sealed record EquipmentEvent(string Kind, string Message, PackRun? Run = null, int? ExitCode = null,
-    bool KioskVerified = false, bool RebootRequired = false, int? Percent = null);
+    bool KioskVerified = false, bool RebootRequired = false, int? Percent = null, bool KioskRebootRequired = false);
 public enum CatalogFailure { Unconfigured, Unauthorized, Forbidden, Timeout, Unavailable, Incompatible }
 public sealed class CatalogException(CatalogFailure failure, string message) : Exception(message)
 {
@@ -130,7 +130,7 @@ public sealed class EquipmentExecution(Func<CancellationToken, Task<PackCatalog>
 {
     public async Task<EquipmentEvent> Run(EquipmentRequest request, Action<EquipmentEvent> progress, CancellationToken ct)
     {
-        bool kioskVerified = false, started = false, reboot = false;
+        bool kioskVerified = false, started = false, reboot = false, kioskReboot = false;
         IEquipmentPackSession? pack = null;
         try
         {
@@ -156,8 +156,9 @@ public sealed class EquipmentExecution(Func<CancellationToken, Task<PackCatalog>
             {
                 started = true;
                 kioskVerified = await kiosk.InstallAndVerify(request.Resume, progress, ct);
-                reboot = kiosk.RebootRequired;
-                if (!kioskVerified) return new("result", "Kiosk no se ha podido verificar. Revisa los diagnósticos antes de reintentar.", Run: pack?.LastRun, ExitCode: 2, RebootRequired: reboot);
+                kioskReboot = kiosk.RebootRequired;
+                reboot = kioskReboot;
+                if (!kioskVerified) return new("result", "Kiosk no se ha podido verificar. Revisa los diagnósticos antes de reintentar.", Run: pack?.LastRun, ExitCode: 2, RebootRequired: reboot, KioskRebootRequired: kioskReboot);
             }
             ct.ThrowIfCancellationRequested();
             if (pack != null)
@@ -165,16 +166,16 @@ public sealed class EquipmentExecution(Func<CancellationToken, Task<PackCatalog>
                 started = true;
                 bool complete = await pack.Install(progress, ct);
                 reboot |= pack.RebootRequired;
-                if (!complete) return new("result", "Quedan aplicaciones pendientes o sin verificar. Puedes reanudar tras revisar el resultado.", Run: pack.LastRun, ExitCode: 2, KioskVerified: kioskVerified, RebootRequired: reboot);
+                if (!complete) return new("result", "Quedan aplicaciones pendientes o sin verificar. Puedes reanudar tras revisar el resultado.", Run: pack.LastRun, ExitCode: 2, KioskVerified: kioskVerified, RebootRequired: reboot, KioskRebootRequired: kioskReboot);
             }
-            return new("result", "Todos los componentes seleccionados están verificados.", Run: pack?.LastRun, ExitCode: 0, KioskVerified: kioskVerified, RebootRequired: reboot);
+            return new("result", "Todos los componentes seleccionados están verificados.", Run: pack?.LastRun, ExitCode: 0, KioskVerified: kioskVerified, RebootRequired: reboot, KioskRebootRequired: kioskReboot);
         }
         catch (SelectionChangedException ex) { return new("review", ex.Message, ExitCode: 1); }
-        catch (OperationCanceledException) { return new("result", "Operación cancelada. Un instalador nativo puede seguir activo; comprueba el estado antes de reanudar.", Run: pack?.LastRun, ExitCode: 2, KioskVerified: kioskVerified, RebootRequired: reboot); }
+        catch (OperationCanceledException) { return new("result", "Operación cancelada. Un instalador nativo puede seguir activo; comprueba el estado antes de reanudar.", Run: pack?.LastRun, ExitCode: 2, KioskVerified: kioskVerified, RebootRequired: reboot, KioskRebootRequired: kioskReboot); }
         catch (Exception ex)
         {
             progress(new("diagnostic", EquipmentDiagnostics.Describe(ex)));
-            return new("result", ex is CatalogException or ComponentPreparationException or ArgumentException or NativeStateException ? ex.Message : "La operación falló. Consulta los diagnósticos de Setup.", Run: pack?.LastRun, ExitCode: started ? 2 : 1, KioskVerified: kioskVerified, RebootRequired: reboot);
+            return new("result", ex is CatalogException or ComponentPreparationException or ArgumentException or NativeStateException ? ex.Message : "La operación falló. Consulta los diagnósticos de Setup.", Run: pack?.LastRun, ExitCode: started ? 2 : 1, KioskVerified: kioskVerified, RebootRequired: reboot, KioskRebootRequired: kioskReboot);
         }
         finally { if (pack != null) await pack.DisposeAsync(); }
     }
