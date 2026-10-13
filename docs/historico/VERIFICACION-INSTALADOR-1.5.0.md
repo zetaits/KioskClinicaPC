@@ -1,5 +1,8 @@
 # Verificación local del asistente 1.5.0
 
+Informe histórico de esa versión. Los comandos de uso y publicación vigentes
+están en la [guía del asistente](../ASISTENTE-EQUIPOS.md).
+
 Fecha: 8 de octubre de 2026. SDK utilizado: `C:\Users\zits\.dotnet\dotnet.exe`
 (.NET 10). Artefactos **ficticios**, con `https://setup.invalid` y claves de prueba:
 no se han desplegado ni publicado en producción ni ejecutado Kiosk o instaladores
@@ -56,7 +59,7 @@ se reempaquetaron con esta corrección, conservando el conjunto probado de compo
 Queda pendiente la aceptación en VM Windows 10/11 sin .NET, UAC con otra cuenta,
 WinGet ausente/bootstrap real, exportación oficial completa, reinicio/reanudación
 e instalación USB de Kiosk sin conexión. No hay herramientas de VM disponibles en
-esta sesión. El procedimiento está en [ASISTENTE-EQUIPOS.md](ASISTENTE-EQUIPOS.md).
+esta sesión. El procedimiento está en [ASISTENTE-EQUIPOS.md](../ASISTENTE-EQUIPOS.md).
 La consulta de vulnerabilidades de NuGet devolvió NU1900 por falta de acceso a
 api.nuget.org; no se presenta esa auditoría como superada.
 

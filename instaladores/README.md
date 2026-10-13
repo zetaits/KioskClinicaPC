@@ -1,6 +1,10 @@
-# Instaladores para el pack inicial
+# Inventario histórico de instaladores locales
 
-Estos archivos se guardan localmente en esta carpeta. El repositorio público solo contiene este inventario; descarga los binarios de sus proveedores antes de continuar en otro equipo. LibreOffice queda fuera del pack por ahora.
+Este inventario conserva la comprobación estática del 2 de octubre de 2026.
+Los archivos se guardaron localmente; el repositorio público contiene únicamente
+esta relación. No define el pack actual ni obliga a descargar estos binarios:
+el [pack WinGet](../docs/PACK-WINGET.md) se configura en el panel y resuelve
+versiones compatibles en cada equipo. LibreOffice quedó fuera de aquella selección.
 
 | Aplicación | Archivo | SHA-256 | Descarga |
 | --- | --- | --- | --- |
@@ -10,4 +14,4 @@ Estos archivos se guardan localmente en esta carpeta. El repositorio público so
 | Google Chrome Enterprise | `googlechromestandaloneenterprise64.msi` | `573e4ca45171abb5a4c3cd1d8b198dbda93101561e44d720f8a166fae1dbd747` | [Chrome Enterprise](https://chromeenterprise.google/download/) |
 | VLC | `vlc-3.0.24-win64.exe` | `d711e1e1fe52052748c39080c7dce63f6b7e4c315efedf1774a3f1957b782ff3` | [VideoLAN](https://www.videolan.org/vlc/download-windows.html) |
 
-Los archivos se identificaron y verificaron estáticamente el 2 de octubre de 2026. Chrome, VLC y Adobe tenían firma Authenticode válida. IZArc y K-Lite no estaban firmados; el SHA-256 de K-Lite coincidía con el publicado por Codec Guide. Ninguno se ha instalado como parte de esta comprobación. Antes de habilitar el pack por defecto, probar la instalación desatendida en una VM Windows limpia.
+Los archivos se identificaron y verificaron estáticamente el 2 de octubre de 2026. Chrome, VLC y Adobe tenían firma Authenticode válida. IZArc y K-Lite no estaban firmados; el SHA-256 de K-Lite coincidía con el publicado por Codec Guide. Ninguno se instaló como parte de esa comprobación. Los hashes describen esos archivos históricos, no descargas nuevas ni una validación de instalación.

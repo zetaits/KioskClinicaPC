@@ -1,43 +1,93 @@
-# Pack de aplicaciones para ordenadores independientes
+# Pack WinGet para preparar equipos
+
+Esta guía describe la gestión del pack actual en el panel. La instalación,
+diagnóstico y publicación se explican en el [asistente de equipos](ASISTENTE-EQUIPOS.md).
 
 ## Uso cotidiano
 
-1. En `/aplicaciones`, la lista **Aplicaciones del pack** muestra todas las apps añadidas, su versión, orden y selección inicial, con recuentos reales. El buscador **Añadir aplicaciones al pack** consulta WinGet; pulsar **Añadir al pack** añade a esa misma lista, fija la versión y la selecciona por defecto. Los cambios se guardan automáticamente. No hay otro catálogo de ejecutables ni acciones remotas en esta página.
-2. **Actualizar versiones del pack** fija las versiones del último índice oficial; las aplicaciones no elegibles conservan su versión anterior y muestran un aviso. No se cambia el pack automáticamente al renovar el índice. **Quitar del pack** no desinstala aplicaciones de ningún equipo.
-3. En el PC de destino, abrir `/instalador`, descargar y abrir el asistente WPF, elegir **solo pack**, **solo Kiosk** o **ambos**, revisar las aplicaciones y pulsar **Instalar**. UAC aparece al comenzar la operación. El progreso y resultado se muestran localmente. Kiosk está incluido en el EXE y solo se extrae e instala si se selecciona. La página no enlaza descargas separadas de GitHub ni activa actualizaciones en la flota. Comandos, publicación y aceptación: [Asistente de equipos](ASISTENTE-EQUIPOS.md).
+1. Abrir `/aplicaciones`. La lista **Aplicaciones del pack** muestra identificador
+   WinGet, orden y selección inicial. Los cambios se guardan automáticamente.
+2. Usar **Añadir aplicaciones al pack** para buscar en el índice oficial. Se puede
+   añadir una aplicación elegible; aparece en la misma lista y queda seleccionada
+   por defecto.
+3. Ajustar selección y orden. Los números menores se instalan primero.
+   **Quitar del pack** no desinstala nada en los equipos.
+4. En el PC de destino, descargar el asistente desde `/instalador`, elegir
+   componentes y revisar la selección antes de instalar.
 
-El pack no registra equipos ni envía estados o logs al panel. El asistente solo lee `/api/setup/v2/catalog` con la clave limitada del Setup y exige el encabezado de versión 2. Al confirmar, el trabajador valida de nuevo revisión y versiones y conserva su snapshot durante la ejecución. Si se elige Kiosk, su cliente y sus servicios mantienen el funcionamiento habitual de la flota.
+El panel muestra **Última versión compatible al instalar**. La versión observada
+en el índice es orientativa; cada equipo consulta WinGet al comenzar y resuelve
+su versión compatible. No hay que fijar versiones manualmente ni pulsar
+Actualizar versiones del pack para los asistentes actuales.
 
-Solo admite paquetes del origen oficial `winget` con versión fija, ámbito machine y modo silent. MSStore, MSIX por usuario, portable, autenticación interactiva, ámbito desconocido y versiones instaladas desconocidas se rechazan. No se infieren parámetros ejecutando EXE arbitrarios. Para una aplicación no admitida hay que mejorar su manifiesto oficial o mantenerla fuera del pack; no se promete automatización universal de cualquier EXE.
+Si una aplicación desaparece o deja de ser elegible en el índice, se conserva
+en la definición y se comprueba de nuevo en el equipo. Las aplicaciones no
+disponibles pueden quedar pendientes mientras se instalan las comprobadas.
 
-## Activación en producción (no realizada por cambiar el código)
+## Definición y política de instalación
 
-- Desplegar el servidor actualizado siguiendo `ACTUALIZAR-PANEL-VPS.txt`.
-- Configurar `Kiosk__InitialSetupKey` y el secret GitHub **production** `KIOSK_INITIAL_SETUP_KEY` con el mismo secreto de 64 dígitos hexadecimales; no imprimirlo ni guardarlo en Git. Mantener `Kiosk__ReleasePublishKey` / `KIOSK_RELEASE_PUBLISH_KEY` existentes para importaciones CI.
-- Ejecutar manualmente **Official WinGet catalogue** (`.github/workflows/winget-index.yml`) la primera vez. Luego se ejecuta diariamente. Windows exporta mediante la API COM oficial y contrasta los modos del repositorio `microsoft/winget-pkgs`. Linux solo lee el JSON local. Una exportación incompleta o una importación inválida no sustituye el índice anterior.
-- Si falla la exportación, consultar el paso **Export structured catalogue** y el artifact **winget-index-diagnostics**: incluye stdout, stderr y un log con fases, recuentos y excepción completa con HRESULT. No registra variables de entorno ni claves. Tras actualizar el workflow, usar **Run workflow** sobre `master`; **Re-run jobs** de una ejecución antigua reutiliza su código anterior.
-- La lectura de versiones, elegibilidad y metadatos está aislada por paquete. HTTP 400 y otros errores definitivos de datos excluyen ese paquete y lo registran; solo HTTP 408/429/5xx y fallos transitorios de red se reintentan, hasta tres intentos con esperas de 1 y 2 segundos. Autenticación, incompatibilidad COM y cancelación detienen la exportación. Si los fallos de lectura superan el 1% del catálogo o 100 paquetes, no se publica. Siguen siendo obligatorios 1000 entradas válidas, 100 elegibles y ausencia de identificadores duplicados. Una app excluida que ya estaba en el pack conserva su versión al actualizar el pack.
-- Publicar ambas ediciones de la versión independiente `1.5.0` mediante **Equipment Setup**. `build-equipment-setup.ps1 -Publish` utiliza los secrets de `production` y publica una candidata por `/api/releases/setup/v3`; se activa desde `/instalador` tras probar los equipos piloto. El endpoint antiguo sigue disponible para paquetes esquema 2. **Nunca** subirlo a los assets públicos de GitHub: contiene credenciales de aprovisionamiento. `build-installer.ps1` y **Release Kiosk** conservan la publicación pública de Kiosk. Actualizar la VPS no reconstruye la descarga del asistente.
-- Comprobar `/aplicaciones`: fecha reciente del índice, búsqueda y aplicaciones elegibles; comprobar `/instalador`: descarga interna disponible. El pack comienza vacío: no se migran ni presuponen los cinco binarios antiguos.
+El asistente usa `/api/setup/v3/catalog` con `X-Setup-Key` y exige
+`X-Setup-Catalog-Version: 3`. Al confirmar valida de nuevo la revisión y los IDs.
+La versión resuelta queda congelada después de la comprobación previa y se
+verifica antes de continuar con la siguiente instalación.
 
-Los archivos persistentes son `data/pack-applications.json`, `data/winget-index.json` y `setups/*.bundle.json` con su EXE. El catálogo anterior de binarios y sus APIs se conservan para instalaciones remotas y Setups antiguos en `/ordenadores/instalaciones`, accesible desde **Ordenadores → Instaladores de la flota** o **Instalar app** en un kiosko. Sus archivos privados y trabajos no se mezclan con el pack WinGet; no se borran ni migran datos. Los enlaces antiguos `/aplicaciones?device=...` y los retornos de subidas se dirigen a esa página separada. El permiso de binarios sin firma sigue siendo una política del **agente remoto antiguo**, no una opción del pack WinGet.
+Solo admite paquetes del origen oficial `winget` con instalador compatible,
+silencioso y para todo el equipo. Se rechazan instaladores por usuario,
+MSStore, MSIX, portable, autenticación interactiva y ámbitos/versiones instaladas
+desconocidos. No se infieren argumentos ejecutando EXE arbitrarios.
 
-El Setup descargado es un único EXE WPF self-contained. Solo al elegir pack extrae el helper y `Microsoft.Management.Deployment.winmd` juntos en un directorio restringido a administradores y SYSTEM: el marshaler necesita esos metadatos junto al ejecutable. No quitar ese archivo al distribuir o probar el helper por separado. Se ha contrastado este requisito con [el diagnóstico del proyecto oficial de Microsoft](https://github.com/microsoft/windows-rs/issues/3352#issuecomment-2504588632).
+Una versión igual o superior ya instalada para todo el equipo se omite. Un fallo
+de red no autoriza descender silenciosamente a versiones antiguas. La instalación
+parcial no permite continuar con un instalador activo o de resultado incierto.
+Los límites, preparación de WinGet y reanudación están en la
+[política del asistente](ASISTENTE-EQUIPOS.md#aplicaciones-y-reanudación).
 
-## Seguridad y recuperación local
+El pack por sí solo no registra equipos ni envía estados o logs al panel.
+Si se instala Kiosk, su cliente y servicios mantienen el funcionamiento habitual
+de la flota.
 
-El Setup eleva una vez bajo un usuario interactivo, no SYSTEM. Si falta WinGet o es anterior a 1.29.380, prepara el módulo oficial Microsoft.WinGet.Client fijado en 1.12.440 y utiliza Repair-WinGetPackageManager para instalar WinGet 1.29.380. El SDK COM de compilación está fijado en esa misma versión. El catálogo acepta los acuerdos de origen y de paquete; no se ignoran hashes, no se fuerzan instalaciones, no se modifican argumentos del fabricante y se resuelven dependencias nativamente.
+## Índice oficial y preparación del servidor
 
-Se comprueba toda la selección antes de copiar Kiosk o instalar aplicaciones. Después se instala secuencialmente, se comparan versiones con WinGet y se verifica el registro de instalación **machine-wide**, no solo exit=0. Una app ya instalada con versión igual o superior se omite. Un fallo ordinario no impide intentar las demás; cualquier resultado sin verificar mantiene el pack incompleto.
+Configurar `Kiosk__InitialSetupKey` en el servidor y el mismo secreto de 64 hex
+como `KIOSK_INITIAL_SETUP_KEY` en el entorno `production` de GitHub. Las credenciales
+de publicación son independientes; su configuración se documenta en
+[Servidor](SERVIDOR.md#configuración).
 
-Estado y logs: `%ProgramData%\ClinicaPC\Setup\last-run.json`, `kiosk-run.json` y `logs/`. No contienen claves. Los bloqueos impiden instalaciones simultáneas. Antes de empezar se puede elegir reanudar pendientes; siempre se consulta el catálogo autorizado y se comprueba el estado real, incluso tras un éxito previo. Una selección nueva no evita la protección de un instalador anterior sin verificar. No aparecen diálogos de reanudación después de Instalar ni se reinicia automáticamente.
+El workflow **Official WinGet catalogue** se ejecuta diariamente y admite ejecución
+manual para la primera importación. Windows exporta mediante la API COM y
+contrasta los manifiestos oficiales; el servidor recibe el JSON y conserva el
+último índice válido si la exportación/importación falla.
 
-Una instalación nativa tiene un límite de 60 minutos. WinGet puede cancelar una descarga, pero no garantiza detener un instalador ya activo: en caso de cancelación/timeout se detiene toda la cola, se marca verificación pendiente y se exige verificación o reinicio manual antes de reintentar. No hay rollback ficticio ni reintentos ciegos del EXE. Las consultas de manifiestos y catálogo permiten hasta tres intentos ante problemas transitorios; errores de autorización no se reintentan.
+Ante un fallo, revisar **Export structured catalogue** y el artifact
+`winget-index-diagnostics`: stdout, stderr y fases con HRESULT. Ejecutar **Run workflow**
+sobre el código actualizado; **Re-run jobs** reutiliza el código de la ejecución
+anterior. Una exportación incompleta no debe sustituir el índice anterior.
 
-Modo desatendido: ejecutar el Setup interno con `/VERYSILENT /SUPPRESSMSGBOXES /NORESTART`. Se carga explícitamente el catálogo y su preselección, sin depender de eventos de botones. Si falla la comprobación previa, se aborta antes de instalar; un pack incompleto devuelve exit code 2. Puede indicarse `/COMPONENTS="pack,kiosk"` para incluir Kiosk de forma explícita.
+El exportador aísla errores definitivos por paquete y reintenta hasta tres veces
+los errores transitorios. Autenticación, incompatibilidad COM y cancelación
+detienen la exportación. Rechaza más del 1% o 100 fallos de lectura y exige al
+menos 1000 entradas válidas, 100 elegibles y ausencia de IDs duplicados.
 
-## Validación pendiente antes de producción
+Para distribuir el asistente, seguir únicamente el
+[procedimiento de publicación](ASISTENTE-EQUIPOS.md#publicación-activación-y-recuperación).
+Actualizar la VPS no reconstruye ni activa su descarga.
 
-La compilación y los tests de catálogo/API/orquestación no sustituyen las pruebas de fabricantes reales. Validar en VMs limpias Windows 10 22H2 y Windows 11 x64: pack-only sin servicios/tareas/config Kiosk, combinación opcional, UAC, bootstrap sin WinGet, aplicación instalada anterior/superior/por usuario, versión retirada, fallo de red/hash, solicitud de reinicio, instalador lento, cancelación, reanudación tras reinicio y modo completamente silencioso. No ejecutar el cliente Kiosk en el escritorio de desarrollo: activa protección fullscreen.
+## Persistencia y compatibilidad
 
-Referencias primarias: [SDK COM oficial](https://www.nuget.org/packages/Microsoft.WindowsPackageManager.ComInterop/1.29.380), [módulo Microsoft.WinGet.Client](https://www.powershellgallery.com/packages/Microsoft.WinGet.Client/1.12.440), [contratos de la API](https://github.com/microsoft/winget-cli/blob/master/src/Microsoft.Management.Deployment/PackageManager.idl) y [manifiestos oficiales](https://github.com/microsoft/winget-pkgs).
+En `DataDir`, `pack-definition-v3.json` conserva identificadores, orden, selección y
+revisión. `winget-index.json` guarda el índice del panel. `pack-applications.json`
+es una proyección con versiones concretas para los asistentes v2 antiguos.
+
+La migración conserva IDs, orden y selección y crea
+`pack-applications.json.before-v3.bak`. Una renovación del índice puede cambiar
+la proyección v2 sin cambiar la revisión de la definición v3. Los asistentes
+antiguos conservan su política de versiones fijas.
+
+Los MSI/EXE privados y los trabajos remotos se gestionan en
+`/ordenadores/instalaciones`, desde **Ordenadores → Instaladores de la flota**.
+No forman parte del pack WinGet. Los datos anteriores se conservan y los enlaces
+antiguos `/aplicaciones?device=...` redirigen a esa página.
+
+El [inventario local de binarios](../instaladores/README.md) es una comprobación
+histórica, no la definición del pack. Las publicaciones del asistente se guardan
+bajo `SetupDir`; su estructura está en [Servidor](SERVIDOR.md#datos-en-disco).

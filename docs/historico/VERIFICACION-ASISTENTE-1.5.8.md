@@ -1,5 +1,8 @@
 # Verificación del asistente 1.5.8
 
+Informe de esa corrección y su prueba de lectura. Para comandos de diagnóstico
+actuales, consultar la [guía del asistente](../ASISTENTE-EQUIPOS.md#estado-y-diagnósticos).
+
 ## Causa comprobada
 
 La ejecución del 9 de octubre de 2026 a las 20:36 instaló IZArc 4.6, pero no la

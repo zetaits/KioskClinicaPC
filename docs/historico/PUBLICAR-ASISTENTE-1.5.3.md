@@ -1,5 +1,9 @@
 # Publicar el asistente 1.5.3 con Kiosk 1.2.1
 
+Documento histórico: conserva los comandos y la lista de archivos de aquella
+tarea. Para una publicación nueva, seguir la
+[guía vigente del asistente](../ASISTENTE-EQUIPOS.md#publicación-activación-y-recuperación).
+
 Ejecutar estos comandos en PowerShell desde este PC. El orden es guardar y subir
 el código, desplegar el servidor y generar el asistente con GitHub Actions.
 La sesión SSH y las credenciales de GitHub se resuelven desde tu consola;

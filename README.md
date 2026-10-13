@@ -12,6 +12,8 @@ and generates a QR code so the customer can take the sheet as a PDF to their pho
 
 </div>
 
+Setup, operation and maintenance: **[documentation index](docs/README.md)**.
+
 ---
 
 ## What it does
@@ -23,7 +25,8 @@ You set the kiosk up on a shop machine. The app:
 3. **Shows** — a spec sheet with CPU, RAM, GPU, disk, display, battery, etc., with a price and a tier note per component.
 4. **Hands out** — a QR code the customer scans to open the sheet and save it as a PDF on their phone.
 
-Everything editable by hand from the screen itself. No code required.
+In local mode, content is editable from the screen. With a server configured, shared content is edited
+in the web panel; each machine keeps its own price, condition and specs. No code required.
 
 ---
 
@@ -57,7 +60,7 @@ email, phone and WhatsApp, clickable to message or call on the spot.
 
 ## Built for a shop
 
-- **Free editing without coding** — Settings → "Enable free edit mode" → click any text and change it in place.
+- **Free editing without coding** — in local mode, Settings → "Enable free edit mode" → click any text and change it in place. With a server, edit shared content in the panel.
 - **Automatic detection** — CPU, cores, RAM, GPU, storage, display, OS, battery, WiFi, camera and the real identity (manufacturer/model). Whatever the machine doesn't have isn't shown. And if something doesn't convince you, override it by hand.
 - **Scores without lying** — each component gets a score and a tier ("balanced", "top-of-the-line"…) computed from the real hardware, placed on a scale from basic to top. No made-up numbers.
 - **A price that sells** — price, discounted price and 6/12-month interest-free financing. The warranty (3 years new · 1 year second-hand) sets itself based on the machine's condition.
@@ -75,10 +78,11 @@ email, phone and WhatsApp, clickable to message or call on the spot.
 |---|---|
 | Open Settings | **3 clicks** in the top-right corner → password |
 | Exit the kiosk | Settings → "Exit kiosk" |
-| Free edit mode | Settings → "Enable free edit mode" |
+| Free edit mode (local mode) | Settings → "Enable free edit mode" |
 
-On first launch, the kiosk requires the manager to create a local password of at least 12 characters.
-Existing installations request a one-time password renewal after upgrading; no shared default password exists.
+On first launch, the kiosk requires a local password of at least 12 characters. The private equipment
+assistant can initialize a new profile with the panel's password hash; existing profiles keep their password.
+Profiles with the old password policy request a one-time renewal. Details: [equipment assistant](docs/ASISTENTE-EQUIPOS.md#contraseña-inicial-de-kiosk).
 
 ---
 
@@ -153,7 +157,7 @@ throttled login attempts.
 
 None of this is needed to use it, but in case you're curious:
 
-- **Installation is shared, not duplicated.** `Kiosk.InstallerCore` contains the verifier/executor used by both the LocalSystem agent and `Kiosk.SetupHelper`. The internal Setup can install Kiosk, a server-managed application pack, or both; the public update Setup remains Kiosk-only. The solution also contains the client, server, shared contracts, maintenance runner and two test projects.
+- **Installation components.** `Kiosk.InstallerCore` verifies and executes private fleet installers. `Kiosk.WinGetCore` handles pack preparation and verification; `Kiosk.EquipmentCore` connects these resources to the equipment assistant and network deployment. The private assistant offers Online and Completo editions and can install Kiosk, the server-defined pack, or both. The public update installer installs Kiosk. The solution includes the client, server, shared contracts, installer helpers, network deployment projects and three test projects.
 - **WPF + .NET 10**, home-grown MVVM, no external frameworks. A single window; 4 "screens" that swap in and out.
 - **Client ↔ server, without a single point of failure.** The client merges the server's *shared* content over its own *local* content (`SharedContent` draws the line: shop/slides/texts from the server, price/specs per-machine). If the server can't be reached it uses the last cached copy. Live updates come over **SignalR**: the panel pushes a "content changed" ping the moment you save, with slow version-polling as a backstop.
 - **The attract loop is clock-synced.** The server keeps a master clock; each kiosk computes the same slide index from it (correcting clock drift), so a row of screens stays in step without the server pushing every slide change.
@@ -168,16 +172,19 @@ None of this is needed to use it, but in case you're curious:
 
 ### Building
 
-.NET 10. Needs the SDK (not just the runtime):
+.NET 10 SDK on Windows. From the repository root, the resolver finds a compatible SDK, including the
+user-local installation:
 
-```
-dotnet build KioskClinicaPC.sln -c Release      # everything
-dotnet run   --project src/Kiosk.Server         # just the server (dev)
+```powershell
+. .\tools\resolve-dotnet.ps1
+$dotnetExe = Resolve-KioskDotnet
+& $dotnetExe build KioskClinicaPC.sln -c Release -m:1 --disable-build-servers -nologo -clp:ErrorsOnly
+& $dotnetExe run --project src/Kiosk.Server     # just the server (dev)
 ```
 
-Client output: `src\Kiosk.Client\bin\Debug\net10.0-windows\KioskClinicaPC.exe` (the WPF project is `net10.0-windows`).
-Server setup: **[docs/SERVIDOR.md](docs/SERVIDOR.md)**. VPS updates:
-**[docs/ACTUALIZAR-PANEL-VPS.txt](docs/ACTUALIZAR-PANEL-VPS.txt)**.
+Release client output: `src\Kiosk.Client\bin\Release\net10.0-windows\KioskClinicaPC.exe` (the WPF project is `net10.0-windows`).
+The [documentation index](docs/README.md) links to server setup, VPS updates, pack configuration,
+the equipment assistant, network deployment and the QR/PDF implementation.
 
 > ⚠️ Running it enters kiosk mode: it hides the taskbar and blocks Task Manager.
 > To exit cleanly use Settings → "Exit kiosk" or `Ctrl+Shift+K`. Killing the process leaves the desktop locked.

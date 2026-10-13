@@ -2,7 +2,7 @@ namespace KioskClinicaPC.Core.Sync;
 
 public interface IPackBackend
 {
-    Task Preflight(PackItemResult item, string log);
+    Task Preflight(PackItemResult item, string log, CancellationToken ct);
     Task Install(PackItemResult item, string log, Action<string> progress, CancellationToken ct);
 }
 
@@ -11,7 +11,7 @@ public static class PackExecution
 {
     public static async Task<bool> Run(PackRun run, IPackBackend engine, string logs,
         Action<PackRun>? changed, Action<PackRun> save, bool preflight, CancellationToken ct,
-        Func<Task<bool>>? beforeInstall = null, bool allowPartial = false)
+        Func<Task<bool>>? beforeInstall = null, bool allowPartial = false, TimeSpan? preflightTimeout = null)
     {
         bool blocked = false;
         foreach (var item in run.Items)
@@ -25,19 +25,37 @@ public static class PackExecution
             // Preflight can still set a fresh guard if it finds an active installer.
             item.RequiresRebootBeforeRetry = uncertain && sameBoot;
             item.State = PackItemState.Checking; changed?.Invoke(run);
+            var working = Copy(item);
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            timeout.CancelAfter(preflightTimeout ?? TimeSpan.FromMinutes(5));
+            Task? check = null;
             try
             {
-                await engine.Preflight(item, Path.Combine(logs, item.Application.Id + ".log")).WaitAsync(TimeSpan.FromMinutes(5), ct);
+                check = engine.Preflight(working, Path.Combine(logs, item.Application.Id + ".log"), timeout.Token);
+                await check.WaitAsync(timeout.Token);
+                ct.ThrowIfCancellationRequested();
+                Apply(working, item);
                 if (uncertain && sameBoot && !item.Verified)
                     throw new InvalidOperationException("Instalación anterior interrumpida: puede seguir activa. Reinicia manualmente y reabre el instalador antes de reintentar.");
                 item.RequiresRebootBeforeRetry = false;
             }
-            catch (OperationCanceledException) { throw; }
-            catch (TimeoutException ex) { blocked = true; item.RequiresRebootBeforeRetry = true; item.LastAttemptBootTimeUtc = currentBoot; item.State = PackItemState.Failed; item.Message = ex.Message; }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+            catch (OperationCanceledException) when (timeout.IsCancellationRequested)
+            {
+                blocked = true; item.State = PackItemState.Failed;
+                item.Message = "La comprobación previa no respondió dentro del tiempo permitido. Reintenta esta aplicación más tarde.";
+            }
             catch (Exception ex)
             {
+                // A completed check may have detected a real active installer before failing.
+                // Never publish mutations from a timed-out or cancelled operation.
+                if (check is null || check.IsCompleted) Apply(working, item);
                 blocked = true; item.State = PackItemState.Failed; item.Message = ex.Message;
                 if (item.RequiresRebootBeforeRetry) item.LastAttemptBootTimeUtc = currentBoot;
+            }
+            finally
+            {
+                if (check is { IsCompleted: false }) _ = Observe(check);
             }
             changed?.Invoke(run);
         }
@@ -66,5 +84,29 @@ public static class PackExecution
             if (item.RequiresRebootBeforeRetry || item.State == PackItemState.VerificationPending) break;
         }
         return run.Complete;
+    }
+
+    private static PackItemResult Copy(PackItemResult item)
+    {
+        var copy = new PackItemResult { Application = item.Application };
+        Apply(item, copy);
+        return copy;
+    }
+    private static void Apply(PackItemResult source, PackItemResult target)
+    {
+        target.Application = source.Application;
+        target.ResolveLatest = source.ResolveLatest;
+        target.ResolvedChannel = source.ResolvedChannel;
+        target.InstalledVersion = source.InstalledVersion;
+        target.State = source.State;
+        target.Message = source.Message;
+        target.RebootRequired = source.RebootRequired;
+        target.RequiresRebootBeforeRetry = source.RequiresRebootBeforeRetry;
+        target.LastAttemptBootTimeUtc = source.LastAttemptBootTimeUtc;
+    }
+    private static async Task Observe(Task check)
+    {
+        try { await check; }
+        catch { /* Detached read-only operation: its result must not be published. */ }
     }
 }

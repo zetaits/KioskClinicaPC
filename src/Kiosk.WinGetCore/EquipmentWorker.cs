@@ -44,7 +44,8 @@ internal static class EquipmentWorker
                 catch (IOException) { }
                 finally { cancel.Cancel(); proceed.TrySetResult(false); }
             });
-            var engine = await Bootstrap.CreateEngine(message => Emit(new("phase", message)), cancel.Token);
+            var timings = new SetupTimingLog(Path.Combine(logs, "timings.jsonl"));
+            var engine = await Bootstrap.CreateEngine(message => Emit(new("phase", message)), cancel.Token, timings);
             if (start.Snapshot.Definition is not null)
             {
                 Emit(new("phase", "Actualizando el catÃ¡logo oficial WinGet y resolviendo versiones compatiblesâ€¦"));

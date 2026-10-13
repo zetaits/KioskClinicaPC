@@ -56,8 +56,9 @@ internal static class LegacyCommands
             // Read-only native evidence, without bootstrap, refresh or installation.
             try
             {
-                var evidence = Task.Run(() => new WinGetEngine().InspectInstalled(args[1], args[2]))
-                    .WaitAsync(TimeSpan.FromMinutes(2)).GetAwaiter().GetResult();
+                using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+                var evidence = Task.Run(() => new WinGetEngine().InspectInstalled(args[1], args[2], timeout.Token))
+                    .WaitAsync(timeout.Token).GetAwaiter().GetResult();
                 Console.WriteLine(JsonSerializer.Serialize(evidence, Json)); return 0;
             }
             catch (Exception ex) { Console.Error.WriteLine(KioskClinicaPC.Equipment.EquipmentDiagnostics.Describe(ex)); return 1; }
@@ -67,7 +68,8 @@ internal static class LegacyCommands
             // Read-only diagnostics: never bootstrap or install applications on the development PC.
             try
             {
-                var item = Task.Run(() => new WinGetEngine().Inspect(args[1], args[2])).WaitAsync(TimeSpan.FromMinutes(5)).GetAwaiter().GetResult();
+                using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(5));
+                var item = Task.Run(() => new WinGetEngine().Inspect(args[1], args[2], timeout.Token)).WaitAsync(timeout.Token).GetAwaiter().GetResult();
                 Console.WriteLine($"{item.Application.WingetId} {item.Application.PinnedVersion}: {item.Message}"); return 0;
             }
             catch (Exception ex) { Console.Error.WriteLine(ex.ToString()); return 1; }
@@ -176,7 +178,8 @@ internal static class LegacyCommands
             }
         }
         string logs = Path.Combine(StateRoot, "logs", run.StartedAtUtc.ToString("yyyyMMdd-HHmmss") + "-" + DateTime.UtcNow.ToString("HHmmss-fff")); Directory.CreateDirectory(logs);
-        var engine = await Bootstrap.CreateEngine(message => { foreach (var item in run.Items) item.Message = message; changed?.Invoke(run); }, ct);
+        var timings = new SetupTimingLog(Path.Combine(logs, "timings.jsonl"));
+        var engine = await Bootstrap.CreateEngine(message => { foreach (var item in run.Items) item.Message = message; changed?.Invoke(run); }, ct, timings);
         bool ok = await PackExecution.Run(run, engine, logs, changed, Save, preflight, ct);
         Ini.Write(output, new() { ["Result"] = new() { ["Ok"] = ok ? "1" : "0", ["RebootRequired"] = run.RebootRequired ? "1" : "0",
             ["Summary"] = (preflight ? (!ok ? "Comprobación previa fallida; desmarca las aplicaciones indicadas y vuelve a comprobar." : "Comprobación previa correcta.") : run.Summary) + "\n" + string.Join("\n", run.Items.Select(x => $"{x.Application.DisplayName}: {x.Message}")) } });

@@ -2,12 +2,15 @@
 
 La integración de código está disponible para preparar un piloto. **No se ha publicado una estación ni validado PXE/Windows en equipos reales.** La descarga permanece vacía hasta importar un paquete compatible que incluya la validación completa. No habilitar el uso habitual antes del piloto.
 
+Guías relacionadas: [índice](README.md), [pack WinGet](PACK-WINGET.md) y
+[asistente de equipos](ASISTENTE-EQUIPOS.md).
+
 ## Componentes
 
 - `Kiosk.DeploymentManager`: ventana WPF normal con Equipos, Sistemas y controladores, Trabajos y Configuración. Cerrar la ventana deja trabajando al servicio. No activa protección de kiosko.
 - `Kiosk.DeploymentService`: autoridad local, cola persistente, canalización con ACL, DPAPI, proxyDHCP UEFI, TFTP inicial, HTTP de arranque, HTTPS de trabajador y SMB de solo lectura.
 - `Kiosk.DeploymentPostInstall`: ejecutable autónomo bajo la cuenta creada. Limpia el inicio automático y archivos de respuestas antes de aplicaciones. Verifica build, edición exacta, usuario y componentes; Kiosk se registra sin abrirse.
-- `Kiosk.EquipmentCore`: los adaptadores de recursos, pack, bloqueo y Kiosk del asistente anterior. El asistente mantiene recursos y modos propios.
+- `Kiosk.EquipmentCore`: adaptadores de recursos, pack, bloqueo y Kiosk compartidos con el asistente de equipos. El asistente mantiene recursos y modos propios.
 - `Kiosk.DeploymentCore` y contratos v1 en Shared: validación, almacenamiento atómico, cola, archivo de respuestas y registro durable de progreso.
 
 ## Preparar el laboratorio y la estación

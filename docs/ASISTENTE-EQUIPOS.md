@@ -1,226 +1,220 @@
-# Asistente WPF para preparar equipos
+# Asistente para preparar equipos
 
-La 1.5.8 corrige el contrato de ámbito de la API COM de WinGet: los metadatos de
-una instalación para todo el equipo usan `System`, mientras los manifiestos YAML
-usan `machine`. La política central de verificación ahora usa el contrato COM en
-la detección previa, la omisión de versiones ya instaladas y la comprobación
-posterior a instalar. Una versión System anterior se puede actualizar; las
-instalaciones User y los ámbitos/versiones desconocidos siguen exigiendo revisión.
-Los logs `*.verification.jsonl` registran versión requerida/instalada, ámbito COM,
-comparación nativa y decisión, sin credenciales. Los diagnósticos
-`inspect-installed-json <id> <versión>` y `audit-last-run-json` permiten comprobar
-el caso real sin instalar ni guardar estados. Evidencia y límites de la prueba:
-[VERIFICACION-ASISTENTE-1.5.8.md](VERIFICACION-ASISTENTE-1.5.8.md).
+Guía del comportamiento actual del repositorio. Las publicaciones y la versión
+activa se consultan en `/instalador`. Los resultados fechados están en el
+[histórico](historico/README.md); un build local no cambia la descarga del panel.
 
-La 1.5.7 limpia la protección de una instalación anterior después de un reinicio
-antes de comprobar las aplicaciones. Un fallo ordinario de ámbito o versión no
-conserva esa marca antigua ni impide instalar IZArc, VLC u otras aplicaciones
-comprobadas cuando se permite un pack parcial. Una instalación activa detectada
-en la comprobación actual y una instalación pendiente del mismo arranque siguen
-deteniendo la cola. Las consultas de manifiestos respetan `Retry-After` y muestran
-un motivo claro ante HTTP 429; un límite prolongado deja esa aplicación pendiente
-sin bloquear las demás. Se mantiene la comprobación machine-wide de lo instalado.
+## Ediciones y requisitos
 
-La corrección preparada para 1.5.6 incluye en el trabajador la DLL nativa
-`Microsoft.Management.Deployment.dll`. Su ausencia en 1.5.5 provocaba
-`COMException 80040154` antes de comprobar las aplicaciones, aunque WinGet
-estuviera instalado. La compilación y la validación del ZIP ahora exigen esa DLL
-además del WinMD. Es necesario generar y publicar un asistente nuevo para aplicar
-la corrección a las descargas del panel.
-El servidor conserva la lectura de las publicaciones anteriores a 1.5.6 para no
-invalidar la versión activa al desplegar; exige la DLL en las nuevas publicaciones.
+El asistente privado ofrece solo pack, solo Kiosk o ambos. Su versión es
+independiente de la de Kiosk incluida. Se distribuye como EXE WPF autónomo,
+con .NET incorporado, para Windows 10 22H2 y Windows 11 x64.
 
-El comando `KioskSetupHelper.exe --diagnose-winget-json` comprueba la activación
-de la API y sus opciones sin reparar WinGet, actualizar el catálogo ni instalar
-aplicaciones. Debe ejecutarse desde la carpeta completa del trabajador, conservando
-la DLL nativa y el WinMD junto al EXE. Devuelve código 0 y `wingetActivated: true`
-si puede activar WinGet 1.29.380 o superior; en caso contrario muestra tipo y HRESULT.
+| Edición | Componentes | Conectividad |
+| --- | --- | --- |
+| Online | Descarga únicamente los componentes seleccionados de la VPS | Necesita conexión para prepararlos |
+| Completo para USB | Incluye las mismas versiones de Kiosk y trabajador | Solo Kiosk puede instalarse sin conexión |
 
-La candidata 1.5.5 incluye Kiosk 1.2.2 y corrige el error al abrir la ventana
-principal después de guardar el precio: los colores de respaldo de los bindings
-usan recursos estáticos válidos para WPF. Los colores enlazados al componente
-siguen actualizándose normalmente. El precio y los ajustes locales se conservan.
-La prueba de carga de la ventana y sus plantillas se ejecuta sin mostrarla ni
-activar protecciones, servicios de red o detección real de hardware.
-
-`Setup-EquipoClinicaPC-1.5.4.exe` es una descarga privada del panel autenticado
-`/instalador`. Su versión es independiente de la de Kiosk incluida. No se publica
-en GitHub Releases ni como artifact público. Contiene credenciales limitadas de
-aprovisionamiento; no contiene claves privadas de firma ni claves de publicación.
-
-La edición **Online** descarga únicamente los componentes seleccionados. La edición
-**Completo para USB**, `Setup-EquipoClinicaPC-1.5.4-Completo.exe`, incluye los mismos
-componentes y permite instalar solo Kiosk sin conexión. El pack de aplicaciones
-necesita internet en ambas. WPF y .NET viajan en el EXE: no hay que instalar .NET.
+El pack necesita internet en ambas ediciones. Estos EXE contienen
+aprovisionamiento limitado y se descargan desde el panel autenticado; se publican
+como candidatos privados. Las actualizaciones públicas de Kiosk se generan por
+separado y siguen siendo Kiosk-only.
 
 ## Uso
 
-1. Descargar desde `/instalador` y abrir el EXE. Aparece WPF antes de extraer los
-   componentes grandes. Pack está activado y Kiosk desactivado inicialmente.
-2. Elegir solo pack, solo Kiosk o ambos. Solo Kiosk omite catálogo y WinGet.
-3. Para el pack, revisar nombres, política de última versión compatible y selección inicial del panel.
-   Un pack vacío muestra un aviso y permite volver a componentes.
-4. Confirmar la selección y la opción de reanudación. Al pulsar **Instalar**,
-   Windows solicita una elevación del trabajador. Se comprueba de nuevo la revisión
-   y los identificadores contra `/api/setup/v3/catalog` con `X-Setup-Key` y el encabezado
-   `X-Setup-Catalog-Version: 3`. Si cambió la definición, se vuelve a revisión antes de preparar
-   WinGet o ejecutar instaladores. No se consulta el catálogo privado de ejecutables.
-   La opción **Instalar las aplicaciones disponibles aunque alguna falle la comprobación**
-   permite omitir las que fallen y continuar con las demás. Está marcada inicialmente.
-   Si falla la comprobación y hay aplicaciones disponibles, el resultado también ofrece
-   **Instalar aplicaciones disponibles**, que repite la comprobación antes de continuar.
-5. Se preparan y verifican primero todos los componentes seleccionados. Después, el orden es comprobación de todas las aplicaciones, Kiosk y pack. Inno actúa
-   únicamente como motor silencioso de Kiosk. El frontend registra el autostart
-   mediante `--register-autostart-only` bajo el usuario original, incluso si UAC
-   usó otra cuenta administradora. Al finalizar correctamente, **Abrir Kiosk al finalizar**
-   aparece marcado y el botón muestra **Finalizar y abrir Kiosk**. Se puede desmarcar
-   para cerrar sin abrirlo. Si se eligieron ambos componentes, esta opción solo aparece
-   cuando termina también el pack y sale el trabajador. No se ofrece ante cancelaciones,
-   resultados incompletos o reinicios pendientes. Los reinicios son manuales.
+1. Abrir el EXE descargado de `/instalador` y elegir los componentes. Pack está
+   seleccionado inicialmente y Kiosk desmarcado.
+2. Revisar las aplicaciones, la selección inicial y la opción de reanudación.
+   Un pack vacío permite volver a componentes.
+3. Pulsar **Instalar**. Windows solicita una elevación del trabajador. Se vuelve
+   a comprobar la revisión y los identificadores del catálogo autorizado; un
+   cambio devuelve la operación a revisión antes de preparar WinGet o instalar.
+4. Se preparan y verifican los componentes seleccionados. Después se comprueban
+   todas las aplicaciones, se instala Kiosk si se eligió y se ejecuta el pack.
+   Inno actúa como motor silencioso de Kiosk.
+5. Revisar el resultado. **Finalizar y abrir Kiosk** se ofrece cuando los
+   componentes elegidos están verificados, el trabajador ha terminado y no hay
+   reinicio pendiente. Se puede desmarcar la apertura. Los reinicios son manuales.
 
-Desde el asistente 1.5.3 con Kiosk 1.2.1, los perfiles sin contraseña local usan
-automáticamente la contraseña del panel vigente al generar el EXE. El asistente
-privado contiene su verificador PBKDF2 y lo instala como `KioskPanelPassword.json`;
-no contiene la contraseña en claro. Kiosk puede validarla sin conexión y omite
-el diálogo inicial. Las contraseñas locales existentes se conservan, incluso
-las de perfiles anteriores. Se puede cambiar la contraseña del equipo desde
-Ajustes, indicando la actual, sin cambiar la del panel. Cambiar la contraseña
-del panel posteriormente no actualiza perfiles ni asistentes ya generados.
+Solo Kiosk omite el catálogo de aplicaciones y WinGet. El autostart se registra
+para el usuario original, incluso si UAC utiliza otra cuenta administradora.
 
-El verificador se obtiene durante la publicación desde
-`GET /api/releases/setup/kiosk-password`, exclusivamente con
-`X-Release-Publish-Key` y sin caché. Ni la clave API pública, ni `X-Setup-Key`,
-ni la sesión administrativa habilitan esa ruta. No se incluye en el instalador
-público de Kiosk ni en el manifiesto de publicación. El diagnóstico del asistente
-solo muestra `panelPasswordProvisioned`, nunca el verificador. Si no se encuentra
-un aprovisionamiento válido, el cliente conserva el diálogo de contraseña local.
-El pack solo no instala el archivo. Los logs de errores detallan fase, porcentaje,
-causa interna y código de error, sin copiar mensajes que puedan contener claves.
+La opción **Instalar las aplicaciones disponibles aunque alguna falle la
+comprobación** está marcada inicialmente. Los rechazos ordinarios quedan
+pendientes y las aplicaciones comprobadas pueden continuar. Si todas fallan,
+Kiosk seleccionado puede instalarse de forma independiente. Un instalador
+activo o de estado incierto detiene la cola. Un resultado parcial conserva los
+errores y devuelve código 2.
 
-Los comandos para desplegar y generar esta versión están en
-[PUBLICAR-ASISTENTE-1.5.3.md](PUBLICAR-ASISTENTE-1.5.3.md).
+Al cancelar o cerrar durante una instalación, la ventana espera al trabajador.
+No mata instaladores nativos ni borra sus recursos mientras se usan. Un resultado
+ambiguo exige comprobar el equipo o reiniciar manualmente antes de reintentar.
 
-La interfaz permanece abierta al cancelar una instalación: espera al trabajador.
-No mata instaladores nativos ni borra sus archivos. Un resultado ambiguo detiene
-la cola y exige comprobación o reinicio antes de reintentar. Una app con fallo
-ordinario permite intentar las siguientes. Solo se declara éxito si todos los
-componentes elegidos están verificados y el autostart de Kiosk se ha confirmado
-para el usuario original.
+## Aplicaciones y reanudación
 
-Las aplicaciones omitidas conservan su error y el resultado es parcial (código 2).
-La opción no permite continuar si hay un instalador activo o de estado incierto.
-Si todas fallan la comprobación ordinaria, no se instalan aplicaciones, pero Kiosk
-seleccionado puede instalarse. El modo desatendido también continúa con las disponibles.
+La definición procede de `/api/setup/v3/catalog` con `X-Setup-Key` y el encabezado
+`X-Setup-Catalog-Version: 3`. Contiene identificadores, orden y selección inicial.
+La [gestión del pack](PACK-WINGET.md) y el catálogo de MSI/EXE de la flota son
+independientes.
 
-Cada ejecución actualiza el origen oficial WinGet y ordena sus versiones con el
-comparador de WinGet dentro del canal predeterminado. Elige la más reciente que
-tenga instalador aplicable, silencioso, sin autenticación y para todo el equipo.
-Comprueba el manifiesto oficial; conserva hash obligatorio, acuerdos y dependencias.
-La versión del índice del panel es orientativa y nunca fija la instalación nueva.
-Un fallo de red no permite usar silenciosamente el catálogo local como actualizado
-ni descender a versiones antiguas. Una discrepancia entre catálogo y manifiesto
-permite como máximo una actualización adicional por ejecución. No se repiten
-instaladores ni se cambia la versión resuelta después de la comprobación previa.
+El trabajador actualiza el origen oficial WinGet y utiliza su comparador para
+elegir la última versión compatible del canal predeterminado. Exige instalador
+aplicable, silencioso, para todo el equipo y sin autenticación interactiva.
+Comprueba el manifiesto oficial, conserva los hashes obligatorios y deja que
+WinGet resuelva las dependencias. La versión observada en el índice del panel
+es orientativa.
 
-El resultado muestra versión resuelta, versión instalada cuando puede verificarse
-y motivo de error. Al reanudar se vuelve a verificar lo instalado, conservando su
-versión resuelta; solo los pendientes vuelven a resolver la última compatible.
-Una versión superior ya instalada para todo el equipo no se degrada.
+La versión resuelta queda congelada antes de instalar. Una discrepancia entre
+catálogo y manifiesto permite como máximo una actualización adicional por
+ejecución. Un fallo de red no autoriza usar un catálogo desactualizado como si
+estuviera actualizado ni seleccionar silenciosamente una versión anterior.
 
-El servidor migra automáticamente la configuración a `pack-definition-v3.json`,
-preservando IDs, orden, selección y revisión, con copia `pack-applications.json.before-v3.bak`.
-El índice diario actualiza una proyección concreta `/api/setup/v2/catalog` para los
-asistentes antiguos sin cambiar la revisión v3. Estos conservan su política estricta;
-para obtener toda la recuperación automática es necesario descargar el EXE 1.5.4 nuevo.
+Se instala secuencialmente y se verifica el ámbito y la versión antes de pasar
+a la siguiente aplicación. La API COM usa `System/User`; los manifiestos YAML
+usan `machine/user`. Una versión igual o superior ya instalada para todo el
+equipo se omite. Una instalación por usuario, un ámbito desconocido o una
+versión no comparable requieren revisión.
 
-La ventana usa los colores y la tipografía Space Grotesk del panel, controles
-propios y el icono de Clínica PC en el EXE y la barra de tareas. La barra superior
-personalizada permite arrastrar, redimensionar, minimizar, maximizar/restaurar
-y cerrar; el cierre conserva la espera segura del trabajador. Los controles
-incluyen estados de foco por teclado, hover y deshabilitado. Las listas se
-desplazan y los textos se ajustan al ancho disponible.
+Al reanudar se comprueba de nuevo lo instalado. Las aplicaciones verificadas
+conservan su versión resuelta; los pendientes vuelven a resolver la última
+compatible. Una selección nueva no evita la protección de un instalador anterior
+sin verificar. Un reinicio permite despejar una protección del arranque anterior,
+pero una instalación activa detectada en la comprobación actual sigue bloqueando.
 
-Estado: `%ProgramData%\ClinicaPC\Setup\last-run.json`, `kiosk-run.json` y
-`logs/`. Los directorios `work/` son exclusivos de administradores y SYSTEM.
-Los errores de la ventana y del registro de autostart se guardan además en
-`%LOCALAPPDATA%\KioskClinicaPC\Setup\logs\assistant-AAAAMMDD.log`, sin copiar
-mensajes de excepción que puedan contener credenciales. El asistente 1.5.4
-corrige un resultado parcial falso al cerrar el canal después de una instalación
-correcta: cada mensaje se vacía mientras el canal está conectado y su cierre
-normal no invalida el resultado ya recibido. Se siguen exigiendo el resultado
-final y un código de salida del trabajador coincidente.
-El trabajador conserva el bloqueo `run.lock` durante comprobación, Kiosk y pack;
-`equipment.lock` coordina instancias del nuevo asistente. Los recursos solo se
-extraen si se eligieron, a rutas internas, y se verifica SHA-256. WinGet y su
-`Microsoft.Management.Deployment.winmd` quedan físicamente juntos, aislados del
-frontend WPF. Se conservan el exportador `export-index` y los comandos antiguos
-del helper para compatibilidad.
+Cada comprobación tiene un límite de cinco minutos y pasa la cancelación a COM
+y HTTP. Trabaja sobre una copia: una respuesta tardía no modifica el estado
+guardado. Un timeout de consulta no crea una marca nueva de instalador nativo
+activo; las protecciones anteriores del mismo arranque se conservan.
+
+La consulta de manifiestos permite tres intentos y 45 segundos por petición.
+Respeta `Retry-After`. Un fallo compartido de transporte, timeout o HTTP 408/429/5xx
+agotado, o un `Retry-After` superior a un minuto, evita repetir esas esperas para
+las siguientes aplicaciones de esa ejecución. Los 404 e incompatibilidades son
+particulares de cada app. Una ejecución nueva vuelve a consultar el repositorio.
+
+Una instalación nativa tiene un límite de 60 minutos. WinGet puede cancelar una
+descarga, pero no garantiza detener un instalador ya activo. Una cancelación,
+timeout o resultado sin verificar detiene la cola y conserva el pack incompleto.
+
+Si WinGet necesita preparación, se usa el módulo oficial `Microsoft.WinGet.Client`
+1.12.440 y `Repair-WinGetPackageManager` para WinGet 1.29.380. El módulo se reutiliza
+si puede importarse; solo se instala, junto con NuGet si falta, cuando hace falta.
+Después se verifica la activación del runtime. Si se cancela durante la reparación,
+se espera a que termine el proceso nativo.
+
+## Contraseña inicial de Kiosk
+
+Los asistentes publicados con aprovisionamiento válido y Kiosk 1.2.1 o posterior
+incluyen un verificador PBKDF2 de la contraseña del panel vigente al generar el
+EXE. Un perfil sin contraseña local lo recibe como `KioskPanelPassword.json` y
+puede validarlo sin conexión. Las contraseñas locales existentes se conservan.
+Cambiar la contraseña del panel después no actualiza perfiles ni EXE anteriores.
+
+El verificador se obtiene en el build desde `GET /api/releases/setup/kiosk-password`
+con `X-Release-Publish-Key`. No se incluye en el instalador público de Kiosk ni en
+el manifiesto. El pack solo no instala ese archivo. Sin aprovisionamiento válido,
+Kiosk mantiene el diálogo de contraseña local. El diagnóstico muestra únicamente
+`panelPasswordProvisioned`.
+
+## Estado y diagnósticos
+
+Estado y logs del trabajador: `%ProgramData%\ClinicaPC\Setup\last-run.json`,
+`kiosk-run.json` y `logs/`. Los errores de interfaz y autostart se registran en
+`%LOCALAPPDATA%\KioskClinicaPC\Setup\logs\assistant-AAAAMMDD.log`. No se registran
+claves, verificador de contraseña ni mensajes de excepción que puedan contenerlos.
+
+Cada ejecución del pack tiene `timings.jsonl` con fecha, fase, aplicación,
+duración y resultado. Las fases son `Bootstrap`, `CatalogRefresh`, `Preflight`,
+`Install` y `Verification`; `Install` incluye la verificación, por lo que esas dos
+duraciones no deben sumarse. Los archivos `*.verification.jsonl` registran versión
+requerida/instalada, ámbito COM, comparación nativa y decisión.
+
+Estos comandos del trabajador son de solo lectura. Ejecutarlos desde su carpeta
+completa, conservando DLL nativa y WinMD junto al EXE:
+
+```powershell
+& .\KioskSetupHelper.exe --diagnose-winget-json
+& .\KioskSetupHelper.exe inspect-installed-json IZArc.IZArc 4.6
+& .\KioskSetupHelper.exe audit-last-run-json
+```
+
+El primero comprueba activación y opciones sin reparar WinGet. El segundo consulta
+lo instalado. El tercero reproduce las comprobaciones del último snapshot, sin
+instalar ni guardar estados; no sustituye la validación del catálogo autorizado
+ni la resolución de versiones de una instalación nueva.
+
+## Componentes y caché
 
 El trabajador se publica desde `Kiosk.PackWorker`, sin WPF, con nombre físico
-`KioskSetupHelper.exe`, DLL, runtimeconfig y WinMD. `Kiosk.WinGetCore` comparte
-motor, bootstrap, protocolo, persistencia y exportación con el helper WPF antiguo.
-El origen local `Payload.UseDirectory` utilizado por instalación por red se conserva
-y prepara sus archivos locales sin depender de las descargas de componentes de la VPS.
+`KioskSetupHelper.exe`. `Kiosk.WinGetCore` comparte el motor, bootstrap, persistencia,
+protocolo y exportación con el helper WPF antiguo. Su carpeta contiene EXE, DLL,
+runtimeconfig, `Microsoft.Management.Deployment.dll` y
+`Microsoft.Management.Deployment.winmd`.
 
-La caché `%ProgramData%\ClinicaPC\Setup\cache` solo permite escritura a
-administradores/SYSTEM y rechaza reparse points en archivos y antecesores. Cada uso
-verifica tamaño y SHA-256. Las descargas se escriben en `.part`; solo se promueven
-tras validar. Se reanudan con el ETag esperado y Range correcto; una respuesta 200
-reinicia el parcial. Un hash incorrecto elimina el parcial. Hay tres intentos para
-fallos transitorios, dos minutos sin progreso y treinta minutos por componente.
-Se muestra progreso y se permite cancelar también desde la consola silenciosa.
-La limpieza limita la caché a 1 GiB, retira primero archivos antiguos disponibles y
-parciales abandonados de más de siete días; no toca estados, registros ni archivos
-bloqueados por operaciones activas.
+`run.lock` se conserva durante comprobación, Kiosk y pack; `equipment.lock` coordina
+instancias del asistente. Los directorios `work/` son exclusivos de administradores
+y SYSTEM. Se exige el resultado final y un código de salida coincidente del
+trabajador; el cierre normal del canal no invalida un resultado ya recibido.
+
+La caché de componentes en `%ProgramData%\ClinicaPC\Setup\cache` permite escritura
+solo a administradores/SYSTEM y rechaza reparse points. Cada uso verifica tamaño
+y SHA-256. Las descargas `.part` se promueven tras validar, se reanudan con ETag y
+Range y reinician el parcial ante una respuesta 200. Un hash incorrecto lo elimina.
+
+Hay tres intentos ante fallos transitorios, dos minutos sin progreso y treinta
+minutos por componente. La limpieza limita la caché a 1 GiB y retira archivos
+antiguos disponibles y parciales abandonados de más de siete días; conserva
+estados, logs y archivos bloqueados por operaciones activas.
+
+El origen local `Payload.UseDirectory` de la
+[instalación por red](INSTALACION-POR-RED.md) prepara los componentes locales sin
+descargarlos de la VPS. Se conserva el exportador `export-index` y los comandos
+del helper antiguo para compatibilidad.
 
 ## Compilación local ficticia
 
-Desde la raíz, con .NET 10 SDK e Inno Setup 6 disponibles:
+Desde la raíz, con .NET 10 SDK e Inno Setup 6:
 
 ```powershell
 & .\build-equipment-setup.ps1
 ```
 
-Detecta el SDK compatible siguiendo `global.json` y los candidatos del usuario
-y de `%TEMP%\clinicapc-dotnet`. Genera `installer\Output\Setup-EquipoClinicaPC-1.5.4.exe`
-, `Setup-EquipoClinicaPC-1.5.4-Completo.exe` y `.bundle.json` esquema 3. Usa `https://setup.invalid` y claves ficticias aunque haya
-credenciales reales en el entorno. No incorpora el verificador del panel: el
-primer arranque mantiene el diálogo de contraseña local en este build ficticio.
-No instala nada. El build verifica el EXE
-final en modo diagnóstico, comprobando versión, compatibilidad y hashes.
-
-Los artefactos internos son inmutables: si ya existe esa versión local, elegir
-otra con `-Version 1.5.5` o retirar manualmente **solo** el build ficticio anterior.
-`-KioskVersion 1.2.1` fija la versión incluida sin crear tags ni releases de Kiosk.
-El build genera ese payload desde el código del checkout; no descarga una release
-histórica por su número. Publicar siempre desde un commit que se haya probado.
-
-Diagnóstico sin instalación:
+Los valores por defecto se toman de `build-equipment-setup.ps1` y del proyecto
+`Kiosk.Client`. Para elegir otra versión, sustituir `X.Y.Z` por una versión nueva:
 
 ```powershell
-& .\installer\Output\Setup-EquipoClinicaPC-1.5.4.exe --diagnose
-# Para capturar JSON, ejecutar --diagnose-json con stdout redirigido.
+$assistantVersion = 'X.Y.Z'
+& .\build-equipment-setup.ps1 -Version $assistantVersion
+& ".\installer\Output\Setup-EquipoClinicaPC-$assistantVersion.exe" --diagnose-json
 ```
 
-El diagnóstico muestra únicamente versiones, commit, compatibilidad y estado
-de recursos; no muestra claves ni configuración incrustada. Devuelve 0 si todo
-es compatible. Online comprueba manifiesto/configuración y ausencia de binarios incrustados, sin descargarlos ni afirmar sus hashes verificados. Completo verifica realmente SHA-256 y compatibilidad de ambos recursos.
+Genera las ediciones Online y Completo y su `.bundle.json` en `installer/Output/`.
+Usa `https://setup.invalid` y claves ficticias, sin aprovisionamiento de contraseña
+del panel ni publicación. No instala nada; verifica los EXE empaquetados en modo
+diagnóstico. Online comprueba manifiesto y ausencia de binarios opcionales;
+Completo verifica tamaños, hashes y compatibilidad de los recursos incluidos.
+
+Una versión existente no se sobrescribe. Para repetir un build local, elegir
+otra versión o retirar explícitamente solo sus artefactos ficticios anteriores.
+`-KioskVersion` permite fijar la versión del componente incluido; el contenido se
+compila desde el checkout, no se descarga una release histórica por ese número.
 
 ## Modo completamente silencioso
 
-Exige una consola **ya elevada**, bajo un usuario interactivo, nunca SYSTEM.
-No abre WPF ni solicita UAC adicional. No lanza la pantalla fullscreen de Kiosk.
+Exige una consola ya elevada bajo un usuario interactivo, nunca SYSTEM. No abre
+WPF, no solicita UAC adicional y no lanza el cliente fullscreen. Usar la versión
+del EXE descargado o generado en `$assistantVersion`:
 
 ```powershell
-& .\Setup-EquipoClinicaPC-1.5.4.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /COMPONENTS=pack
-& .\Setup-EquipoClinicaPC-1.5.4.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /COMPONENTS=kiosk
-& .\Setup-EquipoClinicaPC-1.5.4.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /COMPONENTS=pack,kiosk /RESUME
+& ".\Setup-EquipoClinicaPC-$assistantVersion.exe" /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /COMPONENTS=pack
+& ".\Setup-EquipoClinicaPC-$assistantVersion.exe" /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /COMPONENTS=kiosk
+& ".\Setup-EquipoClinicaPC-$assistantVersion.exe" /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /COMPONENTS=pack,kiosk /RESUME
 ```
 
-Sin `/COMPONENTS`, usa solo pack; selecciona las apps marcadas inicialmente en
-el panel. `/RESUME` conserva el estado anterior, pero todas las apps se comprueban
-otra vez. Una aplicación verificada no se reinstala y Kiosk correctamente
-instalado se omite. No se aceptan URLs, comandos, rutas ni argumentos de fabricante.
+Sin `/COMPONENTS`, usa solo pack y la selección inicial del panel. `/RESUME` vuelve a
+comprobar el estado anterior. El modo desatendido continúa con las aplicaciones
+disponibles ante rechazos ordinarios; conserva la parada ante estado nativo incierto.
+No se aceptan URLs, comandos, rutas ni argumentos del fabricante.
 
 | Código | Significado |
 | --- | --- |
@@ -229,86 +223,75 @@ instalado se omite. No se aceptan URLs, comandos, rutas ni argumentos de fabrica
 | 2 | Incompleto, cancelado o sin verificación final |
 | 64 | Argumentos no válidos |
 
-## Publicación candidata, activación y recuperación
+## Publicación, activación y recuperación
 
-1. Probar y guardar el código en un commit. Desplegar primero el servidor mediante
-   `deploy-server-vps.ps1` según `ACTUALIZAR-PANEL-VPS.txt`. `/health/ready` debe devolver
-   200, `{"status":"ok"}`, `X-Setup-Catalog-Version: 3` y `X-Setup-Component-Protocol: 1`.
-   El despliegue del servidor no reconstruye ni activa asistentes.
-2. Ejecutar el workflow **Equipment Setup**, versión `1.5.4`, con Kiosk `1.2.1`, desde el commit probado.
-   `/health/ready` debe anunciar también `X-Kiosk-Password-Provisioning: 1`.
-   Conserva los secretos de `production` y la separación de `X-Release-Publish-Key`
-   para publicar y `X-Setup-Key` para descargar. No publicar estos EXE como assets
-   públicos: contienen aprovisionamiento limitado. No necesitan la clave privada de firma.
-3. El build construye Kiosk y el trabajador una vez, y genera dos EXE autónomos y
-   comprimidos del mismo conjunto. Importa con `POST /api/releases/setup/v3` un
-   manifiesto esquema 3, campos multipart `manifest`, `online`, `complete`, `kiosk`
-   y `worker`. El límite agregado sigue siendo 1 GiB más margen multipart. Valida
-   tamaños, hashes, nombres, protocolo y ZIP en disco. Un reintento con los mismos
-   archivos y manifiesto es idempotente; cambiar contenido exige otra versión.
-4. La publicación queda como **candidata**. `/instalador` destaca las ediciones Online
-   y Completo para USB de la versión más reciente, con enlaces fijados a esa versión
-   incluso antes de activarla. Descargar ambas y probar los equipos piloto. El asistente
-   antiguo 1.4.0 no aparece en la página. Ambas ediciones usan las mismas versiones
-   fijadas; no resuelven componentes a «latest».
-5. Tras aprobar las pruebas de VM/piloto, pulsar **Activar versión 1.5.4**.
-   Requiere cookie administrativa y antiforgery. Se verifican de nuevo los dos EXE
-   y los dos componentes antes de sustituir atómicamente `setups/v3/active.json`.
-   La importación fallida nunca modifica ese puntero.
-6. Recuperación: restaurar otra versión validada de las nuevas ediciones desde
-   **Otras versiones y recuperación**, que aparece cuando hay más de una publicación.
-   Se conservan publicaciones, almacén antiguo y todos los componentes referenciados.
-   Descargar una candidata no cambia la versión activa ni asigna trabajos a la flota.
+1. Probar y guardar el código en un commit. Comprobar que el servidor compatible
+   está desplegado siguiendo [Actualizar el panel](ACTUALIZAR-PANEL-VPS.txt).
+   `/health/ready` debe devolver 200, `{"status":"ok"}` y los encabezados
+   `X-Setup-Catalog-Version: 3`, `X-Setup-Component-Protocol: 1` y
+   `X-Kiosk-Password-Provisioning: 1`.
+2. Ejecutar el workflow manual **Equipment Setup** desde ese commit, con una versión
+   nueva del asistente. `kiosk_version` vacío usa la versión del proyecto. El
+   entorno `production` aporta `KIOSK_SERVER_API_KEY`, `KIOSK_INITIAL_SETUP_KEY` y
+   `KIOSK_RELEASE_PUBLISH_KEY`; la clave de Setup debe coincidir con
+   `Kiosk__InitialSetupKey` del servidor. La publicación local con `-Publish` requiere
+   PowerShell 7, `KIOSK_SERVER_URL` y esas credenciales. Los EXE quedan privados.
+3. El build crea Kiosk y trabajador una vez, genera ambas ediciones y las importa
+   por `POST /api/releases/setup/v3`. El manifiesto es esquema 3 y los campos
+   multipart son `manifest`, `online`, `complete`, `kiosk` y `worker`. El límite agregado
+   sigue siendo 1 GiB más margen multipart. Se comprueban hashes, tamaños,
+   nombres, protocolo y ZIP.
+4. La publicación queda como candidata. Descargar ambas ediciones de esa versión
+   desde `/instalador` y probarlas en los equipos piloto. Los componentes están
+   fijados al mismo conjunto probado; no se resuelven dinámicamente a `latest`.
+5. Después de aceptar las pruebas, activar esa versión desde el panel. Se vuelven
+   a verificar EXE y componentes y se sustituye atómicamente `setups/v3/active.json`.
+   La importación por sí sola no cambia la versión activa.
+6. Para recuperar, elegir otra publicación validada en **Otras versiones y
+   recuperación**. Conservar las publicaciones y los componentes referenciados.
 
-`/panel/setup/download` sirve online de la versión activa; `?edition=complete` sirve
-USB de esa misma versión. `?version=1.5.4&edition=online` permite probar candidatas;
-`?version=legacy` permite recuperar el asistente anterior. La API antigua de
-publicación `/api/releases/setup` sigue operativa para manifiestos esquema 2.
+Un reintento con los mismos archivos y manifiesto es idempotente. Cambiar el
+contenido exige una versión nueva. **Equipment Setup** no crea una release pública
+de Kiosk ni activa actualizaciones de la flota.
 
-Los componentes publicados son inmutables y se descargan desde
-`GET /api/setup/v3/components/{kind}/{sha256}` (`kind`: `kiosk` o `worker`) con
-`X-Setup-Key`, ETag fuerte basado en SHA-256 y Range. No se exponen archivos
-huérfanos de importaciones interrumpidas. El protocolo de componentes 1 es
-independiente del catálogo de aplicaciones 3.
+`GET /panel/setup/download` sirve Online de la versión activa; `edition=complete`
+sirve USB y `version=X.Y.Z` permite descargar una candidata concreta. Los componentes
+inmutables se obtienen con `X-Setup-Key` desde
+`GET /api/setup/v3/components/{kind}/{sha256}`, con ETag y Range.
+
+Las API de Setup anteriores se conservan para compatibilidad. El servidor migra
+el pack a `pack-definition-v3.json` y mantiene `pack-applications.json` como proyección
+con versiones concretas para `/api/setup/v2/catalog`. Esa proyección tiene revisión
+propia y no modifica la definición v3. Las publicaciones esquema 2 usan
+`/api/releases/setup` y pueden recuperarse con `version=legacy`.
 
 ## Verificación y aceptación
 
 ```powershell
 . .\tools\resolve-dotnet.ps1
 $sdk = Resolve-KioskDotnet
-& $sdk test .\KioskClinicaPC.sln -c Release -nologo
+& $sdk test .\KioskClinicaPC.sln -c Release -m:1 --disable-build-servers -nologo
 ```
 
-Las pruebas cubren WPF con servicios y procesos simulados, selección/preselección,
-catálogos vacíos, auth, timeout/reintentos, incompatibilidad sin fallback,
-cambio de revisión/versiones, orden de componentes, cancelación/cierre del
-trabajador, reanudación, estados ambiguos, migraciones idempotentes, selección de
-última compatible, actualización acotada, hashes y compatibilidad de trabajadores.
-Las suites
-existentes siguen comprobando exportación WinGet y APIs de la flota.
+Las pruebas automatizadas cubren selección, catálogo y cambios de revisión,
+resolución de versiones, cancelación y reanudación, instalación parcial, estados
+nativos ambiguos, caché e integridad, publicación y comunicación del trabajador.
+Los resultados concretos se conservan en el [histórico](historico/README.md).
 
-**Pendiente de aceptación real en VMs Windows 10 22H2 y Windows 11 x64:**
+La instalación completa en VMs limpias Windows 10 22H2 y Windows 11 x64 sigue
+pendiente en la última verificación local. La aceptación debe comprobar:
 
-- Abrir el EXE del panel sin .NET/WinGet; comprobar WPF inmediato y apps del panel.
-- Confirmar una sola solicitud UAC y ninguna ventana de Inno ni decisión posterior.
-- Probar pack-only sin servicios, tareas, autostart o perfil Kiosk.
-- Probar solo Kiosk y ambos, con UAC bajo otra cuenta; verificar HKCU original.
-- Probar red interrumpida, instalador lento, cancelación, reanudación y reinicio manual.
-- Probar versión instalada superior, por usuario, retirada y resultado sin verificar.
-- Retirar una versión entre comprobación e instalación: mantenerla congelada en esa
-  ejecución y resolver de nuevo únicamente los pendientes al reanudar.
-- Forzar un fallo ordinario en una app: verificar las demás y Kiosk, resultado parcial
-  y código 2; forzar todas indisponibles: comprobar que Kiosk independiente continúa.
-- Ejecutar el modo totalmente silencioso desde consola elevada interactiva.
-- Online: probar solo Kiosk, solo pack y ambos, comprobar que no se solicitan componentes
-  desmarcados; interrumpir una descarga y comprobar reanudación con ETag/Range.
-- Completo: desconectar la red, desmarcar pack e instalar solo Kiosk; volver a conectar
-  y probar pack. Confirmar que el pack no se presenta como un repositorio offline.
-- Windows sin .NET y sin WinGet: comprobar el frontend autónomo y el bootstrap oficial.
-- Usar UAC con otra cuenta, reiniciar y reanudar; comprobar registro HKCU del usuario original.
-- Publicar en servidor de laboratorio con claves ficticias, probar ambas candidatas,
-  activar, reiniciar el servidor y restaurar 1.4.0; verificar que ninguna prueba cambia
-  el panel de producción. No ejecutar estos comandos de instalación en el PC de desarrollo.
+- Frontend autónomo sin .NET/WinGet, una sola elevación y bootstrap real.
+- Solo pack, solo Kiosk y ambos; UAC con otra cuenta y autostart del usuario original.
+- Versiones instaladas anterior/superior/por usuario y versión retirada entre
+  comprobación e instalación, manteniendo la versión congelada.
+- Fallo ordinario de una o todas las apps, resultado parcial y continuidad de
+  Kiosk independiente; instalador activo o incierto con parada de la cola.
+- Pérdida de red, descarga reanudable, hash incorrecto, cancelación, instalador
+  lento, reinicio manual y reanudación conservando aplicaciones verificadas.
+- Online solicitando solo componentes elegidos; Completo con solo Kiosk sin red.
+- Modo silencioso y candidata/activación/recuperación en servidor de laboratorio.
 
-La compilación y los tests no validan instaladores reales. No ejecutar estas
-instalaciones ni el cliente fullscreen en el escritorio de desarrollo.
+La compilación y los tests no equivalen a haber instalado aplicaciones de sus
+fabricantes. Las pruebas de instalación y del cliente fullscreen se realizan
+en VM o equipos piloto, fuera del escritorio de desarrollo.

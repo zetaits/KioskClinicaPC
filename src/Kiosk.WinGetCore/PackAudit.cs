@@ -9,7 +9,7 @@ internal static class PackAudit
 {
     private sealed class ReadOnlyBackend(WinGetEngine engine) : IPackBackend
     {
-        public Task Preflight(PackItemResult item, string log) => engine.Preflight(item, "");
+        public Task Preflight(PackItemResult item, string log, CancellationToken ct) => engine.Preflight(item, "", ct);
         public Task Install(PackItemResult item, string log, Action<string> progress, CancellationToken ct)
             => throw new InvalidOperationException("El diagnóstico no permite instalar aplicaciones.");
     }

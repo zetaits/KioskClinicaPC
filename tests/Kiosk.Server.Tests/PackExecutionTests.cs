@@ -10,7 +10,7 @@ public sealed class PackExecutionTests
     {
         public List<string> Calls = [];
         public string? Reject, Fail, Cancel, Already, Unverified, Active;
-        public Task Preflight(PackItemResult item, string log)
+        public Task Preflight(PackItemResult item, string log, CancellationToken ct)
         {
             Calls.Add("check" + item.Application.Id);
             if (item.Application.Id == Active) { item.RequiresRebootBeforeRetry = true; throw new InvalidOperationException("Instalador activo"); }
@@ -149,6 +149,94 @@ public sealed class PackExecutionTests
         var backend = new Backend { Already = "1" }; var run = Run();
         Assert.True(await PackExecution.Run(run, backend, ".", null, _ => { }, false, CancellationToken.None));
         Assert.DoesNotContain("install1", backend.Calls);
+    }
+    private sealed class AsyncBackend(Func<PackItemResult, CancellationToken, Task> check) : IPackBackend
+    {
+        public List<string> Installed { get; } = [];
+        public Task Preflight(PackItemResult item, string log, CancellationToken ct) => check(item, ct);
+        public Task Install(PackItemResult item, string log, Action<string> progress, CancellationToken ct)
+        {
+            Installed.Add(item.Application.Id); item.State = PackItemState.Succeeded; return Task.CompletedTask;
+        }
+    }
+
+    [Theory]
+    [InlineData(false)] [InlineData(true)]
+    public async Task Query_timeout_cancels_the_backend_without_creating_a_native_install_guard(bool previousGuard)
+    {
+        var run = Run(); run.Items[0].RequiresRebootBeforeRetry = previousGuard;
+        run.Items[0].LastAttemptBootTimeUtc = previousGuard ? run.HostBootTimeUtc : null;
+        bool cancelled = false;
+        var queryStopped = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var backend = new AsyncBackend(async (item, ct) =>
+        {
+            if (item.Application.Id == "0")
+            {
+                try { await Task.Delay(Timeout.InfiniteTimeSpan, ct); }
+                finally { cancelled = ct.IsCancellationRequested; queryStopped.SetResult(); }
+            }
+            item.State = PackItemState.Pending;
+        });
+        Assert.False(await PackExecution.Run(run, backend, ".", null, _ => { }, false, default,
+            allowPartial: true, preflightTimeout: TimeSpan.FromMilliseconds(30)));
+        await queryStopped.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.True(cancelled);
+        Assert.Equal(PackItemState.Failed, run.Items[0].State);
+        Assert.Equal(previousGuard, run.Items[0].RequiresRebootBeforeRetry);
+        Assert.Equal(previousGuard ? Array.Empty<string>() : new[] { "1", "2" }, backend.Installed);
+    }
+
+    [Fact]
+    public async Task Noncooperative_query_cannot_mutate_live_or_saved_state_after_timeout()
+    {
+        var run = Run();
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var finished = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var backend = new AsyncBackend(async (item, ct) =>
+        {
+            if (item.Application.Id == "0")
+            {
+                await release.Task; // Deliberately ignores cancellation, like a late COM reply.
+                item.Application = item.Application with { PinnedVersion = "99" };
+                item.ResolveLatest = false; item.ResolvedChannel = "late"; item.InstalledVersion = "99";
+                item.RequiresRebootBeforeRetry = true; item.RebootRequired = true;
+                item.State = PackItemState.Succeeded; item.Message = "Late reply";
+                finished.SetResult();
+                return;
+            }
+            item.State = PackItemState.Pending;
+        });
+        string? saved = null;
+        Assert.False(await PackExecution.Run(run, backend, ".", null,
+            value => saved = System.Text.Json.JsonSerializer.Serialize(value), false, default,
+            allowPartial: true, preflightTimeout: TimeSpan.FromMilliseconds(30)));
+        Assert.Equal(new[] { "1", "2" }, backend.Installed);
+        release.SetResult(); await finished.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.Equal(saved, System.Text.Json.JsonSerializer.Serialize(run));
+        Assert.Equal("1", run.Items[0].Application.PinnedVersion);
+        Assert.False(run.Items[0].RequiresRebootBeforeRetry); Assert.False(run.RebootRequired);
+        Assert.Equal(PackItemState.Failed, run.Items[0].State);
+    }
+
+    [Fact]
+    public async Task Caller_cancellation_reaches_the_query_and_discards_its_late_result()
+    {
+        var run = Run(); using var cancel = new CancellationTokenSource();
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var finished = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        CancellationToken received = default;
+        var backend = new AsyncBackend(async (item, ct) =>
+        {
+            received = ct; started.SetResult(); await release.Task;
+            item.State = PackItemState.Succeeded; item.RequiresRebootBeforeRetry = true; finished.SetResult();
+        });
+        var execution = PackExecution.Run(run, backend, ".", null, _ => throw new Exception("Cancelled check must not save"), false, cancel.Token);
+        await started.Task.WaitAsync(TimeSpan.FromSeconds(5)); cancel.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => execution.WaitAsync(TimeSpan.FromSeconds(5)));
+        Assert.True(received.IsCancellationRequested); Assert.Empty(backend.Installed);
+        release.SetResult(); await finished.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.Equal(PackItemState.Checking, run.Items[0].State); Assert.False(run.Items[0].RequiresRebootBeforeRetry);
     }
     [Theory]
     [InlineData("msi", "machine", null, true)]

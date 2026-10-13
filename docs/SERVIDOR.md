@@ -4,6 +4,8 @@ El kiosko funciona **solo**, sin nada más. Este servidor es la capa **para vari
 que edita el contenido compartido de toda la tienda y sincroniza el bucle de atracción. Si no lo despliegas,
 cada PC sigue siendo autónoma (modo local puro).
 
+Las guías de operación y el historial de verificaciones están en el [índice de documentación](README.md).
+
 - **Proyecto:** `src/Kiosk.Server` (ASP.NET Core, net10.0). Todo el cableado está en `Program.cs`.
 - **Qué expone:** API de contenido (`/api/*`), biblioteca de imágenes, hub de sincronización (SignalR) y el
   **panel de administración** (Blazor Server).
@@ -20,8 +22,10 @@ cada PC sigue siendo autónoma (modo local puro).
 
 En desarrollo (arranca en `http://localhost:5xxx`, lo imprime en consola):
 
-```
-dotnet run --project src/Kiosk.Server
+```powershell
+. .\tools\resolve-dotnet.ps1
+$dotnetExe = Resolve-KioskDotnet
+& $dotnetExe run --project src/Kiosk.Server
 ```
 
 La VPS de producción se actualiza con el [procedimiento único](ACTUALIZAR-PANEL-VPS.txt). El host necesita el runtime ASP.NET Core 10 y ejecuta el bundle como servicio `systemd`.
@@ -43,7 +47,7 @@ bajo). Todas las claves cuelgan de la sección `Kiosk`:
 | `PanelInitialPassword` | `Kiosk__PanelInitialPassword` | Contraseña del panel que se hashea al crear `panel.json`. Mínimo 12 caracteres; después puede quitarse del entorno. | sin valor; el primer arranque falla de forma segura |
 | `DataDir` | `Kiosk__DataDir` | Carpeta de los JSON de datos. | `data/` bajo el ContentRoot |
 | `AssetsDir` | `Kiosk__AssetsDir` | Carpeta de la biblioteca de imágenes. | `assets/` bajo el ContentRoot |
-| `InstallersDir` | `Kiosk__InstallersDir` | Binarios privados del catálogo de aplicaciones. | `installers/` bajo el ContentRoot |
+| `InstallersDir` | `Kiosk__InstallersDir` | Binarios privados para instalaciones remotas de la flota; el pack WinGet usa otro catálogo. | `installers/` bajo el ContentRoot |
 | `SetupDir` | `Kiosk__SetupDir` | Instaladores internos y manifiestos que el panel ofrece para descarga. | `setups/` bajo el ContentRoot |
 | `UpdatesDir` | `Kiosk__UpdatesDir` | Releases firmadas que CI importa y la VPS distribuye a los kioscos. | `updates/` bajo el ContentRoot |
 | `ReleasePublishKey` | `Kiosk__ReleasePublishKey` | Secreto exclusivo con el que CI importa releases; no se comparte con los kioscos. | vacío; publicación deshabilitada |
@@ -120,8 +124,10 @@ Remove-Item Env:KIOSK_SERVER_API_KEY
 
 La clave se pasa solo durante la compilación y no se guarda en el repositorio. El Setup deja la provisión junto
 al ejecutable y verifica URL + API key contra `/api/config/version`. Al abrirse bajo el usuario correcto, el
-kiosko la copia a su `KioskSettings.json` solo si el perfil es nuevo. Una actualización conserva siempre la
-contraseña, identidad y ajustes existentes, incluso si el UAC se aprobó con otra cuenta administradora.
+kiosko la copia a su `KioskSettings.json` si **tanto `ServerUrl` como `ServerApiKey` están vacíos**, también
+en perfiles existentes. Una actualización conserva la contraseña, identidad y demás ajustes, incluso si
+el UAC se aprobó con otra cuenta administradora. La clave queda incluida en el instalador público y es
+extraíble por diseño; la clave limitada del asistente del pack es independiente.
 
 ---
 
@@ -145,20 +151,27 @@ contraseña, identidad y ajustes existentes, incluso si el UAC se aprobó con ot
 | `GET /api/installations/{id}/manifest` | API key + token de trabajo | Manifiesto inmutable ligado al equipo y paquete. |
 | `GET /api/installations/{id}/download` | API key + token de trabajo | Descarga privada con soporte de rangos. |
 | `POST /api/installations/{id}/status` | API key + token de trabajo | Progreso y resultado del agente. |
-| `GET /api/setup/catalog` | clave de Setup | Aplicaciones permitidas y selección predeterminada del instalador inicial. |
-| `POST /api/setup/sessions` | clave de Setup | Crea una sesión auditable y fija los paquetes seleccionados. |
-| `GET /api/setup/sessions/{id}/packages/{packageId}/download` | clave + token de sesión | Descarga privada y reanudable para el Setup. |
-| `POST /api/setup/sessions/{id}/packages/{packageId}/status` | clave + token de sesión | Resultado de cada aplicación del pack. |
+| `GET /api/setup/v3/catalog` | `X-Setup-Key` | Definición actual del pack: identificadores, orden, preselección y política de última versión compatible. |
+| `GET /api/setup/v2/catalog` | `X-Setup-Key` | Proyección de versiones concretas para asistentes WinGet antiguos. |
+| `POST /api/releases/winget-index` | `X-Release-Publish-Key` | Importa el índice oficial usado para buscar aplicaciones en el panel. |
+| `GET /api/setup/catalog` | `X-Setup-Key` | Catálogo del Setup antiguo de binarios privados, conservado por compatibilidad. |
+| `POST /api/setup/sessions` | `X-Setup-Key` | Sesión del Setup antiguo de binarios privados. |
+| `GET /api/setup/sessions/{id}/packages/{packageId}/download` | clave + token de sesión | Descarga privada y reanudable para ese Setup antiguo. |
+| `POST /api/setup/sessions/{id}/packages/{packageId}/status` | clave + token de sesión | Resultado de un paquete de ese Setup antiguo. |
 | `GET /panel/setup/download` | cookie | Online de la versión activa; `edition=complete` para USB y `version=X.Y.Z` para candidatas. |
-| `POST /api/releases/setup/v3` | clave de publicación | Importa manifiesto esquema 3, ambos asistentes y componentes como candidata, sin activarla. |
-| `GET /api/setup/v3/components/{kind}/{sha256}` | clave de Setup | Componentes publicados, inmutables, con ETag y Range. |
+| `GET /api/releases/setup/kiosk-password` | `X-Release-Publish-Key` | Semilla PBKDF2 de la contraseña del panel para perfiles nuevos del asistente privado; no devuelve texto plano. |
+| `POST /api/releases/setup/v3` | `X-Release-Publish-Key` | Importa manifiesto esquema 3, ambos asistentes y componentes como candidata, sin activarla. |
+| `GET /api/setup/v3/components/{kind}/{sha256}` | `X-Setup-Key` | Componentes publicados, inmutables, con ETag y Range. |
 | `POST /panel/setup/activate` | cookie + antiforgery | Verifica y activa/restaura una candidata; `version=legacy` restaura el asistente anterior. |
 | `POST /api/maintenance/{id}/status` | API key + token de mantenimiento | Resultado verificado de una autodesinstalación de Kiosk. |
-| `POST /panel/installers/upload` | cookie + antiforgery | Añade un MSI/Inno/NSIS al catálogo. |
+| `POST /panel/installers/upload` | cookie + antiforgery | Añade un instalador compatible al catálogo privado de la flota. |
 | `POST /login` · `POST /logout` | cookie | Sesión del panel (con antiforgery + throttle). |
 | `GET /panel/assets/{cat}/{fichero}` | cookie | Vista previa de imágenes dentro del panel. |
 | `/hub/sync` (SignalR) | — | Reloj maestro del attract (`SyncState`) + aviso `ContentChanged`. Sin datos sensibles. |
 | `/` y páginas del panel | cookie | Panel Blazor Server; sin sesión redirige a `/login`. |
+
+El protocolo de estaciones de instalación por red usa credenciales propias y se describe en
+[Instalación por red](INSTALACION-POR-RED.md).
 
 Cómo llegan los cambios del panel a los kioscos: al guardar contenido o modificar una imagen, el panel emite
 `ContentChanged` por el hub (**push** inmediato); como red de seguridad, cada cliente sondea
@@ -175,10 +188,14 @@ Bajo `DataDir` (`data/` por defecto):
 - `events.json` — eventos programados / overrides temporales (`EventStore`).
 - `panel.json` — hash de la contraseña del panel (`PanelAuthStore`).
 - `fleet.json` + `fleet-activity.json` — overrides y registro de actividad de la flota (`FleetRegistry`).
-- `installers.json` + `install-jobs.json` — catálogo y últimos 500 trabajos de instalación.
-- `setup-installations.json` — últimas 500 sesiones de instalación inicial y sus resultados.
+- `installers.json` + `install-jobs.json` — catálogo privado y últimos 500 trabajos de instalación remota de la flota.
+- `pack-definition-v3.json` — definición vigente del pack WinGet, independiente de las versiones resueltas en cada equipo.
+- `winget-index.json` — índice importado para buscar y añadir aplicaciones desde el panel.
+- `pack-applications.json` — proyección de compatibilidad para asistentes v2; la migración conserva `pack-applications.json.before-v3.bak`.
+- `setup-installations.json` — últimas 500 sesiones del Setup antiguo de binarios privados; no es el registro del asistente WinGet actual.
 - `maintenance-jobs.json` — últimos 500 trabajos de mantenimiento/desinstalación y su resultado.
 - `kiosk-updates.json` — releases de Kiosk, versión objetivo, ventana y trabajos de actualización.
+- `deployment-v1.json` — estaciones, perfiles y trabajos de instalación por red; recuperación y migraciones en [su guía](INSTALACION-POR-RED.md).
 
 Bajo `AssetsDir` (`assets/` por defecto): `Brands/` y `SpecImages/` con las imágenes normalizadas de la
 biblioteca, más el marcador interno que evita resembrar imágenes borradas deliberadamente.
@@ -207,8 +224,10 @@ cualquier versión activa o todavía en instalación).
 ## Flota e instalación de aplicaciones
 
 La vista **Ordenadores** recibe heartbeats reales por `/hub/fleet` y permite órdenes dirigidas. La página
-**Aplicaciones** mantiene un catálogo vacío y administrable: sube MSI, Inno Setup o NSIS, selecciona uno o
-varios equipos online y observa descarga, verificación, instalación y resultado.
+**Instaladores de la flota** (`/ordenadores/instalaciones`) mantiene un catálogo privado: sube un MSI o un
+EXE compatible (Inno Setup, NSIS o Adobe Reader), selecciona equipos online y observa descarga,
+verificación, instalación y resultado. **Aplicaciones** (`/aplicaciones`) configura el
+[pack WinGet del asistente](PACK-WINGET.md).
 
 El instalador del kiosko registra `KioskClinicaPCInstallerAgent` como servicio `LocalSystem`. La app sin
 privilegios solo le entrega un ID/token por named pipe; el agente vuelve al servidor, verifica tamaño,
@@ -223,35 +242,36 @@ el servicio y la tarea programada antes de marcar el equipo como **desinstalado*
 configuración del usuario que ejecutaba Kiosk. Si falla, el equipo no se retira de la flota y el panel conserva
 el error; no se interpreta como éxito el mero hecho de haber iniciado `unins*.exe`.
 
-En **Aplicaciones**, **Retirar del catálogo** solo impide nuevos despliegues y archiva sus metadatos. No intenta
+En **Instaladores de la flota**, **Retirar del catálogo** solo impide nuevos despliegues y archiva sus metadatos. No intenta
 desinstalar esa aplicación en los ordenadores donde ya estuviera instalada. Esta separación evita confundir
 la gestión del catálogo del servidor con una desinstalación remota del software de terceros.
-
-### Instalador inicial de equipos
-
-Cada aplicación del catálogo puede marcarse como **visible en el Setup**, **preseleccionada** y recibir un
-orden. La página **Instalador** permite descargar el Setup interno y consultar el resultado por equipo y
-aplicación. El asistente ofrece Kiosk y el pack por separado; descarga e instala el pack secuencialmente con
-los mismos controles de tamaño, SHA-256, firma y argumentos silenciosos que el agente remoto.
-
-Genera una clave distinta de la API principal, configúrala como `Kiosk__InitialSetupKey` y usa la misma solo
-durante el build interno:
-
-```powershell
-$env:KIOSK_SERVER_API_KEY = '<api key de 64 hex>'
-.\build-installer.ps1 -ServerUrl 'https://panel.clinicapc.es'
-Remove-Item Env:KIOSK_SERVER_API_KEY
-```
-
-Este build genera `Setup-KioskClinicaPC-*`, que se publica para auto-update y contiene
-la `ApiKey` de la flota para conectar kioscos nuevos y anteriores sin servidor; cualquiera que
-descargue la release puede extraerla. El asistente WPF `Setup-EquipoClinicaPC-*` se genera y publica por separado con el workflow manual **Equipment Setup** y añade la clave limitada del pack. Las dos ediciones 1.5.0 se importan como candidatas por `/api/releases/setup/v3` y se activan desde el panel, nunca en el release público. Se conserva `/api/releases/setup` para paquetes anteriores. Actualizar la VPS no reconstruye esta descarga. Rotar la clave del pack
-invalida su descarga en Setups internos antiguos, aunque estos siguen pudiendo instalar Kiosk.
 
 En el primer arranque con `ServerUrl`, el agente empareja ese origen HTTPS en
 `HKLM\SOFTWARE\ClinicaPC\Kiosk\InstallerServerUrl`; además, el pipe solo acepta al `KioskClinicaPC.exe`
 instalado junto al agente. Si se migra el panel a otro dominio, un administrador debe detener el servicio,
 borrar ese valor y arrancar de nuevo el kiosko para realizar un nuevo emparejamiento.
+
+### Instalador inicial de equipos
+
+La página **Aplicaciones** configura identificadores, orden y preselección del pack WinGet. Cada equipo
+resuelve la última versión compatible y la fija para su ejecución. El asistente permite instalar Kiosk,
+el pack o ambos; sus resultados y diagnósticos se conservan en el equipo. Las sesiones del Setup antiguo
+de binarios privados no describen este flujo.
+
+La página **Instalador** ofrece las ediciones Online y Completo de `Setup-EquipoClinicaPC-*`. Online
+descarga los componentes seleccionados; Completo incorpora trabajador y Kiosk para USB. Las aplicaciones
+del pack requieren conexión en ambas. Uso, caché, reanudación y diagnóstico están en
+[Asistente de equipos](ASISTENTE-EQUIPOS.md).
+
+La clave limitada `Kiosk__InitialSetupKey` debe ser distinta de la API de la flota y de la clave de
+publicación. El workflow privado **Equipment Setup** construye ambas ediciones y las importa como
+candidatas; la activación se realiza desde el panel siguiendo el
+[procedimiento de publicación](ASISTENTE-EQUIPOS.md#publicación-activación-y-recuperación).
+Actualizar la VPS no reconstruye ni activa el asistente. Rotar la clave de Setup invalida las consultas
+al catálogo y las descargas de componentes de asistentes que llevan la clave anterior.
+
+El instalador público `Setup-KioskClinicaPC-*` se construye por separado para Kiosk y sus actualizaciones.
+Su provisión de servidor se explica en [Apuntar los kioscos al servidor](#apuntar-los-kioscos-al-servidor).
 
 ### Actualizaciones de Kiosk
 
@@ -279,15 +299,17 @@ openssl ec -in kiosk-update-private.pem -pubout -out kiosk-update-public.pem
 - Configura el mismo secreto `KIOSK_RELEASE_PUBLISH_KEY` en GitHub y en la VPS.
 - Configura el secreto GitHub `KIOSK_SERVER_API_KEY` en el entorno `production` con el mismo valor que `Kiosk__ApiKey` de la VPS. El workflow falla si falta; no guardes la clave en Git.
 
-Para publicar, crea y sube un tag que coincida exactamente con la versión de los proyectos:
+Para publicar desde un commit verificado, elige una versión nueva y crea un tag `vX.Y.Z`. El workflow
+usa esa versión para construir el instalador. Sustituye el marcador antes de ejecutar:
 
-```bash
-git tag v1.2.0
-git push origin v1.2.0
+```powershell
+$kioskVersion = 'X.Y.Z'
+git tag "v$kioskVersion"
+git push origin "v$kioskVersion"
 ```
 
-`v1.2.0` es la release puente. Los kioscos antiguos con el actualizador de GitHub descargan
-el instalador público y lo aplican con su tarea programada. Al arrancar, la nueva versión rellena
+Los kioscos antiguos con el actualizador de GitHub descargan
+el instalador público y lo aplican con su tarea programada. Al arrancar, la versión actual rellena
 `ServerUrl` y `ServerApiKey` **solo si ambos estaban vacíos**; conserva contraseña, identidad y
 ajustes locales. Los perfiles que aún usan la política de contraseña antigua deben renovarla
 en el primer arranque; el kiosco se registra después de completar ese paso. Comprueba en
@@ -338,8 +360,10 @@ sudo chmod 600 /etc/kiosk-server/kiosk-server.env
 sudo nano /etc/kiosk-server/kiosk-server.env
 ```
 
-Genera dos secretos **distintos** con `openssl rand -hex 32`, guárdalos en un gestor de contraseñas y
-sustituye los marcadores del fichero. `AllowedHosts` incluye el dominio público, el host técnico y loopback para la sonda local. Arranca:
+Genera secretos **distintos** para API de la flota, Setup, publicación y tokens de actualización con
+`openssl rand -hex 32`; define además una contraseña inicial del panel. Guárdalos en un gestor de
+contraseñas y sustituye los marcadores del fichero. `AllowedHosts` incluye el dominio público, el host
+técnico y loopback para la sonda local. Arranca:
 
 ```bash
 sudo systemctl daemon-reload

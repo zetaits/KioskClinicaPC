@@ -70,4 +70,21 @@ public sealed class PackVersionPolicyTests
         var cancelled = new PackCatalogSession(_ => throw new OperationCanceledException());
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => cancelled.Prepare(CancellationToken.None));
     }
+    [Fact]
+    public async Task Cancellation_during_compatibility_check_never_publishes_a_selected_version()
+    {
+        using var cancel = new CancellationTokenSource();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => PackVersionPolicy.Select([new("1.0", "")], "", Compare,
+            _ => { cancel.Cancel(); return Task.FromResult(true); }, cancel.Token));
+    }
+    [Fact]
+    public async Task Cancelled_drift_refresh_prevents_later_apps_using_the_stale_catalog()
+    {
+        int refreshes = 0;
+        var session = new PackCatalogSession(_ => ++refreshes == 1 ? Task.CompletedTask : throw new OperationCanceledException());
+        await session.Prepare(default);
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => session.Check(() => throw new CatalogDriftException("drift"), default));
+        await Assert.ThrowsAsync<IOException>(() => session.Check(() => throw new Exception("Must not use stale catalog"), default));
+        Assert.Equal(2, refreshes);
+    }
 }

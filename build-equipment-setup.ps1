@@ -1,5 +1,5 @@
 ﻿param(
-    [string]$Version = '1.5.8',
+    [string]$Version = '1.5.9',
     [string]$KioskVersion,
     [switch]$Publish
 )

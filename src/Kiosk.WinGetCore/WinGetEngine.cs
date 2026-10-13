@@ -1,4 +1,5 @@
 using System.IO;
+using System.Net.Http;
 using System.Text.Json;
 using Microsoft.Management.Deployment;
 using KioskClinicaPC.Core.Sync;
@@ -9,12 +10,15 @@ internal sealed class WinGetEngine : IPackBackend
 {
     private readonly PackageManager _manager;
     private readonly Action<string>? _phase, _info;
+    private static readonly HttpClient ManifestHttp = new() { Timeout = TimeSpan.FromSeconds(45) };
+    private readonly ManifestClient _manifests = new(ManifestHttp);
+    private readonly SetupTimingLog? _timings;
     private bool _latest;
     private PackCatalogSession? _catalogSession;
-    private CancellationToken _preflightToken;
-    public WinGetEngine(Action<string>? phase = null, Action<string>? info = null)
+    public WinGetEngine(Action<string>? phase = null, Action<string>? info = null, SetupTimingLog? timings = null)
     {
         (_phase, _info) = (phase, info);
+        _timings = timings;
         _phase?.Invoke("Activating WinGet PackageManager COM API");
         _manager = WinGetActivation.Create<PackageManager>();
         _info?.Invoke("WinGet COM activation completed.");
@@ -37,12 +41,15 @@ internal sealed class WinGetEngine : IPackBackend
     }
     public async Task PrepareLatest(CancellationToken ct)
     {
-        _latest = true; _preflightToken = ct;
+        ct.ThrowIfCancellationRequested();
+        _latest = true;
         _catalogSession = new PackCatalogSession(Refresh);
         await _catalogSession.Prepare(ct);
     }
-    private async Task Refresh(CancellationToken ct)
+    private Task Refresh(CancellationToken ct) => Measure(SetupPhase.CatalogRefresh, null, () => RefreshCore(ct));
+    private async Task RefreshCore(CancellationToken ct)
     {
+        ct.ThrowIfCancellationRequested();
         _phase?.Invoke("Actualizando el catálogo oficial WinGet…");
         var source = OfficialSource();
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct); timeout.CancelAfter(TimeSpan.FromMinutes(2));
@@ -53,8 +60,9 @@ internal sealed class WinGetEngine : IPackBackend
         catch (OperationCanceledException) when (!ct.IsCancellationRequested) { throw new IOException("El catálogo WinGet no respondió en dos minutos."); }
         if (result.Status != RefreshPackageCatalogStatus.Ok) throw new IOException($"Actualización WinGet fallida ({result.Status}).");
     }
-    private async Task<PackageCatalog> Connect(bool installed)
+    private async Task<PackageCatalog> Connect(bool installed, CancellationToken ct = default)
     {
+        ct.ThrowIfCancellationRequested();
         var source = OfficialSource();
         if (installed)
         {
@@ -64,18 +72,19 @@ internal sealed class WinGetEngine : IPackBackend
             source = _manager.CreateCompositePackageCatalog(options);
         }
         _phase?.Invoke("Connecting to official winget source");
-        var result = await source.ConnectAsync();
+        var result = await source.ConnectAsync().AsTask(ct).WaitAsync(ct);
         _info?.Invoke($"Source connection status: {result.Status}.");
         if (result.Status != ConnectResultStatus.Ok) throw new IOException($"WinGet: conexión fallida ({result.Status}).");
         return result.PackageCatalog;
     }
-    private async Task<CatalogPackage> Find(string id, bool installed = true)
+    private async Task<CatalogPackage> Find(string id, bool installed = true, CancellationToken ct = default)
     {
-        var catalog = await Connect(installed);
+        var catalog = await Connect(installed, ct);
+        ct.ThrowIfCancellationRequested();
         var filter = WinGetActivation.Create<PackageMatchFilter>(); filter.Field = PackageMatchField.Id;
         filter.Option = PackageFieldMatchOption.EqualsCaseInsensitive; filter.Value = id;
         var options = WinGetActivation.Create<FindPackagesOptions>(); options.Selectors.Add(filter);
-        var result = await catalog.FindPackagesAsync(options);
+        var result = await catalog.FindPackagesAsync(options).AsTask(ct).WaitAsync(ct);
         if (result.Status != FindPackagesResultStatus.Ok || result.Matches.Count != 1)
             throw new CatalogDriftException($"No se encuentra exactamente {id} en el catálogo oficial WinGet.");
         return result.Matches[0].CatalogPackage;
@@ -128,14 +137,18 @@ internal sealed class WinGetEngine : IPackBackend
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         { _info?.Invoke($"Verification diagnostic could not be written: {ex.GetType().Name}; HRESULT {ex.HResult:X8}"); }
     }
-    public async Task Preflight(PackItemResult item, string log)
+    public Task Preflight(PackItemResult item, string log, CancellationToken ct)
+        => Measure(SetupPhase.Preflight, item.Application.Id, () => PreflightCore(item, log, ct), () => item.State.ToString());
+    private async Task PreflightCore(PackItemResult item, string log, CancellationToken ct)
     {
-        if (_catalogSession is not null) await _catalogSession.Check(() => Check(item, log), _preflightToken);
-        else await Check(item, log);
+        ct.ThrowIfCancellationRequested();
+        if (_catalogSession is not null) await _catalogSession.Check(() => Check(item, log, ct), ct);
+        else await Check(item, log, ct);
     }
-    private async Task Check(PackItemResult item, string log)
+    private async Task Check(PackItemResult item, string log, CancellationToken ct)
     {
-        var package = await Find(item.Application.WingetId);
+        var package = await Find(item.Application.WingetId, ct: ct);
+        ct.ThrowIfCancellationRequested();
         if (_manager.GetInstallProgress(package, _manager.GetPackageCatalogByName("winget").Info) is { } active && active.Status == Windows.Foundation.AsyncStatus.Started)
         {
             item.RequiresRebootBeforeRetry = true;
@@ -144,7 +157,7 @@ internal sealed class WinGetEngine : IPackBackend
         if (!item.ResolveLatest && Verified(package, item.Application.PinnedVersion))
         { RecordEvidence(log, "preflight-already-installed", item.Application, InstalledEvidence(package, item.Application.PinnedVersion));
             item.InstalledVersion = package.InstalledVersion.Version; item.State = PackItemState.AlreadyInstalled; item.Message = "Ya instalada y verificada (todo el equipo)."; return; }
-        if (_latest) await Resolve(package, item, log);
+        if (_latest) await Resolve(package, item, log, ct);
         var evidence = InstalledEvidence(package, item.Application.PinnedVersion);
         RecordEvidence(log, "preflight", item.Application, evidence);
         // Use the COM API's installed scope (System/User), not the YAML manifest vocabulary.
@@ -162,10 +175,11 @@ internal sealed class WinGetEngine : IPackBackend
         var options = Options(package, item.Application, log, item.ResolvedChannel);
         var installer = package.GetPackageVersionInfo(options.PackageVersionId).GetApplicableInstaller(options);
         string type = (installer.InstallerType == PackageInstallerType.Zip ? installer.NestedInstallerType : installer.InstallerType).ToString().ToLowerInvariant();
-        if (!_latest) await ManifestPolicy.ValidateOnline(item.Application.WingetId, item.Application.PinnedVersion, installer.Architecture.ToString().ToLowerInvariant(), type, _preflightToken);
+        if (!_latest) await _manifests.Validate(item.Application.WingetId, item.Application.PinnedVersion, installer.Architecture.ToString().ToLowerInvariant(), type, ct);
+        ct.ThrowIfCancellationRequested();
         item.State = PackItemState.Pending; item.Message = "Comprobación previa correcta.";
     }
-    private async Task Resolve(CatalogPackage package, PackItemResult item, string log)
+    private async Task Resolve(CatalogPackage package, PackItemResult item, string log, CancellationToken ct)
     {
         var defaultVersion = package.DefaultInstallVersion ?? throw new CatalogDriftException("WinGet no ofrece una versión aplicable de esta aplicación.");
         var keys = new Dictionary<PackVersionCandidate, PackageVersionId>();
@@ -186,22 +200,23 @@ internal sealed class WinGetEngine : IPackBackend
             catch (InvalidDataException) { return false; }
             var installer = package.GetPackageVersionInfo(options.PackageVersionId).GetApplicableInstaller(options);
             var type = (installer.InstallerType == PackageInstallerType.Zip ? installer.NestedInstallerType : installer.InstallerType).ToString().ToLowerInvariant();
-            try { await ManifestPolicy.ValidateOnline(application.WingetId, candidate.Version, installer.Architecture.ToString().ToLowerInvariant(), type, _preflightToken); }
+            try { await _manifests.Validate(application.WingetId, candidate.Version, installer.Architecture.ToString().ToLowerInvariant(), type, ct); }
             catch (InvalidDataException) { return false; }
             return true;
-        }, _preflightToken);
+        }, ct);
+        ct.ThrowIfCancellationRequested();
         item.Application = item.Application with { PinnedVersion = selected.Version };
         item.ResolvedChannel = selected.Channel; item.ResolveLatest = false;
     }
-    public async Task<PackItemResult> Inspect(string id, string version)
+    public async Task<PackItemResult> Inspect(string id, string version, CancellationToken ct = default)
     {
-        if (version == "latest") version = (await Find(id)).DefaultInstallVersion.Version;
+        if (version == "latest") version = (await Find(id, ct: ct)).DefaultInstallVersion.Version;
         var item = new PackItemResult { Application = new("inspect", id, id, version) };
-        await Preflight(item, ""); return item;
+        await Preflight(item, "", ct); return item;
     }
-    public async Task<object> InspectInstalled(string id, string version)
+    public async Task<object> InspectInstalled(string id, string version, CancellationToken ct = default)
     {
-        var package = await Find(id);
+        var package = await Find(id, ct: ct);
         var installed = package.InstalledVersion;
         var native = _manager.GetInstallProgress(package, _manager.GetPackageCatalogByName("winget").Info);
         return new { wingetId = id, requestedVersion = version, installedVersion = installed?.Version,
@@ -209,13 +224,16 @@ internal sealed class WinGetEngine : IPackBackend
             versionComparison = installed?.CompareToVersion(version).ToString(),
             verified = Verified(package, version), nativeInstallActive = native?.Status == Windows.Foundation.AsyncStatus.Started };
     }
-    public async Task Install(PackItemResult item, string log, Action<string> progress, CancellationToken ct)
+    public Task Install(PackItemResult item, string log, Action<string> progress, CancellationToken ct)
+        => Measure(SetupPhase.Install, item.Application.Id, () => InstallCore(item, log, progress, ct), () => item.State.ToString());
+    private async Task InstallCore(PackItemResult item, string log, Action<string> progress, CancellationToken ct)
     {
-        var package = await Find(item.Application.WingetId);
+        var package = await Find(item.Application.WingetId, ct: ct);
         var beforeInstall = InstalledEvidence(package, item.Application.PinnedVersion);
         RecordEvidence(log, "before-install", item.Application, beforeInstall);
         if (beforeInstall.Disposition == PackInstalledDisposition.Verified) { item.InstalledVersion = beforeInstall.Version; item.State = PackItemState.AlreadyInstalled; item.Message = "Ya instalada y verificada."; return; }
         var options = Options(package, item.Application, log, item.ResolvedChannel);
+        ct.ThrowIfCancellationRequested();
         Windows.Foundation.IAsyncOperationWithProgress<InstallResult, InstallProgress> operation;
         try { operation = package.InstalledVersion == null ? _manager.InstallPackageAsync(package, options) : _manager.UpgradePackageAsync(package, options); }
         catch (System.Runtime.InteropServices.COMException ex)
@@ -242,11 +260,15 @@ internal sealed class WinGetEngine : IPackBackend
         if (ct.IsCancellationRequested || result.Status == InstallResultStatus.InternalError)
             throw new OperationCanceledException("El estado nativo no puede confirmarse. Se detiene la cola para verificarlo antes de reintentar.", ct);
         if (result.Status != InstallResultStatus.Ok) throw new InvalidOperationException($"WinGet {result.Status}; instalador {result.InstallerErrorCode}; {result.ExtendedErrorCode?.Message}");
+        await Measure(SetupPhase.Verification, item.Application.Id, () => Verify(item, log, ct), () => item.State.ToString());
+    }
+    private async Task Verify(PackItemResult item, string log, CancellationToken ct)
+    {
         try
         {
             for (int attempt = 0; attempt < 6; attempt++)
             {
-                var installed = await Find(item.Application.WingetId);
+                var installed = await Find(item.Application.WingetId, ct: ct);
                 var evidence = InstalledEvidence(installed, item.Application.PinnedVersion);
                 RecordEvidence(log, $"post-install-{attempt + 1}", item.Application, evidence);
                 if (evidence.Disposition == PackInstalledDisposition.Verified)
@@ -260,6 +282,8 @@ internal sealed class WinGetEngine : IPackBackend
         item.RequiresRebootBeforeRetry = true;
         item.Message = "WinGet terminó, pero la versión machine-wide aún no se puede verificar. Revisar o reanudar tras reiniciar.";
     }
+    private Task Measure(SetupPhase phase, string? app, Func<Task> action, Func<string>? outcome = null)
+        => _timings is null ? action() : _timings.Measure(phase, app, action, outcome);
     public async Task<WingetIndex> Export(string manifestRepository)
     {
         var catalog = await Connect(false);

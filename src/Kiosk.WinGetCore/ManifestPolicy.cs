@@ -1,16 +1,12 @@
 using System.IO;
-using System.Net;
-using System.Net.Http;
 using System.Text.RegularExpressions;
 using YamlDotNet.RepresentationModel;
-using KioskClinicaPC.Core.Sync;
 
 namespace Kiosk.SetupHelper;
 
 /// <summary>WinGet's API doesn't expose InstallModes. Validate the official manifest, not guessed EXE flags.</summary>
 internal static class ManifestPolicy
 {
-    private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(45) };
     public static string RelativeDirectory(string id, string version)
     {
         if (!Regex.IsMatch(id, "^[A-Za-z0-9][A-Za-z0-9._+-]{1,199}$") || version is "." or ".." || version.IndexOfAny(['/', '\\', '\r', '\n']) >= 0)
@@ -48,50 +44,6 @@ internal static class ManifestPolicy
         });
     }
     private static YamlNode? Node(YamlMappingNode map, string key) => map.Children.TryGetValue(new YamlScalarNode(key), out var value) ? value : null;
-    public static Task ValidateOnline(string id, string version, string architecture, string type, CancellationToken ct = default)
-        => ValidateOnline(id, version, architecture, type, Http, Task.Delay, ct);
-    internal static async Task ValidateOnline(string id, string version, string architecture, string type,
-        HttpClient http, Func<TimeSpan, CancellationToken, Task> delay, CancellationToken ct = default)
-    {
-        string directory = RelativeDirectory(id, version);
-        foreach (string name in new[] { id + ".installer.yaml", id + ".yaml" })
-        {
-            string url = "https://raw.githubusercontent.com/microsoft/winget-pkgs/master/" + string.Join('/', (directory + "/" + name).Split('/').Select(Uri.EscapeDataString));
-            for (int attempt = 0; ; attempt++)
-            {
-                try
-                {
-                    using var response = await http.GetAsync(url, ct);
-                    if (response.StatusCode == HttpStatusCode.NotFound) break;
-                    if (response.StatusCode is HttpStatusCode.RequestTimeout or HttpStatusCode.TooManyRequests || (int)response.StatusCode >= 500)
-                    {
-                        string reason = response.StatusCode == HttpStatusCode.TooManyRequests
-                            ? "GitHub ha limitado temporalmente la consulta del manifiesto oficial (HTTP 429). Reintenta esta aplicación más tarde."
-                            : $"El repositorio de manifiestos oficiales no está disponible temporalmente (HTTP {(int)response.StatusCode}). Reintenta esta aplicación más tarde.";
-                        if (attempt >= 2) throw new IOException(reason);
-                        var retry = response.Headers.RetryAfter;
-                        var wait = retry?.Delta ?? (retry?.Date is { } date ? date - DateTimeOffset.UtcNow : TimeSpan.FromSeconds(5 * (attempt + 1)));
-                        // Do not retry earlier than the server allows or stall the entire pack
-                        // for an extended rate-limit window. Other applications can continue.
-                        if (wait > TimeSpan.FromMinutes(1)) throw new IOException(reason);
-                        await delay(wait > TimeSpan.Zero ? wait : TimeSpan.Zero, ct);
-                        continue;
-                    }
-                    response.EnsureSuccessStatusCode();
-                    if (!SupportsSilentMachine(await response.Content.ReadAsStringAsync(ct), architecture, type))
-                        throw new InvalidDataException("El manifiesto oficial no declara instalación silenciosa machine-wide para el instalador aplicable.");
-                    return;
-                }
-                catch (HttpRequestException ex) when (attempt < 2 && (ex.StatusCode == null || ex.StatusCode is HttpStatusCode.RequestTimeout or HttpStatusCode.TooManyRequests || (int)ex.StatusCode >= 500)) { await delay(TimeSpan.FromSeconds(attempt + 1), ct); }
-                catch (OperationCanceledException) when (!ct.IsCancellationRequested)
-                {
-                    if (attempt >= 2) throw new IOException("El manifiesto oficial no respondió después de tres intentos.");
-                    await delay(TimeSpan.FromSeconds(attempt + 1), ct);
-                }
-            }
-        }
-        throw new CatalogDriftException("El manifiesto oficial de esta versión ya no está disponible.");
-    }
     public static bool ValidateLocal(string repository, string id, string version)
     {
         string directory = Path.Combine(repository, RelativeDirectory(id, version).Replace('/', Path.DirectorySeparatorChar));

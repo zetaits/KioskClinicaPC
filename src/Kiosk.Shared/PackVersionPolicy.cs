@@ -22,7 +22,9 @@ public static class PackVersionPolicy
         foreach (var candidate in Order(candidates, channel, compare))
         {
             ct.ThrowIfCancellationRequested();
-            if (await compatible(candidate)) return candidate;
+            bool applicable = await compatible(candidate);
+            ct.ThrowIfCancellationRequested();
+            if (applicable) return candidate;
         }
         throw new InvalidDataException("No hay una versión compatible con instalación silenciosa para todo el equipo.");
     }
@@ -35,13 +37,16 @@ public sealed class PackCatalogSession(Func<CancellationToken, Task> refresh)
     private Exception? _failure;
     public async Task Prepare(CancellationToken ct)
     {
+        ct.ThrowIfCancellationRequested();
         if (_prepared) return;
         _prepared = true;
         try { await refresh(ct); }
+        catch (OperationCanceledException ex) { _failure = ex; throw; }
         catch (Exception ex) when (ex is IOException or System.Runtime.InteropServices.COMException) { _failure = ex; }
     }
     public async Task Check(Func<Task> check, CancellationToken ct)
     {
+        ct.ThrowIfCancellationRequested();
         if (!_prepared) throw new InvalidOperationException("Actualiza el catálogo antes de resolver versiones.");
         if (_failure is not null) throw new IOException("No se pudo actualizar el origen WinGet. Reintenta con conexión al catálogo oficial.", _failure);
         try { await check(); }
@@ -49,7 +54,7 @@ public sealed class PackCatalogSession(Func<CancellationToken, Task> refresh)
         {
             _extraRefreshUsed = true;
             try { await refresh(ct); }
-            catch (Exception ex) when (ex is IOException or System.Runtime.InteropServices.COMException) { _failure = ex; throw; }
+            catch (Exception ex) when (ex is IOException or System.Runtime.InteropServices.COMException or OperationCanceledException) { _failure = ex; throw; }
             await check();
         }
     }

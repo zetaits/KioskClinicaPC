@@ -6,15 +6,16 @@
 - Inspect relevant code before editing; do not invent project structure or commands.
 - Never read or expose `.env` or `.env.*` unless the user explicitly requests it.
 - After changes, run the smallest relevant verification and report what could not run.
+- Documentation starts at `docs/README.md`. Update the relevant operational guide when behavior changes; keep version-specific plans and verification reports in `docs/historico/`, with their validation and publication status explicit. The QR application assets in `docs/` are published code; preserve their paths.
 
 ## Projects and build
 
-`KioskClinicaPC.sln` contains the WPF client (`src/Kiosk.Client`), ASP.NET Core server (`src/Kiosk.Server`), shared models (`src/Kiosk.Shared`), Windows installer agent and helpers (`src/Kiosk.InstallerAgent`, `src/Kiosk.InstallerCore`, `src/Kiosk.SetupHelper`, `src/Kiosk.UpdateRunner`, `src/Kiosk.MaintenanceRunner`), two test projects and `tools/Kiosk.ReleaseTool`. The client assembly remains `KioskClinicaPC.exe`.
+`KioskClinicaPC.sln` contains the WPF client (`src/Kiosk.Client`), ASP.NET Core server (`src/Kiosk.Server`), shared models (`src/Kiosk.Shared`), installer agent and helpers (`src/Kiosk.InstallerAgent`, `src/Kiosk.InstallerCore`, `src/Kiosk.SetupHelper`, `src/Kiosk.UpdateRunner`, `src/Kiosk.MaintenanceRunner`), equipment assistant and pack worker (`src/Kiosk.EquipmentSetup`, `src/Kiosk.EquipmentCore`, `src/Kiosk.WinGetCore`, `src/Kiosk.PackWorker`), network deployment (`src/Kiosk.DeploymentCore`, `src/Kiosk.DeploymentManager`, `src/Kiosk.DeploymentService`), three test projects (`tests/Kiosk.Tests`, `tests/Kiosk.Server.Tests`, `tests/Kiosk.EquipmentSetup.Tests`) and `tools/Kiosk.ReleaseTool`. The client assembly remains `KioskClinicaPC.exe`.
 
 Use the user-local .NET 10 SDK:
 
 ```powershell
-& "C:\Users\zits\.dotnet\dotnet.exe" build "C:\Users\zits\Documents\Proyectos\KioskClinicaPC\KioskClinicaPC.sln" -nologo -clp:ErrorsOnly
+& "C:\Users\zits\.dotnet\dotnet.exe" build "C:\Users\zits\Documents\Proyectos\KioskClinicaPC\KioskClinicaPC.sln" -m:1 --disable-build-servers -nologo -clp:ErrorsOnly
 ```
 
 `C:\Program Files\dotnet\dotnet.exe` has runtimes only; VS2022 MSBuild cannot resolve the SDK. `dotnet` is not on the Bash PATH. The working SDK is `C:\Users\zits\.dotnet\sdk\10.0.100` (`global.json` permits later .NET 10 feature bands). Client output: `src\Kiosk.Client\bin\Debug\net10.0-windows\KioskClinicaPC.exe`.
@@ -39,4 +40,5 @@ Use the user-local .NET 10 SDK:
 
 - WPF uses custom MVVM (`BaseViewModel`), Newtonsoft.Json and Serilog. `MainWindow.NavigateToScreen` swaps four screens; inline editing uses `Controls/Editable` and `Controls/InlineEdit`.
 - `RemoteConfigRepository` merges server-owned shop, slides, texts and images over local price, condition and hardware through `SharedContent.ApplyServerToLocal`. `SyncClient` handles SignalR attract timing and content reload; `FleetClient` passes only job IDs/tokens to the privileged installer agent.
-- `src/Kiosk.Server/Program.cs` wires the API, SignalR hubs and Blazor panel. Server stores are file-backed; remote packages are verified before execution. The QR page is served at `/ficha/`; GitHub Pages only redirects older printed QR codes. Details: `docs/SERVIDOR.md` and `docs/README.md`.
+- `src/Kiosk.Server/Program.cs` wires the API, SignalR hubs and Blazor panel. Server stores are file-backed; remote packages are verified before execution. `/aplicaciones` configures the WinGet pack; `/ordenadores/instalaciones` manages private fleet installers. Details: `docs/SERVIDOR.md` and `docs/PACK-WINGET.md`.
+- The QR page is served at `/ficha/`; GitHub Pages only redirects older printed QR codes. Implementation: `docs/FICHA-PDF.md`. All operational guides: `docs/README.md`.
