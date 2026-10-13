@@ -29,6 +29,38 @@ public sealed class WizardTests
         return done.Task;
     }
     [Fact]
+    public Task Concurrent_pack_progress_shows_download_install_and_verification_without_reordering_the_list() => Sta(async () =>
+    {
+        var completed = new TaskCompletionSource<EquipmentEvent>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var run = new PackRun { Items =
+        [
+            new() { Application = Catalog.Applications[0], State = PackItemState.Installing, Phase = PackItemPhase.Downloading, Message = "Descargando 5 / 10 MB" },
+            new() { Application = Catalog.Applications[1], State = PackItemState.Installing, Phase = PackItemPhase.Installing, Message = "Instalando…" },
+            new() { Application = new("third", "Vendor.Third", "Tercera", "1"), State = PackItemState.VerificationPending,
+                Phase = PackItemPhase.Verifying, NativeInstallSucceeded = true, Message = "Comprobando versión" }
+        ] };
+        var window = new MainWindow(_ => Task.FromResult(Catalog), (_, progress, _) =>
+        {
+            progress(new("applications", "Progreso", run.Copy())); return completed.Task;
+        }, () => Task.CompletedTask);
+        window.ShowStep(1); await window.LoadCatalog(); window.Confirm();
+        Task installing = window.Install();
+        Assert.Contains("1 descargando", window.StatusLabel.Text); Assert.Contains("1 instalando", window.StatusLabel.Text);
+        Assert.Contains("1 verificando", window.StatusLabel.Text); Assert.Contains("5 / 10 MB", window.Activity.Text);
+        Assert.True(window.Activity.Text.IndexOf("Aplicación del panel", StringComparison.Ordinal) < window.Activity.Text.IndexOf("Opcional", StringComparison.Ordinal));
+        foreach (var item in run.Items.Take(2)) { item.State = PackItemState.Succeeded; item.Phase = null; }
+        run.Items[2].Phase = null; run.Items[2].RequiresRebootBeforeRetry = true;
+        completed.SetResult(new("result", "Pendiente de verificación", run, ExitCode: 2)); await installing;
+        Assert.Contains("Verificación pendiente", window.ResultDetails.Text); Assert.False(window.LaunchCheck.IsChecked);
+        Assert.Equal("Preparación parcial", window.ResultTitle.Text);
+        Assert.Equal("INCOMPLETO", window.ResultStateBadge.Text);
+        Assert.Equal("2", window.ResultVerifiedCount.Text);
+        Assert.Equal("1", window.ResultPendingCount.Text);
+        Assert.Equal("0", window.ResultFailedCount.Text);
+        Assert.Equal("Tercera", Assert.IsType<List<MainWindow.ResultApplicationRow>>(window.ResultApplications.ItemsSource)[0].Name);
+        window.Close();
+    });
+    [Fact]
     public Task Loading_is_immediate_and_async_selection_is_sent_with_pinned_versions() => Sta(async () =>
     {
         var loaded = new TaskCompletionSource<PackCatalog>(); EquipmentRequest? sent = null; int registration = 0;
@@ -47,6 +79,30 @@ public sealed class WizardTests
         window.Confirm(); await window.Install();
         Assert.NotNull(sent); Assert.Equal(7, sent.CatalogRevision); Assert.Equal(new EquipmentSelection(new string('b', 32), "2.0"), Assert.Single(sent.Applications));
         Assert.Equal("Preparación completa", window.ResultTitle.Text); Assert.Equal(0, registration);
+        Assert.Equal("COMPLETADO", window.ResultStateBadge.Text);
+        Assert.Equal(Visibility.Collapsed, window.ResultStats.Visibility);
+        window.Close();
+    });
+    [Fact]
+    public Task Completed_pack_shows_verified_count_without_repeating_the_status() => Sta(async () =>
+    {
+        var run = new PackRun { Items = [new()
+        {
+            Application = Catalog.Applications[0], State = PackItemState.Succeeded,
+            InstalledVersion = "3.2", Message = "Instalada y verificada."
+        }] };
+        var window = new MainWindow(_ => Task.FromResult(Catalog), (_, _, _) =>
+            Task.FromResult(new EquipmentEvent("result", "Todas las aplicaciones instaladas y verificadas.", run, ExitCode: 0)),
+            () => Task.CompletedTask);
+        window.ShowStep(1); await window.LoadCatalog(); window.Confirm(); await window.Install();
+        Assert.Equal("COMPLETADO", window.ResultStateBadge.Text);
+        Assert.Equal("1", window.ResultVerifiedCount.Text);
+        Assert.Equal("0", window.ResultPendingCount.Text);
+        Assert.Equal("0", window.ResultFailedCount.Text);
+        var row = Assert.Single(Assert.IsType<List<MainWindow.ResultApplicationRow>>(window.ResultApplications.ItemsSource));
+        Assert.Equal("Verificada", row.Status);
+        Assert.Equal("Versión 3.2", row.Detail);
+        Assert.DoesNotContain("Instalada y verificada: Instalada", window.ResultDetails.Text);
         window.Close();
     });
     [Fact]
@@ -63,6 +119,8 @@ public sealed class WizardTests
         Assert.NotNull(sent); Assert.True(sent.ResolveLatest); Assert.True(sent.AllowPartialPack);
         Assert.Empty(Assert.Single(sent.Applications).Version);
         Assert.Contains("3.2", window.ResultDetails.Text); Assert.Contains("No disponible", window.ResultDetails.Text);
+        Assert.Equal("ERROR", window.ResultStateBadge.Text);
+        Assert.Equal("1", window.ResultFailedCount.Text);
         window.Close();
     });
     [Fact]
@@ -92,7 +150,7 @@ public sealed class WizardTests
         Task install = window.Install(); window.Close();
         Assert.True(token.IsCancellationRequested); Assert.False(install.IsCompleted);
         finished.SetResult(new("result", "Cancelado", ExitCode: 2)); await install;
-        Assert.Equal("Preparación parcial", window.ResultTitle.Text); window.Close();
+        Assert.Equal("Preparación detenida", window.ResultTitle.Text); window.Close();
     });
     [Fact]
     public Task Changed_catalogue_returns_to_review_without_registering_autostart() => Sta(async () =>
@@ -163,8 +221,31 @@ public sealed class WizardTests
         window.ShowStep(1); await window.LoadCatalog(); window.Confirm(); await window.Install();
         Assert.Equal(Visibility.Collapsed, window.LaunchCheck.Visibility);
         Assert.False(window.LaunchCheck.IsChecked);
+        if (exitCode == 0 && reboot) Assert.Equal("REINICIO PENDIENTE", window.ResultStateBadge.Text);
         window.LaunchCheck.IsChecked = true; window.Finish();
         Assert.Equal(0, launches);
+    });
+    [Fact]
+    public Task Verified_pack_with_pending_windows_reboot_shows_notice_without_application_failures() => Sta(async () =>
+    {
+        var run = new PackRun { Items = [new()
+        {
+            Application = Catalog.Applications[0], State = PackItemState.AlreadyInstalled,
+            InstalledVersion = "3.2", RebootRequired = true
+        }] };
+        var window = new MainWindow(_ => Task.FromResult(Catalog), (_, progress, _) =>
+        {
+            progress(new("applications", "Verificadas", run));
+            return Task.FromResult(new EquipmentEvent("result", run.Summary, run, ExitCode: 0, RebootRequired: run.RebootRequired));
+        }, () => Task.CompletedTask);
+        window.ShowStep(1); await window.LoadCatalog(); window.Confirm(); await window.Install();
+        Assert.Equal("Reinicio pendiente", window.ResultTitle.Text);
+        Assert.Contains("reiniciar manualmente", window.ResultLabel.Text);
+        Assert.Equal("1", window.ResultVerifiedCount.Text);
+        Assert.Equal("0", window.ResultPendingCount.Text);
+        Assert.Equal("0", window.ResultFailedCount.Text);
+        Assert.Equal(Visibility.Collapsed, window.LaunchCheck.Visibility);
+        window.Close();
     });
     [Fact]
     public Task Cancelled_run_does_not_offer_launch_even_if_the_worker_returns_success() => Sta(async () =>
@@ -211,8 +292,9 @@ public sealed class WizardTests
         var rows = Assert.IsType<List<MainWindow.ApplicationRow>>(window.ApplicationsList.ItemsSource); rows[1].Selected = true;
         window.Confirm(); window.PartialPackCheck.IsChecked = false; await window.Install();
         Assert.Equal(Visibility.Visible, window.InstallAvailableButton.Visibility);
+        Assert.Equal("Preparación detenida", window.ResultTitle.Text);
         await window.ContinueAvailable();
-        Assert.Equal(2, attempts); Assert.Equal("Preparación parcial", window.ResultTitle.Text);
+        Assert.Equal(2, attempts); Assert.Equal("Preparación pendiente", window.ResultTitle.Text);
         Assert.Contains("Versión no disponible", window.ResultDetails.Text);
         Assert.Equal(Visibility.Collapsed, window.InstallAvailableButton.Visibility); window.Close();
     });

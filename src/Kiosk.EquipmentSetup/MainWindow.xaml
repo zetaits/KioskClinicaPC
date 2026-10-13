@@ -95,11 +95,55 @@
                         </Grid>
                         <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Visibility="{Binding Visibility, ElementName=ResultPanel}">
                             <StackPanel x:Name="ResultPanel" Visibility="Collapsed">
-                                <TextBlock x:Name="ResultTitle" FontSize="22" FontWeight="Bold"/>
-                                <TextBlock x:Name="ResultLabel" Margin="0,16,0,12"/>
-                                <TextBox x:Name="ResultDetails" MaxHeight="150" IsReadOnly="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" FontSize="13"/>
+                                <Border x:Name="ResultBanner" Background="{StaticResource SuccessSurfaceBrush}" BorderBrush="{StaticResource SuccessBrush}" BorderThickness="1" CornerRadius="10" Padding="16">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="52"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                        <Border x:Name="ResultIconBorder" Width="40" Height="40" CornerRadius="20" Background="{StaticResource SuccessBrush}" VerticalAlignment="Top" HorizontalAlignment="Left">
+                                            <TextBlock x:Name="ResultIcon" Text="✓" Foreground="{StaticResource PageBrush}" FontSize="24" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </Border>
+                                        <StackPanel Grid.Column="1">
+                                            <TextBlock x:Name="ResultStateBadge" Text="COMPLETADO" Foreground="{StaticResource SuccessBrush}" FontSize="11" FontWeight="Bold"/>
+                                            <TextBlock x:Name="ResultTitle" FontSize="22" FontWeight="Bold" Margin="0,4,0,4"/>
+                                            <TextBlock x:Name="ResultLabel" Foreground="{StaticResource TextBrush}" FontSize="13"/>
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                                <Grid x:Name="ResultStats" Margin="0,14,0,0" Visibility="Collapsed">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                    <Border Grid.Column="0" Background="{StaticResource InsetBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,7,0">
+                                        <StackPanel><TextBlock x:Name="ResultVerifiedCount" Foreground="{StaticResource SuccessBrush}" FontSize="24" FontWeight="Bold"/><TextBlock Text="Verificadas" Foreground="{StaticResource MutedBrush}" FontSize="12"/></StackPanel>
+                                    </Border>
+                                    <Border Grid.Column="1" Background="{StaticResource InsetBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="3,0,3,0">
+                                        <StackPanel><TextBlock x:Name="ResultPendingCount" Foreground="{StaticResource WarningBrush}" FontSize="24" FontWeight="Bold"/><TextBlock Text="Pendientes" Foreground="{StaticResource MutedBrush}" FontSize="12"/></StackPanel>
+                                    </Border>
+                                    <Border Grid.Column="2" Background="{StaticResource InsetBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="7,0,0,0">
+                                        <StackPanel><TextBlock x:Name="ResultFailedCount" Foreground="{StaticResource ErrorBrush}" FontSize="24" FontWeight="Bold"/><TextBlock Text="Con error" Foreground="{StaticResource MutedBrush}" FontSize="12"/></StackPanel>
+                                    </Border>
+                                </Grid>
+                                <StackPanel x:Name="ResultApplicationsPanel" Margin="0,20,0,0" Visibility="Collapsed">
+                                    <TextBlock Text="Estado de las aplicaciones" FontWeight="Bold" FontSize="15" Margin="0,0,0,10"/>
+                                    <ItemsControl x:Name="ResultApplications">
+                                        <ItemsControl.ItemTemplate><DataTemplate>
+                                            <Border Background="{StaticResource InsetBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,7">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                                    <StackPanel Margin="0,0,12,0">
+                                                        <TextBlock Text="{Binding Name}" FontWeight="Bold" FontSize="13"/>
+                                                        <TextBlock Text="{Binding Detail}" Foreground="{StaticResource MutedBrush}" FontSize="12" Margin="0,3,0,0"/>
+                                                    </StackPanel>
+                                                    <Border Grid.Column="1" Background="{Binding Surface}" BorderBrush="{Binding Tone}" BorderThickness="1" CornerRadius="6" Padding="8,4" VerticalAlignment="Top">
+                                                        <TextBlock Text="{Binding Status}" Foreground="{Binding Tone}" FontWeight="Bold" FontSize="11"/>
+                                                    </Border>
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate></ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
                                 <Button x:Name="InstallAvailableButton" Content="Instalar aplicaciones disponibles" Click="InstallAvailable" Visibility="Collapsed" HorizontalAlignment="Left" Margin="0,12,0,0"/>
-                                <TextBlock Text="Diagnósticos: %ProgramData%\ClinicaPC\Setup\logs. Los reinicios son siempre manuales." Foreground="{StaticResource MutedBrush}" FontSize="13" Margin="0,12,0,8"/>
+                                <Expander x:Name="ResultDetailsExpander" Header="Ver detalles completos" Foreground="{StaticResource MutedBrush}" Visibility="Collapsed" Margin="0,12,0,0">
+                                    <TextBox x:Name="ResultDetails" MaxHeight="150" IsReadOnly="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" FontSize="13" Margin="0,8,0,0"/>
+                                </Expander>
+                                <TextBlock Text="Diagnósticos: %ProgramData%\ClinicaPC\Setup\logs. Los reinicios son siempre manuales." Foreground="{StaticResource MutedBrush}" FontSize="12" Margin="0,16,0,8"/>
                                 <CheckBox x:Name="LaunchCheck" IsChecked="False" Visibility="Collapsed" Checked="LaunchChanged" Unchecked="LaunchChanged"><TextBlock Text="Abrir Kiosk al finalizar"/></CheckBox>
                             </StackPanel>
                         </ScrollViewer>

@@ -38,19 +38,12 @@ internal sealed class ProgressWindow : Window
         {
             ExitCode = await Task.Run(() => Program.Execute(_request, _output, run => Dispatcher.InvokeAsync(() =>
             {
-                _run = run; _details.Text = string.Join("\n\n", run.Items.Select(x => $"{x.Application.DisplayName} ({x.Application.PinnedVersion}) · {StateLabel(x.State)}\n{x.Message}"));
-                _status.Text = run.Items.Any(x => x.State is PackItemState.Installing or PackItemState.Checking) ? "Instalación en curso. Puedes dejar el equipo trabajando." : run.Summary;
+                _run = run; _details.Text = string.Join("\n\n", run.Items.Select(x => $"{x.Application.DisplayName} ({x.Application.PinnedVersion}) · {x.ActivityDescription()}"));
+                _status.Text = run.Items.Any(x => x.Phase is not null || x.State is PackItemState.Installing or PackItemState.Checking) ? run.ActivitySummary() : run.Summary;
             }), false, _cancellation.Token, resume));
             _status.Text = _run?.Summary ?? "No se recibió un resultado.";
         }
         catch (Exception ex) { _status.Text = "ERROR: " + ex.Message; Ini.Write(_output, new() { ["Result"] = new() { ["Ok"] = "0", ["Error"] = ex.Message } }); }
         finally { _running = false; _cancel.IsEnabled = true; _cancel.Content = "Cerrar"; _retry.IsEnabled = _run != null && !_run.Complete && !_run.Items.Any(x => x.RequiresRebootBeforeRetry || x.State == PackItemState.VerificationPending); }
     }
-    private static string StateLabel(PackItemState state) => state switch
-    {
-        PackItemState.Pending => "Pendiente", PackItemState.Checking => "Comprobando",
-        PackItemState.Installing => "Instalando", PackItemState.Succeeded => "Instalada y verificada",
-        PackItemState.AlreadyInstalled => "Ya instalada", PackItemState.Failed => "Error",
-        _ => "Verificación pendiente"
-    };
 }

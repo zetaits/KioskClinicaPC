@@ -106,10 +106,11 @@ builder.Services.AddSingleton(new InstallerCatalog(dataDir, installersDir, maxIn
 builder.Services.AddSingleton(new InstallationJobStore(dataDir));
 builder.Services.AddSingleton(new InitialSetupSessionStore(dataDir));
 builder.Services.AddSingleton(new InitialSetupBundleStore(setupDir));
-builder.Services.AddSingleton(new SetupReleaseStore(setupDir));
+builder.Services.AddSingleton(sp => new SetupReleaseStore(setupDir, sp.GetRequiredService<ILogger<SetupReleaseStore>>()));
 builder.Services.AddSingleton(new PackCatalogStore(dataDir));
 builder.Services.AddSingleton(new DeploymentStore(dataDir));
-builder.Services.AddSingleton(new DeploymentReleaseStore(setupDir));
+builder.Services.AddSingleton(sp => new DeploymentReleaseStore(setupDir, sp.GetRequiredService<ILogger<DeploymentReleaseStore>>()));
+builder.Services.AddScoped<IInstallerPageQuery, InstallerPageQuery>();
 builder.Services.AddSingleton(new MaintenanceJobStore(dataDir));
 builder.Services.AddSingleton(new KioskUpdateStore(dataDir, updatesDir, maxInstallerBytes, storeTz,
     updateTokenKey, updateSigningKeys));

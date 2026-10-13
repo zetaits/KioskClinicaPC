@@ -18,21 +18,25 @@ public sealed class PackExecutionTests
             item.State = item.Application.Id == Already ? PackItemState.AlreadyInstalled : PackItemState.Pending;
             return Task.CompletedTask;
         }
-        public Task Install(PackItemResult item, string log, Action<string> progress, CancellationToken ct)
+        public Task<PackNativeResult> ExecuteNative(PackItemResult item, string log, Action<PackProgress> progress, CancellationToken ct)
         {
             Calls.Add("install" + item.Application.Id);
             if (item.Application.Id == Cancel) throw new OperationCanceledException();
-            if (item.Application.Id == Fail) throw new InvalidOperationException("Instalador fallido");
-            if (item.Application.Id == Unverified) { item.State = PackItemState.VerificationPending; item.RequiresRebootBeforeRetry = true; return Task.CompletedTask; }
-            item.State = PackItemState.Succeeded; return Task.CompletedTask;
+            return Task.FromResult(item.Application.Id == Fail
+                ? new PackNativeResult(PackNativeDisposition.Failed, "Instalador fallido")
+                : new PackNativeResult(PackNativeDisposition.Succeeded, "WinGet terminó"));
         }
+        public Task<PackVerificationResult> Verify(PackItemResult item, string log, CancellationToken ct)
+            => Task.FromResult(new PackVerificationResult(item.Application.Id != Unverified, "Verificación", "1"));
     }
     [Fact]
-    public async Task Native_success_without_verification_stops_the_remaining_queue()
+    public async Task Native_success_without_verification_continues_the_remaining_queue_but_stays_incomplete()
     {
         var backend = new Backend { Unverified = "1" }; var run = Run();
         Assert.False(await PackExecution.Run(run, backend, ".", null, _ => { }, false, CancellationToken.None));
-        Assert.Equal(PackItemState.VerificationPending, run.Items[1].State); Assert.DoesNotContain("install2", backend.Calls);
+        Assert.Equal(PackItemState.VerificationPending, run.Items[1].State); Assert.Contains("install2", backend.Calls);
+        Assert.True(run.Items[1].NativeInstallSucceeded); Assert.True(run.Items[1].RequiresRebootBeforeRetry);
+        Assert.Equal(PackItemState.Succeeded, run.Items[2].State);
     }
     [Fact]
     public async Task Whole_selection_is_checked_before_any_install()
@@ -55,7 +59,8 @@ public sealed class PackExecutionTests
         Assert.False(await PackExecution.Run(run, backend, ".", null, value => saved = value, false, CancellationToken.None,
             () => { gates++; Assert.Equal(new[] { "check0", "check1", "check2" }, backend.Calls); return Task.FromResult(true); }, allowPartial: true));
         Assert.Equal(new[] { "check0", "check1", "check2", "install0", "install2" }, backend.Calls);
-        Assert.Equal(1, gates); Assert.Same(run, saved); Assert.False(run.Complete);
+        Assert.Equal(1, gates); Assert.NotSame(run, saved); Assert.False(run.Complete);
+        Assert.Equal(System.Text.Json.JsonSerializer.Serialize(run), System.Text.Json.JsonSerializer.Serialize(saved));
         Assert.Equal(PackItemState.Failed, run.Items[1].State); Assert.Equal("No compatible", run.Items[1].Message);
         Assert.Equal(PackItemState.Succeeded, run.Items[0].State); Assert.Equal(PackItemState.Succeeded, run.Items[2].State);
     }
@@ -154,10 +159,12 @@ public sealed class PackExecutionTests
     {
         public List<string> Installed { get; } = [];
         public Task Preflight(PackItemResult item, string log, CancellationToken ct) => check(item, ct);
-        public Task Install(PackItemResult item, string log, Action<string> progress, CancellationToken ct)
+        public Task<PackNativeResult> ExecuteNative(PackItemResult item, string log, Action<PackProgress> progress, CancellationToken ct)
         {
-            Installed.Add(item.Application.Id); item.State = PackItemState.Succeeded; return Task.CompletedTask;
+            Installed.Add(item.Application.Id); return Task.FromResult(new PackNativeResult(PackNativeDisposition.Succeeded, "WinGet terminó"));
         }
+        public Task<PackVerificationResult> Verify(PackItemResult item, string log, CancellationToken ct)
+            => Task.FromResult(new PackVerificationResult(true, "Verificada", "1"));
     }
 
     [Theory]

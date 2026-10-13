@@ -6,6 +6,9 @@ Para operar el sistema, usar el [índice de guías actuales](../README.md).
 
 | Documento | Alcance |
 | --- | --- |
+| [Preparación 1.5.11](VERIFICACION-ASISTENTE-1.5.11.md) | Aviso de reinicio corregido, auditoría real de solo lectura y 621 pruebas Release superadas. Online/Completo locales validados con configuración ficticia; publicación de producción pendiente. |
+| [Cola concurrente del pack](VERIFICACION-COLA-PACK-2026-10-13.md) | Pruebas, build y EXE local 1.5.10: cinco instalaciones y seis verificaciones correctas en unos 2 min 32 s tras reiniciar. Solapamiento real confirmado; aviso omitido corregido después en 1.5.11. Benchmark y publicación pendientes. |
+| [Carga de Instalador](VERIFICACION-CARGA-INSTALADOR-2026-10-13.md) | Catálogo ligero, streaming, historial diferido y pruebas locales del 13 de octubre de 2026. Publicación y revisión visual pendientes. |
 | [Verificación 1.5.9](VERIFICACION-ASISTENTE-1.5.9.md) | Optimización de preparación, cancelación, pruebas y builds locales ficticios del 12 de octubre de 2026. Instalación completa en VM pendiente. |
 | [Verificación 1.5.8](VERIFICACION-ASISTENTE-1.5.8.md) | Corrección de ámbito COM y diagnóstico real de solo lectura. |
 | [Notas del asistente](NOTAS-ASISTENTE.md) | Cambios de versiones que antes estaban intercalados en la guía de uso. |

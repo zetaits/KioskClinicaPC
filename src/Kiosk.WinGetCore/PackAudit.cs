@@ -10,8 +10,10 @@ internal static class PackAudit
     private sealed class ReadOnlyBackend(WinGetEngine engine) : IPackBackend
     {
         public Task Preflight(PackItemResult item, string log, CancellationToken ct) => engine.Preflight(item, "", ct);
-        public Task Install(PackItemResult item, string log, Action<string> progress, CancellationToken ct)
+        public Task<PackNativeResult> ExecuteNative(PackItemResult item, string log, Action<PackProgress> progress, CancellationToken ct)
             => throw new InvalidOperationException("El diagnóstico no permite instalar aplicaciones.");
+        public Task<PackVerificationResult> Verify(PackItemResult item, string log, CancellationToken ct)
+            => throw new InvalidOperationException("El diagnóstico solo permite la comprobación previa.");
     }
 
     public static async Task<object> LastRun(CancellationToken ct)

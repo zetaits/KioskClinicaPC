@@ -52,12 +52,14 @@ internal static class EquipmentWorker
                 await engine.PrepareLatest(cancel.Token);
             }
             bool ready = false;
-            bool complete = await PackExecution.Run(run, engine, logs,
+            bool complete = await timings.Measure(SetupPhase.PackTotal, null, () => PackExecution.Run(run, engine, logs,
                 changed => Emit(new("applications", "Estado de las aplicaciones", changed)), PackState.Save, false, cancel.Token,
                 async () => { ready = true; Emit(new("preflight-ready", run.Items.Any(x => x.State == PackItemState.Failed)
-                    ? "Se instalarÃ¡n las aplicaciones disponibles. Las que fallaron quedan pendientes." : "Todas las aplicaciones comprobadas.", run)); return await proceed.Task; }, start.AllowPartial);
+                    ? "Se instalarÃ¡n las aplicaciones disponibles. Las que fallaron quedan pendientes." : "Todas las aplicaciones comprobadas.", run.Copy())); return await proceed.Task; }, start.AllowPartial,
+                executionTiming: duration => timings.Record(SetupPhase.PackExecution, null, DateTime.UtcNow - duration, duration,
+                    run.Complete ? "Verified" : "Incomplete")), () => run.Complete ? "Verified" : "Incomplete");
             if (!ready) Emit(new("preflight-failed", "Hay aplicaciones que no superan la comprobaciÃ³n previa.", run));
-            Emit(new("result", run.Summary, run, complete ? 0 : 2, RebootRequired: run.RebootRequired));
+            Emit(new("result", run.Summary, run.Copy(), complete ? 0 : 2, RebootRequired: run.RebootRequired));
             return complete ? 0 : 2;
         }
         catch (Exception ex)

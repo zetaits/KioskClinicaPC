@@ -19,6 +19,7 @@ public static class PackResumePolicy
                 ResolveLatest = snapshot.Definition is not null && !keepVerified,
                 ResolvedChannel = keepVerified ? old!.ResolvedChannel : null,
                 InstalledVersion = keepVerified ? old!.InstalledVersion : null,
+                NativeInstallSucceeded = old?.NativeInstallSucceeded == true,
                 State = keepVerified ? old!.State : resume && sameVersion ? old!.State : PackItemState.Pending,
                 RequiresRebootBeforeRetry = old != null && Uncertain(old) && SameBoot(old),
                 RebootRequired = old != null && SameBoot(old) && old.RebootRequired,

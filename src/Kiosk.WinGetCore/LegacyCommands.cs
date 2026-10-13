@@ -179,8 +179,10 @@ internal static class LegacyCommands
         }
         string logs = Path.Combine(StateRoot, "logs", run.StartedAtUtc.ToString("yyyyMMdd-HHmmss") + "-" + DateTime.UtcNow.ToString("HHmmss-fff")); Directory.CreateDirectory(logs);
         var timings = new SetupTimingLog(Path.Combine(logs, "timings.jsonl"));
-        var engine = await Bootstrap.CreateEngine(message => { foreach (var item in run.Items) item.Message = message; changed?.Invoke(run); }, ct, timings);
-        bool ok = await PackExecution.Run(run, engine, logs, changed, Save, preflight, ct);
+        var engine = await Bootstrap.CreateEngine(message => { foreach (var item in run.Items) item.Message = message; changed?.Invoke(run.Copy()); }, ct, timings);
+        bool ok = await timings.Measure(SetupPhase.PackTotal, null, () => PackExecution.Run(run, engine, logs, changed, Save, preflight, ct,
+            executionTiming: duration => timings.Record(SetupPhase.PackExecution, null, DateTime.UtcNow - duration, duration,
+                run.Complete ? "Verified" : "Incomplete")), () => run.Complete ? "Verified" : "Incomplete");
         Ini.Write(output, new() { ["Result"] = new() { ["Ok"] = ok ? "1" : "0", ["RebootRequired"] = run.RebootRequired ? "1" : "0",
             ["Summary"] = (preflight ? (!ok ? "Comprobación previa fallida; desmarca las aplicaciones indicadas y vuelve a comprobar." : "Comprobación previa correcta.") : run.Summary) + "\n" + string.Join("\n", run.Items.Select(x => $"{x.Application.DisplayName}: {x.Message}")) } });
         return ok ? 0 : 2;

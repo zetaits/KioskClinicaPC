@@ -1,0 +1,45 @@
+<details class="card setup-history">
+    <summary @onclick="EnsureLoadedAsync">Otras versiones y recuperación
+        @if (State.Status == InstallerSectionStatus.Ready && State.Data is { } loaded)
+        { <span class="muted">@loaded.Releases.Length disponibles</span> }
+    </summary>
+    <div aria-busy="@(State.Status == InstallerSectionStatus.Loading ? "true" : "false")">
+        <p class="muted">Descarga una edición anterior o restáurala como versión activa si necesitas recuperar una instalación.</p>
+        @if (State.Status == InstallerSectionStatus.Loading)
+        {
+            <div class="setup-history-release" aria-hidden="true">
+                <span class="installer-skeleton installer-skeleton-version"></span>
+                <span class="installer-skeleton installer-skeleton-button"></span>
+            </div>
+            <p class="installer-visually-hidden" role="status">Cargando otras versiones…</p>
+        }
+        else if (State.Status == InstallerSectionStatus.Error)
+        {
+            <div class="alert" role="status"><p>@State.Message</p><button class="btn" type="button" @onclick="RetryAsync">Reintentar</button></div>
+        }
+        else if (State.Status == InstallerSectionStatus.Empty)
+        { <p class="muted" role="status">No hay otras versiones disponibles.</p> }
+        else if (State.Data is { } data)
+        {
+            @foreach (var release in data.Releases)
+            {
+                <div class="setup-history-release" @key="release.Version">
+                    <div class="setup-release-heading"><strong>Versión @release.Version</strong><span class="badge @(release.Version == ActiveVersion ? "accent" : "")">@(release.Version == ActiveVersion ? "Activa" : "Disponible")</span></div>
+                    <div class="setup-history-actions">
+                        @foreach (var edition in release.Editions)
+                        {
+                            <a class="btn button-link" href="@($"/panel/setup/download?version={release.Version}&edition={edition.Edition}")">@(edition.Edition == "online" ? "Online" : "Completo para USB") · @Size(edition.SizeBytes)</a>
+                        }
+                        @if (release.Version != ActiveVersion)
+                        {
+                            <form method="post" action="/panel/setup/activate">
+                                <AntiforgeryToken /><input type="hidden" name="version" value="@release.Version" />
+                                <button class="btn" type="submit">Restaurar @release.Version</button>
+                            </form>
+                        }
+                    </div>
+                </div>
+            }
+        }
+    </div>
+</details>

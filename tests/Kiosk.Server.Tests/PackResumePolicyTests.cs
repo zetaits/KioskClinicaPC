@@ -6,6 +6,25 @@ public sealed class PackResumePolicyTests
 {
     private static PackApplication App => new(new string('a', 32), "Vendor.App", "App", "2");
     [Fact]
+    public void Old_json_remains_conservative_and_new_verification_activity_retains_its_guard()
+    {
+        var previous = new PackRun { Items = [new() { Application = App, State = PackItemState.Installing }] };
+        var json = System.Text.Json.Nodes.JsonNode.Parse(System.Text.Json.JsonSerializer.Serialize(previous))!;
+        json["Items"]![0]!.AsObject().Remove("Phase");
+        json["Items"]![0]!.AsObject().Remove("NativeInstallSucceeded");
+        var old = System.Text.Json.JsonSerializer.Deserialize<PackRun>(json.ToJsonString())!;
+        Assert.Null(old.Items[0].Phase); Assert.False(old.Items[0].NativeInstallSucceeded);
+        Assert.True(PackResumePolicy.Create(new(7, [App]), old, true).Items[0].RequiresRebootBeforeRetry);
+
+        previous.Items[0].State = PackItemState.VerificationPending;
+        previous.Items[0].Phase = PackItemPhase.Verifying; previous.Items[0].NativeInstallSucceeded = true;
+        var restored = System.Text.Json.JsonSerializer.Deserialize<PackRun>(System.Text.Json.JsonSerializer.Serialize(previous))!;
+        var resumed = PackResumePolicy.Create(new(7, [App]), restored, true);
+        Assert.True(resumed.Items[0].RequiresRebootBeforeRetry); Assert.True(resumed.Items[0].NativeInstallSucceeded);
+        Assert.Null(resumed.Items[0].Phase); Assert.False(resumed.Complete);
+    }
+
+    [Fact]
     public void Latest_resume_keeps_verified_concrete_version_and_resolves_only_pending_items_again()
     {
         var other = App with { Id = new string('b', 32), WingetId = "Vendor.Other" };

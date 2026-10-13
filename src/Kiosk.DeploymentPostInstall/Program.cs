@@ -52,13 +52,14 @@ internal static class Program
             {
                 if (value.Kind is not ("phase" or "extract" or "preflight-ready" or "preflight-failed" or "applications")) return;
                 string phase = value.Message;
-                var activeApp = value.Run?.Items.FirstOrDefault(i => i.State is KioskClinicaPC.Core.Sync.PackItemState.Checking or KioskClinicaPC.Core.Sync.PackItemState.Installing);
-                if (activeApp is not null) phase = activeApp.Application.DisplayName + ": " + activeApp.Message;
+                var activeApp = value.Run?.Items.FirstOrDefault(i => i.Phase is KioskClinicaPC.Core.Sync.PackItemPhase.Installing or KioskClinicaPC.Core.Sync.PackItemPhase.PostInstall)
+                    ?? value.Run?.Items.FirstOrDefault(i => i.Phase is not null || i.State is KioskClinicaPC.Core.Sync.PackItemState.Checking or KioskClinicaPC.Core.Sync.PackItemState.Installing);
+                if (activeApp is not null) phase = value.Run!.ActivitySummary() + " · " + activeApp.Application.DisplayName + ": " + activeApp.Message;
                 KioskClinicaPC.Core.Sync.PackRun? applications = null;
                 if (value.Run is { } run)
                 {
                     var signature = JsonSerializer.Serialize(run.Items.Select(i => new { i.Application.Id,
-                        i.Application.PinnedVersion, i.State, i.InstalledVersion, i.RequiresRebootBeforeRetry, i.RebootRequired,
+                        i.Application.PinnedVersion, i.State, i.Phase, i.NativeInstallSucceeded, i.InstalledVersion, i.RequiresRebootBeforeRetry, i.RebootRequired,
                         Error = i.State is KioskClinicaPC.Core.Sync.PackItemState.Failed or KioskClinicaPC.Core.Sync.PackItemState.VerificationPending ? i.Message : null }));
                     // Retain state/version changes offline without duplicating the full pack for every download tick.
                     if (signature != lastApplications) { applications = run; lastApplications = signature; }

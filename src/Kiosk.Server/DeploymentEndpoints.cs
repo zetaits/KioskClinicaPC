@@ -46,7 +46,9 @@ public static class DeploymentEndpoints
         app.MapGet("/panel/deployment/download", (HttpContext ctx, DeploymentReleaseStore releases) =>
         {
             ctx.Response.Headers.CacheControl = "no-store";
-            var release = releases.Latest();
+            string? version = ctx.Request.Query["version"].FirstOrDefault();
+            if (version is not null && !Version.TryParse(version, out _)) return Results.BadRequest();
+            var release = version is null ? releases.Latest() : releases.Find(version);
             if (release is null) return Results.NotFound(new { error = "No hay una versión de instalación por red publicada y validada." });
             if (Guid.TryParseExact(ctx.Request.Query["downloadId"], "N", out var id))
                 ctx.Response.Cookies.Append("kioskDeploymentDownload", id.ToString("N"), new CookieOptions

@@ -110,6 +110,27 @@ public sealed class DeploymentIntegrationTests : IDisposable
         Assert.Contains("data-download-cookie=\"kioskDeploymentDownload\"", installer);
     }
     [Fact]
+    public async Task Versioned_download_never_substitutes_newer_or_older_publications_and_keeps_legacy_latest()
+    {
+        using var panel = Client(true);
+        var releases = _factory.Services.GetRequiredService<DeploymentReleaseStore>();
+        byte[] firstBytes = [1, 2, 3, 4], secondBytes = [5, 6, 7, 8];
+        var first = InstallerMetadataTests.DeploymentBundle("0.1.0", firstBytes);
+        var second = InstallerMetadataTests.DeploymentBundle("0.2.0", secondBytes);
+        await releases.Import(first, new MemoryStream(firstBytes), default);
+        await releases.Import(second, new MemoryStream(secondBytes), default);
+        Assert.Equal(firstBytes, await panel.GetByteArrayAsync("/panel/deployment/download?version=0.1.0"));
+        Assert.Equal(secondBytes, await panel.GetByteArrayAsync("/panel/deployment/download"));
+        File.WriteAllBytes(Path.Combine(_root, "setups", "deployment", second.FileName), [8, 7, 6, 5]);
+        Assert.Equal(HttpStatusCode.NotFound, (await panel.GetAsync("/panel/deployment/download?version=0.2.0")).StatusCode);
+        Assert.Equal(firstBytes, await panel.GetByteArrayAsync("/panel/deployment/download"));
+        Assert.Equal(HttpStatusCode.NotFound, (await panel.GetAsync("/panel/deployment/download?version=9.9.9")).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await panel.GetAsync("/panel/deployment/download?version=..%2Fescape")).StatusCode);
+        using var guest = Client();
+        Assert.Equal(HttpStatusCode.Unauthorized, (await guest.GetAsync("/panel/deployment/download?version=0.1.0")).StatusCode);
+    }
+
+    [Fact]
     public async Task Publishing_uses_release_key_and_never_accepts_fleet_credentials()
     {
         using var client = Client(); client.DefaultRequestHeaders.Add("X-Api-Key", "fleet-key");

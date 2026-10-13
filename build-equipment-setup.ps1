@@ -1,9 +1,12 @@
 ﻿param(
-    [string]$Version = '1.5.9',
+    [string]$Version = '1.5.11',
     [string]$KioskVersion,
-    [switch]$Publish
+    [switch]$Publish,
+    [switch]$PrepareRelease
 )
 $ErrorActionPreference = 'Stop'
+if ($Publish -and $PrepareRelease) { throw 'Usa Publish o PrepareRelease, no ambos.' }
+$productionBuild = $Publish -or $PrepareRelease
 $root = $PSScriptRoot
 . (Join-Path $root 'tools\resolve-dotnet.ps1')
 $dotnet = Resolve-KioskDotnet
@@ -14,22 +17,23 @@ $serverUrl = 'https://setup.invalid'
 $serverKey = '0' * 64
 $setupKey = '1' * 64
 $passwordSeed = $null
-if ($Publish) {
-    if ($PSVersionTable.PSVersion.Major -lt 7) { throw 'La publicación requiere PowerShell 7.' }
+if ($productionBuild) {
+    if ($PSVersionTable.PSVersion.Major -lt 7) { throw 'La preparación de producción requiere PowerShell 7.' }
     $serverUrl = $env:KIOSK_SERVER_URL
     $serverKey = $env:KIOSK_SERVER_API_KEY
     $setupKey = $env:KIOSK_INITIAL_SETUP_KEY
-    if (-not $serverUrl -or $serverKey -notmatch '^[a-fA-F0-9]{64}$' -or $setupKey -notmatch '^[a-fA-F0-9]{64}$' -or -not $env:KIOSK_RELEASE_PUBLISH_KEY) { throw 'Faltan las credenciales de production para publicar.' }
+    if (-not $serverUrl -or $serverKey -notmatch '^[a-fA-F0-9]{64}$' -or $setupKey -notmatch '^[a-fA-F0-9]{64}$' -or -not $env:KIOSK_RELEASE_PUBLISH_KEY) { throw 'Faltan las credenciales de production para preparar la versión.' }
 }
 $serverUri = $null
 if (-not [Uri]::TryCreate($serverUrl, [UriKind]::Absolute, [ref]$serverUri) -or $serverUri.Scheme -ne 'https' -or $serverUri.UserInfo -or $serverUri.Query -or $serverUri.Fragment) { throw 'Servidor HTTPS no válido.' }
 $serverUrl = $serverUrl.TrimEnd('/')
-if ($Publish) {
+if ($productionBuild) {
     $ready = Invoke-WebRequest -Uri "$serverUrl/health/ready" -MaximumRedirection 0
-    if (($ready.Content | ConvertFrom-Json).status -ne 'ok' -or $ready.Headers['X-Kiosk-Password-Provisioning'] -ne '1') { throw 'Despliega primero el servidor con aprovisionamiento de contraseña del panel.' }
+    if (($ready.Content | ConvertFrom-Json).status -ne 'ok' -or $ready.Headers['X-Kiosk-Password-Provisioning'] -ne '1' -or
+        $ready.Headers['X-Setup-Catalog-Version'] -ne '3' -or $ready.Headers['X-Setup-Component-Protocol'] -ne '1') { throw 'Se requiere servidor preparado, catálogo 3, componentes 1 y aprovisionamiento de contraseña del panel.' }
     $passwordSeed = Invoke-RestMethod -Uri "$serverUrl/api/releases/setup/kiosk-password" -Headers @{ 'X-Release-Publish-Key' = $env:KIOSK_RELEASE_PUBLISH_KEY } -MaximumRedirection 0
 }
-if ($Publish -and -not $passwordSeed) { throw 'Falta el aprovisionamiento inicial de contraseña del panel.' }
+if ($productionBuild -and -not $passwordSeed) { throw 'Falta el aprovisionamiento inicial de contraseña del panel.' }
 if ($passwordSeed) {
     # Validate without echoing the verifier or parser errors into the build log.
     $validSeed = $false
@@ -127,6 +131,7 @@ try {
         } elseif (-not $diagnostic.workerResourceVerified -or -not $diagnostic.kioskResourceVerified -or $diagnostic.binariesAbsent) { throw 'Completo no supera integridad de recursos.' }
         $info = Get-Item -LiteralPath $setups[$edition]
         $editions += @{edition=$edition; fileName=$info.Name; sizeBytes=$info.Length; sha256=(Get-Hash $info.FullName)}
+        [IO.File]::WriteAllText(($info.FullName + '.sha256'), ($editions[-1].sha256 + ' *' + $info.Name), [Text.Encoding]::ASCII)
         Write-Host "$edition : $($info.Length) bytes"
     }
     if ($editions[1].sizeBytes -ge 366646608) { throw 'Completo debe ser menor que el asistente anterior (349,7 MiB).' }
@@ -152,6 +157,10 @@ try {
             }
         }
         Write-Host 'Candidata publicada. Prueba ambas ediciones en equipos piloto y activa desde el panel.'
+    } elseif ($PrepareRelease) {
+        Write-Host 'Candidata de producción preparada con aprovisionamiento real, sin importar ni activar en el panel.'
+    } else {
+        Write-Host 'Build local ficticio: no distribuir; contiene setup.invalid y claves de prueba.'
     }
     Write-Host "Ambas ediciones $Version generadas y comprobadas: $output"
 } finally {

@@ -22,7 +22,8 @@ public sealed class SetupTimingLogTests
             {
                 Assert.DoesNotContain("PRIVATE DATA", lines[i]);
                 using var json = JsonDocument.Parse(lines[i]);
-                Assert.Equal(5, json.RootElement.EnumerateObject().Count());
+                Assert.Equal(6, json.RootElement.EnumerateObject().Count());
+                Assert.True(json.RootElement.GetProperty("startedAtUtc").GetDateTime() <= json.RootElement.GetProperty("atUtc").GetDateTime());
                 Assert.Equal("app-id", json.RootElement.GetProperty("application").GetString());
                 Assert.True(json.RootElement.GetProperty("durationMs").GetDouble() >= 0);
                 Assert.Equal(outcomes[i], json.RootElement.GetProperty("result").GetString());
@@ -30,6 +31,27 @@ public sealed class SetupTimingLogTests
         }
         finally { File.Delete(path); }
     }
+    [Fact]
+    public void Activity_intervals_are_ordered_and_late_callbacks_do_not_append_after_completion()
+    {
+        string path = Path.Combine(Path.GetTempPath(), "setup-phases-" + Guid.NewGuid().ToString("N") + ".jsonl");
+        try
+        {
+            var log = new SetupTimingLog(path);
+            using var activity = log.Track("app");
+            activity.Move(KioskClinicaPC.Core.Sync.PackItemPhase.Downloading);
+            activity.Move(KioskClinicaPC.Core.Sync.PackItemPhase.Installing);
+            activity.Move(KioskClinicaPC.Core.Sync.PackItemPhase.Downloading); // Out-of-order progress.
+            activity.Complete("Succeeded");
+            activity.Move(KioskClinicaPC.Core.Sync.PackItemPhase.PostInstall); activity.Dispose();
+            var lines = File.ReadAllLines(path);
+            Assert.Equal(3, lines.Length);
+            Assert.Equal(new[] { "Queued", "Download", "NativeInstall" }, lines.Select(line =>
+            { using var value = JsonDocument.Parse(line); return value.RootElement.GetProperty("phase").GetString(); }));
+        }
+        finally { File.Delete(path); }
+    }
+
     [Fact]
     public async Task Diagnostic_write_failure_does_not_change_the_operation_result()
     {

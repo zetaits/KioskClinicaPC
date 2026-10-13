@@ -9,6 +9,12 @@
     <SolidColorBrush x:Key="MutedBrush" Color="#B3B9C2"/>
     <SolidColorBrush x:Key="AccentBrush" Color="#F37A4A"/>
     <SolidColorBrush x:Key="FocusBrush" Color="#FFB069"/>
+    <SolidColorBrush x:Key="SuccessBrush" Color="#67D5A3"/>
+    <SolidColorBrush x:Key="SuccessSurfaceBrush" Color="#1C302A"/>
+    <SolidColorBrush x:Key="WarningBrush" Color="#FFC078"/>
+    <SolidColorBrush x:Key="WarningSurfaceBrush" Color="#34291F"/>
+    <SolidColorBrush x:Key="ErrorBrush" Color="#F48F91"/>
+    <SolidColorBrush x:Key="ErrorSurfaceBrush" Color="#342326"/>
     <Style x:Key="KeyboardFocus">
         <Setter Property="Control.Template">
             <Setter.Value><ControlTemplate><Border BorderBrush="{StaticResource FocusBrush}" BorderThickness="2" CornerRadius="9" Margin="-3"/></ControlTemplate></Setter.Value>

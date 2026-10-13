@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Windows;
+using System.Windows.Media;
 using KioskClinicaPC.Core.Sync;
 using KioskClinicaPC.Equipment;
 
@@ -13,6 +14,7 @@ public partial class MainWindow : Window
         public bool Selected { get; set; } = application.SelectedByDefault;
         public string VersionDescription => string.IsNullOrWhiteSpace(Application.PinnedVersion) ? "Última versión compatible al instalar" : "Versión " + Application.PinnedVersion;
     }
+    public sealed record ResultApplicationRow(string Name, string Status, string Detail, Brush Tone, Brush Surface);
     private int _step;
     private bool _loading, _running, _closeRequested, _canLaunch;
     private PackCatalog? _catalog;
@@ -169,7 +171,11 @@ public partial class MainWindow : Window
             {
                 Progress.IsIndeterminate = value.Percent == null;
                 if (value.Percent is { } percent) Progress.Value = percent;
-                if (value.Run != null) { _lastRun = value.Run; Activity.Text = string.Join("\n", value.Run.Items.Select(ItemDetails)); }
+                if (value.Run != null)
+                {
+                    _lastRun = value.Run; Activity.Text = string.Join("\n", value.Run.Items.Select(ItemDetails));
+                    StatusLabel.Text = value.Run.ActivitySummary();
+                }
                 else { Activity.AppendText(value.Message + "\n"); Activity.ScrollToEnd(); }
             }), _cancel.Token);
             if (result.KioskVerified)
@@ -192,10 +198,42 @@ public partial class MainWindow : Window
         _running = false;
         if (result.Run is not null) _lastRun = result.Run;
         if (result.Kind == "review") { ShowStep(1); await LoadCatalog(); CatalogLabel.Text = result.Message; return; }
-        ShowStep(3); ResultTitle.Text = result.ExitCode == 0 ? "Preparación completa" : result.ExitCode == 1 || _lastRun?.Items.Any(i => i.RequiresRebootBeforeRetry) == true ? "Preparación detenida" : "Preparación parcial";
-        ResultLabel.Text = result.Message + (result.RebootRequired ? "\nEs necesario reiniciar manualmente." : "");
+        ShowStep(3);
+        bool stopped = result.ExitCode == 1 || _cancel.IsCancellationRequested ||
+            _lastRun?.Items.Any(i => i.RequiresRebootBeforeRetry && !i.NativeInstallSucceeded) == true;
+        bool hasVerified = result.KioskVerified || _lastRun?.Items.Any(i => i.Verified) == true;
+        bool hasPending = _lastRun?.Items.Any(i => !i.Verified && i.State != PackItemState.Failed) == true;
+        bool incomplete = hasVerified || hasPending;
+        bool rebootPending = result.ExitCode == 0 && result.RebootRequired;
+        string tone = result.ExitCode == 0 && !rebootPending ? "Success" : stopped || incomplete || rebootPending ? "Warning" : "Error";
+        Brush color = (Brush)FindResource(tone + "Brush");
+        ResultBanner.Background = (Brush)FindResource(tone + "SurfaceBrush");
+        ResultBanner.BorderBrush = color;
+        ResultIconBorder.Background = color;
+        ResultStateBadge.Foreground = color;
+        ResultIcon.Text = result.ExitCode == 0 && !rebootPending ? "✓" : stopped || incomplete || rebootPending ? "!" : "×";
+        ResultStateBadge.Text = rebootPending ? "REINICIO PENDIENTE" : result.ExitCode == 0 ? "COMPLETADO" :
+            stopped ? "DETENIDO" : incomplete ? "INCOMPLETO" : "ERROR";
+        ResultTitle.Text = rebootPending ? "Reinicio pendiente" : result.ExitCode == 0 ? "Preparación completa" : stopped ? "Preparación detenida" :
+            hasVerified ? "Preparación parcial" : hasPending ? "Preparación pendiente" : "No se pudo completar";
+        ResultLabel.Text = result.Message + (result.RebootRequired && !result.Message.Contains("reinici", StringComparison.OrdinalIgnoreCase)
+            ? "\nEs necesario reiniciar manualmente." : "");
         ResultDetails.Text = _lastRun == null ? "" : string.Join("\n", _lastRun.Items.Select(ItemDetails));
-        ResultDetails.Visibility = string.IsNullOrWhiteSpace(ResultDetails.Text) ? Visibility.Collapsed : Visibility.Visible;
+        ResultDetailsExpander.Visibility = string.IsNullOrWhiteSpace(ResultDetails.Text) ? Visibility.Collapsed : Visibility.Visible;
+        ResultDetailsExpander.IsExpanded = false;
+        bool hasApplications = _lastRun?.Items.Count > 0;
+        ResultStats.Visibility = hasApplications ? Visibility.Visible : Visibility.Collapsed;
+        ResultApplicationsPanel.Visibility = hasApplications ? Visibility.Visible : Visibility.Collapsed;
+        if (_lastRun is { } completedRun)
+        {
+            ResultVerifiedCount.Text = completedRun.Items.Count(i => i.Verified).ToString();
+            ResultPendingCount.Text = completedRun.Items.Count(i => !i.Verified && i.State != PackItemState.Failed).ToString();
+            ResultFailedCount.Text = completedRun.Items.Count(i => i.State == PackItemState.Failed).ToString();
+            ResultApplications.ItemsSource = completedRun.Items
+                .OrderBy(i => i.Verified ? 2 : i.State == PackItemState.Failed ? 0 : 1)
+                .Select(ResultRow).ToList();
+        }
+        else ResultApplications.ItemsSource = null;
         if (result.ExitCode != 0) { BackButton.Visibility = Visibility.Visible; BackButton.Content = "Revisar"; }
         InstallAvailableButton.Visibility = result.ExitCode == 1 && !request.AllowPartialPack && _lastRun is { } run &&
             run.Items.Any(i => i.State == PackItemState.Failed) && run.Items.Any(i => i.State == PackItemState.Pending || i.Verified) &&
@@ -207,12 +245,38 @@ public partial class MainWindow : Window
         LaunchCheck.Visibility = _canLaunch ? Visibility.Visible : Visibility.Collapsed;
         LaunchCheck.IsChecked = _canLaunch;
         UpdateFinishButton();
-        StatusLabel.Text = $"Resultado: {result.ExitCode}";
+        StatusLabel.Text = rebootPending ? "Reinicia manualmente para terminar." : result.ExitCode == 0 ? "Todo listo." : stopped ? "Revisa el motivo antes de continuar." :
+            incomplete ? "Quedan componentes por revisar." : "Revisa el error antes de reintentar.";
         if (_closeRequested) StatusLabel.Text += " · La operación ha terminado; ya puedes cerrar.";
+    }
+    private ResultApplicationRow ResultRow(PackItemResult item)
+    {
+        bool verified = item.Verified;
+        bool failed = item.State == PackItemState.Failed;
+        string tone = verified ? "Success" : failed ? "Error" : "Warning";
+        string status = item.State switch
+        {
+            PackItemState.Succeeded => "Verificada",
+            PackItemState.AlreadyInstalled => "Ya estaba",
+            PackItemState.Failed => "Error",
+            PackItemState.VerificationPending => "Sin verificar",
+            _ => "Pendiente"
+        };
+        string? version = item.InstalledVersion ?? (string.IsNullOrWhiteSpace(item.Application.PinnedVersion) ? null : item.Application.PinnedVersion);
+        string versionText = version is null ? "" : item.InstalledVersion is null ? $"Objetivo: {version}" : $"Versión {version}";
+        string message = item.Message?.Trim() ?? "";
+        if (verified && (message == "Instalada y verificada." || message == "Ya instalada y verificada.")) message = "";
+        if (verified && message == "Ya instalada y verificada (todo el equipo).") message = "Verificada para todo el equipo";
+        if (message == "Pendiente") message = "";
+        string detail = string.Join(" · ", (verified ? new[] { versionText, message } : new[] { message, versionText })
+            .Where(s => !string.IsNullOrEmpty(s)));
+        if (string.IsNullOrEmpty(detail)) detail = status;
+        return new(item.Application.DisplayName, status, detail,
+            (Brush)FindResource(tone + "Brush"), (Brush)FindResource(tone + "SurfaceBrush"));
     }
     private static string ItemDetails(PackItemResult item) => $"{item.Application.DisplayName} · " +
         (string.IsNullOrWhiteSpace(item.Application.PinnedVersion) ? "sin versión resuelta" : $"resuelta {item.Application.PinnedVersion}") +
-        (item.InstalledVersion is null ? "" : $" · instalada {item.InstalledVersion}") + $": {item.Message}";
+        (item.InstalledVersion is null ? "" : $" · instalada {item.InstalledVersion}") + $" · {item.ActivityDescription()}";
     private async void InstallAvailable(object sender, RoutedEventArgs e) => await ContinueAvailable();
     internal async Task ContinueAvailable()
     {

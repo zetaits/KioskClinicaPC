@@ -22,8 +22,28 @@ en `/aplicaciones`; son funciones independientes.
 
 ## Estado de las verificaciones
 
-La última verificación local del asistente documentada es
-[1.5.9](historico/VERIFICACION-ASISTENTE-1.5.9.md): builds ficticios, pruebas
+La carga progresiva de `/instalador` tiene un
+[informe local del 13 de octubre de 2026](historico/VERIFICACION-CARGA-INSTALADOR-2026-10-13.md).
+Incluye pruebas del catálogo, streaming e interacción de componentes, y un paquete
+Linux Release preparado con 328 pruebas superadas en Release. La revisión
+visual en navegador y la comprobación tras publicar en la VPS están pendientes.
+
+La cola concurrente del pack tiene un
+[informe local del 13 de octubre de 2026](historico/VERIFICACION-COLA-PACK-2026-10-13.md):
+151 pruebas relevantes del servidor y 77 del asistente verificadas, con compilación
+de la solución. El asistente local 1.5.10 se generó y ejecutó solo con Pack;
+tras reiniciar el PC, instaló cinco aplicaciones y verificó las seis en unos
+2 minutos y 32 segundos, con solapamiento de instalación y verificación.
+El aviso de reinicio omitido por el resumen quedó corregido en la
+[preparación de 1.5.11](historico/VERIFICACION-ASISTENTE-1.5.11.md): 621 pruebas
+Release superadas, ambos EXE locales diagnosticados y auditoría real de solo
+lectura con seis verificadas y reinicio pendiente detectado. Los EXE locales son
+de validación ficticia; el workflow genera los de producción con sus credenciales.
+El benchmark en Windows 10/11 y la publicación siguen pendientes. El cambio no
+está publicado ni activado.
+
+La verificación de la candidata
+[1.5.9](historico/VERIFICACION-ASISTENTE-1.5.9.md) recoge builds ficticios, pruebas
 automatizadas y auditoría de solo lectura. La instalación completa en VMs
 limpias queda pendiente. No se afirma aquí que esa candidata esté publicada.
 

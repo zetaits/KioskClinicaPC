@@ -142,6 +142,8 @@ internal sealed class WinGetEngine : IPackBackend
     private async Task PreflightCore(PackItemResult item, string log, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
+        // Report an existing Windows reboot even if all applications are already installed.
+        item.RebootRequired |= WinGetRebootStatus.ReadSystemPending(_info);
         if (_catalogSession is not null) await _catalogSession.Check(() => Check(item, log, ct), ct);
         else await Check(item, log, ct);
     }
@@ -224,63 +226,126 @@ internal sealed class WinGetEngine : IPackBackend
             versionComparison = installed?.CompareToVersion(version).ToString(),
             verified = Verified(package, version), nativeInstallActive = native?.Status == Windows.Foundation.AsyncStatus.Started };
     }
-    public Task Install(PackItemResult item, string log, Action<string> progress, CancellationToken ct)
-        => Measure(SetupPhase.Install, item.Application.Id, () => InstallCore(item, log, progress, ct), () => item.State.ToString());
-    private async Task InstallCore(PackItemResult item, string log, Action<string> progress, CancellationToken ct)
+    public async Task<PackNativeResult> ExecuteNative(PackItemResult item, string log, Action<PackProgress> progress, CancellationToken ct)
     {
-        var package = await Find(item.Application.WingetId, ct: ct);
-        var beforeInstall = InstalledEvidence(package, item.Application.PinnedVersion);
-        RecordEvidence(log, "before-install", item.Application, beforeInstall);
-        if (beforeInstall.Disposition == PackInstalledDisposition.Verified) { item.InstalledVersion = beforeInstall.Version; item.State = PackItemState.AlreadyInstalled; item.Message = "Ya instalada y verificada."; return; }
-        var options = Options(package, item.Application, log, item.ResolvedChannel);
-        ct.ThrowIfCancellationRequested();
+        PackNativeResult? result = null;
+        await Measure(SetupPhase.Install, item.Application.Id,
+            async () => result = await ExecuteNativeCore(item, log, progress, ct), () => result?.Disposition.ToString() ?? "Uncertain");
+        return result!;
+    }
+    private async Task<PackNativeResult> ExecuteNativeCore(PackItemResult item, string log, Action<PackProgress> progress, CancellationToken ct)
+    {
+        CatalogPackage package;
+        InstallOptions options;
+        try
+        {
+            package = await Find(item.Application.WingetId, ct: ct);
+            var evidence = InstalledEvidence(package, item.Application.PinnedVersion);
+            RecordEvidence(log, "before-install", item.Application, evidence);
+            if (evidence.Disposition == PackInstalledDisposition.Verified)
+                return new(PackNativeDisposition.AlreadyInstalled, "Ya instalada y verificada.",
+                    RebootRequired: WinGetRebootStatus.ReadSystemPending(_info), InstalledVersion: evidence.Version);
+            options = Options(package, item.Application, log, item.ResolvedChannel);
+            ct.ThrowIfCancellationRequested();
+        }
+        catch (OperationCanceledException) { return new(PackNativeDisposition.NotStarted, "Cancelado antes de iniciar WinGet."); }
+        catch (Exception ex) { return new(PackNativeDisposition.Failed, ex.Message); }
+
+        using var phases = _timings?.Track(item.Application.Id);
         Windows.Foundation.IAsyncOperationWithProgress<InstallResult, InstallProgress> operation;
         try { operation = package.InstalledVersion == null ? _manager.InstallPackageAsync(package, options) : _manager.UpgradePackageAsync(package, options); }
-        catch (System.Runtime.InteropServices.COMException ex)
-        { throw new OperationCanceledException("No se puede determinar si WinGet inició el instalador. Se detiene la cola.", ex, ct); }
-        operation.Progress = (_, p) => progress(p.State == PackageInstallProgressState.Downloading
-            ? $"Descargando {p.BytesDownloaded / 1048576} / {p.BytesRequired / 1048576} MB" : p.State switch
+        catch (Exception)
+        { return new(PackNativeDisposition.Uncertain, "No se puede determinar si WinGet inició el instalador. Se detiene la cola."); }
+        int nativeStarted = 0;
+        operation.Progress = (_, p) =>
+        {
+            if (p.State is PackageInstallProgressState.Installing or PackageInstallProgressState.PostInstall)
+                Interlocked.Exchange(ref nativeStarted, 1);
+            if (p.State == PackageInstallProgressState.Finished) return;
+            var phase = p.State switch
             {
-                PackageInstallProgressState.Queued => "En cola", PackageInstallProgressState.Installing => "Instalando…",
-                PackageInstallProgressState.PostInstall => "Finalizando instalación…", _ => "Verificando resultado…"
-            });
-        // Cancel stops a download, but cannot roll back an active native installer. Stop the queue on timeout/cancel.
-        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct); timeout.CancelAfter(TimeSpan.FromMinutes(60));
-        using var registration = timeout.Token.Register(operation.Cancel);
+                PackageInstallProgressState.Downloading => PackItemPhase.Downloading,
+                PackageInstallProgressState.Installing => PackItemPhase.Installing,
+                PackageInstallProgressState.PostInstall => PackItemPhase.PostInstall,
+                _ => PackItemPhase.Queued
+            };
+            phases?.Move(phase);
+            progress(new(phase, phase switch
+            {
+                PackItemPhase.Downloading => p.BytesRequired > 0
+                    ? $"Descargando {p.BytesDownloaded / 1048576} / {p.BytesRequired / 1048576} MB" : "Descargando…",
+                PackItemPhase.Installing => "Instalando…", PackItemPhase.PostInstall => "Finalizando instalación…", _ => "En cola de WinGet"
+            }, p.BytesDownloaded, p.BytesRequired));
+        };
+        void CancelOperation()
+        {
+            try { operation.Cancel(); }
+            catch (Exception ex) { _info?.Invoke($"WinGet cancellation: {ex.GetType().Name}; HRESULT {ex.HResult:X8}"); }
+        }
+        // Drain an installer already executing. Cancelling COM can lose its result even when it cannot stop it.
+        using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(60));
+        using var cancellation = ct.Register(() => { if (Volatile.Read(ref nativeStarted) == 0) CancelOperation(); });
+        using var deadline = timeout.Token.Register(CancelOperation);
         var task = operation.AsTask();
         InstallResult result;
         try { result = await task.WaitAsync(timeout.Token); }
-        catch (OperationCanceledException) { throw; }
-        catch (Exception ex)
+        catch (Exception)
         {
-            try { operation.Cancel(); } catch { }
-            throw new OperationCanceledException("Se perdió el resultado de WinGet. El instalador puede seguir activo; se detiene la cola.", ex, ct);
+            CancelOperation(); _ = ObserveNative(task);
+            return new(PackNativeDisposition.Uncertain, "Se perdió el resultado de WinGet. El instalador puede seguir activo; se detiene la cola.");
         }
-        item.RebootRequired |= result.RebootRequired;
-        if (ct.IsCancellationRequested || result.Status == InstallResultStatus.InternalError)
-            throw new OperationCanceledException("El estado nativo no puede confirmarse. Se detiene la cola para verificarlo antes de reintentar.", ct);
-        if (result.Status != InstallResultStatus.Ok) throw new InvalidOperationException($"WinGet {result.Status}; instalador {result.InstallerErrorCode}; {result.ExtendedErrorCode?.Message}");
-        await Measure(SetupPhase.Verification, item.Application.Id, () => Verify(item, log, ct), () => item.State.ToString());
-    }
-    private async Task Verify(PackItemResult item, string log, CancellationToken ct)
-    {
-        try
+        var disposition = result.Status switch
         {
-            for (int attempt = 0; attempt < 6; attempt++)
+            InstallResultStatus.Ok => PackNativeDisposition.Succeeded,
+            InstallResultStatus.InternalError => PackNativeDisposition.Uncertain,
+            _ => PackNativeDisposition.Failed
+        };
+        if (ct.IsCancellationRequested && disposition != PackNativeDisposition.Succeeded)
+            disposition = PackNativeDisposition.Uncertain;
+        bool systemRebootPending = WinGetRebootStatus.ReadSystemPending(_info);
+        bool rebootRequired = WinGetRebootStatus.Required(result.RebootRequired, result.InstallerErrorCode, systemRebootPending);
+        if (!string.IsNullOrEmpty(log))
+        {
+            try
             {
-                var installed = await Find(item.Application.WingetId, ct: ct);
-                var evidence = InstalledEvidence(installed, item.Application.PinnedVersion);
-                RecordEvidence(log, $"post-install-{attempt + 1}", item.Application, evidence);
-                if (evidence.Disposition == PackInstalledDisposition.Verified)
-                { item.InstalledVersion = evidence.Version; item.State = PackItemState.Succeeded; item.Message = "Instalada y verificada."; return; }
-                await Task.Delay(TimeSpan.FromSeconds(5), ct);
+                // Numeric/native evidence only: no exception text or request data.
+                File.AppendAllText(log + ".native-result.jsonl", JsonSerializer.Serialize(new
+                {
+                    atUtc = DateTime.UtcNow, wingetId = item.Application.WingetId, status = result.Status.ToString(),
+                    installerCode = result.InstallerErrorCode, extendedHResult = result.ExtendedErrorCode?.HResult,
+                    winGetRebootRequired = result.RebootRequired, systemRebootPending, rebootRequired
+                }) + Environment.NewLine);
             }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            { _info?.Invoke($"Native diagnostic could not be written: {ex.GetType().Name}; HRESULT {ex.HResult:X8}"); }
         }
-        catch (OperationCanceledException) { throw; }
-        catch (Exception ex) { throw new OperationCanceledException("Se perdió la verificación del instalador nativo. Se detiene la cola.", ex, ct); }
-        item.State = PackItemState.VerificationPending;
-        item.RequiresRebootBeforeRetry = true;
-        item.Message = "WinGet terminó, pero la versión machine-wide aún no se puede verificar. Revisar o reanudar tras reiniciar.";
+        phases?.Complete(disposition.ToString());
+        return new(disposition, disposition == PackNativeDisposition.Succeeded ? "WinGet terminó correctamente."
+            : $"WinGet {result.Status}; instalador {result.InstallerErrorCode}; {result.ExtendedErrorCode?.Message}", rebootRequired);
+    }
+    public async Task<PackVerificationResult> Verify(PackItemResult item, string log, CancellationToken ct)
+    {
+        PackVerificationResult? result = null;
+        await Measure(SetupPhase.Verification, item.Application.Id,
+            async () => result = await VerifyCore(item, log, ct), () => result?.Verified == true ? "Verified" : "Pending");
+        return result!;
+    }
+    private async Task<PackVerificationResult> VerifyCore(PackItemResult item, string log, CancellationToken ct)
+    {
+        for (int attempt = 0; attempt < 6; attempt++)
+        {
+            var installed = await Find(item.Application.WingetId, ct: ct);
+            var evidence = InstalledEvidence(installed, item.Application.PinnedVersion);
+            RecordEvidence(log, $"post-install-{attempt + 1}", item.Application, evidence);
+            if (evidence.Disposition == PackInstalledDisposition.Verified)
+                return new(true, "Instalada y verificada.", evidence.Version);
+            if (attempt < 5) await Task.Delay(TimeSpan.FromSeconds(5), ct);
+        }
+        return new(false, "WinGet terminó, pero la versión para todo el equipo aún no se puede verificar. Revisar o reanudar tras reiniciar.");
+    }
+    private static async Task ObserveNative(Task task)
+    {
+        try { await task; } catch { /* Native result remains uncertain; never publish a late completion. */ }
     }
     private Task Measure(SetupPhase phase, string? app, Func<Task> action, Func<string>? outcome = null)
         => _timings is null ? action() : _timings.Measure(phase, app, action, outcome);

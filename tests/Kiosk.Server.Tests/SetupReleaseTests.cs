@@ -42,7 +42,7 @@ public sealed class SetupReleaseTests : IDisposable
             : AuthenticateResult.NoResult());
     }
     private static string Hash(byte[] bytes) => Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
-    private static (SetupRelease Release, Dictionary<string, byte[]> Bytes) Bundle(string version = "1.5.0", bool unsafeZip = false, bool activationDll = true)
+    internal static (SetupRelease Release, Dictionary<string, byte[]> Bytes) Bundle(string version = "1.5.0", bool unsafeZip = false, bool activationDll = true)
     {
         using var worker = new MemoryStream();
         using (var archive = new ZipArchive(worker, ZipArchiveMode.Create, true))
@@ -210,9 +210,14 @@ public sealed class SetupReleaseTests : IDisposable
         var (latest, latestBytes) = Bundle("1.6.0"); await Publish(client, latest, latestBytes);
         await Store.Activate(release.Version, default);
         html = WebUtility.HtmlDecode(await client.GetStringAsync("/instalador"));
-        Assert.True(html.IndexOf("Descargar Online", StringComparison.Ordinal) < html.IndexOf("Instalar sistemas por red", StringComparison.Ordinal));
+        Assert.Contains("Preparar este equipo", html);
+        Assert.Contains("Instalar sistemas por red", html);
         Assert.Contains($"href=\"/panel/setup/download?version={latest.Version}&edition=online\"", html);
-        Assert.True(html.IndexOf("Versión 1.6.0", StringComparison.Ordinal) < html.IndexOf("Versión 1.5.0", StringComparison.Ordinal));
+        Assert.Contains("Versión 1.6.0", html);
+        Assert.DoesNotContain($"href=\"/panel/setup/download?version={release.Version}&edition=online\"", html);
+        using var queryScope = _factory.Services.CreateScope();
+        var history = await queryScope.ServiceProvider.GetRequiredService<IInstallerPageQuery>().GetHistoryAsync(latest.Version, default);
+        Assert.Equal(release.Version, Assert.Single(history.Data!.Releases).Version);
         Assert.Contains("Otras versiones y recuperación", html);
         Assert.DoesNotContain("1.4.0", html);
         Assert.Equal(release.Version, Store.ActiveVersion);

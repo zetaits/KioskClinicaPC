@@ -1,114 +1,15 @@
 @page "/instalador"
 @attribute [Authorize]
+@attribute [StreamRendering]
 @rendermode InteractiveServer
-@inject SetupReleaseStore SetupReleases
-@inject DeploymentReleaseStore DeploymentReleases
+@using Kiosk.Server.Components.Shared.Installer
 
 <div class="setup-page">
     <h2>Instalador de equipos</h2>
-    <section class="card setup-hero">
-        <div class="setup-hero-heading">
-            <div><h2>Preparar este equipo</h2><p class="muted">Elige cómo llevar el instalador al ordenador que vas a preparar.</p></div>
-            <span class="badge accent">Windows x64</span>
-        </div>
-        <p>Instala solo pack, solo Kiosk o ambos. Puedes elegir las aplicaciones durante la instalación y configurar la lista en <a href="/aplicaciones">Aplicaciones</a>. El equipo no necesita pertenecer a la flota.</p>
-        @if (_latest is not null)
-        {
-            <div class="setup-release-heading">
-                <strong>Versión @_latest.Version</strong>
-                <span class="badge @(_latest.Version == _activeVersion ? "accent" : "warn")">@(_latest.Version == _activeVersion ? "Activa" : "Pendiente de activación")</span>
-            </div>
-            <div class="setup-editions">
-            @foreach (var edition in _latest.Editions.OrderBy(e => e.Edition == "online" ? 0 : 1))
-            {
-                <article class="setup-edition @(edition.Edition == "online" ? "setup-edition-online" : "")">
-                    <div class="setup-edition-heading"><h3>@(edition.Edition == "online" ? "Online" : "Completo para USB")</h3><span class="setup-edition-size">@Size(edition.SizeBytes)</span></div>
-                    <p>@(edition.Edition == "online" ? "Descarga pequeña para preparar equipos con conexión a internet." : "Lleva el instalador y sus componentes en un USB para preparar varios equipos.")</p>
-                    <ul class="setup-edition-features">
-                        @if (edition.Edition == "online")
-                        {
-                            <li>Descarga solo los componentes que elijas.</li>
-                            <li>Necesita internet para instalar el pack y Kiosk.</li>
-                        }
-                        else
-                        {
-                            <li>Incluye los componentes de Kiosk y del pack.</li>
-                            <li>Kiosk se puede instalar sin conexión; las aplicaciones del pack necesitan internet.</li>
-                        }
-                    </ul>
-                    <div class="setup-download-action">
-                        <a class="btn @(edition.Edition == "online" ? "primary" : "") button-link setup-download-button" href="@($"/panel/setup/download?version={_latest.Version}&edition={edition.Edition}")" data-setup-download>
-                            <span class="setup-spinner" aria-hidden="true"></span><span data-setup-download-label>Descargar @(edition.Edition == "online" ? "Online" : "Completo para USB")</span>
-                        </a>
-                        <p class="setup-download-status" data-setup-download-status hidden role="status"></p>
-                    </div>
-                </article>
-            }
-            </div>
-            @if (_latest.Version != _activeVersion)
-            {
-                <div class="setup-activation">
-                    <div><strong>Prueba esta versión antes de activarla</strong><p class="muted">Las dos descargas ya están disponibles para equipos piloto. Actívala cuando hayas comprobado la instalación.</p></div>
-                    <form method="post" action="/panel/setup/activate">
-                        <AntiforgeryToken />
-                        <input type="hidden" name="version" value="@_latest.Version" />
-                        <button class="btn" type="submit">Activar versión @_latest.Version</button>
-                    </form>
-                </div>
-            }
-        }
-        else { <p class="alert" role="status">Todavía no se han publicado las ediciones Online y Completo para USB.</p> }
-        <p class="muted setup-requirements">Windows 10 22H2 / Windows 11 x64 · Permisos de administrador. El progreso se muestra en el equipo que estás preparando. Nunca reinicia automáticamente.</p>
-    </section>
-    <section class="card">
-        <h2>Instalar sistemas por red</h2>
-        <p>ClínicaPC · Instalación por red. Instálalo en el PC del encargado para preparar otros equipos por Ethernet. Importa una ISO oficial y gestiona los perfiles en <a href="/despliegue">Instalación de sistemas</a>.</p>
-        @if (_deployment is { } deploymentRelease)
-        {
-            <div class="setup-download-action">
-                <a class="btn primary button-link setup-download-button" href="/panel/deployment/download" data-setup-download data-download-cookie="kioskDeploymentDownload">
-                    <span class="setup-spinner" aria-hidden="true"></span><span data-setup-download-label>Descargar instalación por red @deploymentRelease.Release.Version</span>
-                </a>
-                <p class="setup-download-status" data-setup-download-status hidden role="status"></p>
-            </div>
-        }
-        else { <p class="alert" role="status">Todavía no hay una versión publicada y validada para instalación por red.</p> }
-        <p class="muted">Encargado: Windows 11 x64, administrador y Ethernet en la misma red. Destinos: UEFI y arranque PXE por Ethernet. Conectar el cable no basta: hay que encender el equipo y elegir el arranque por red.</p>
-        <a href="/despliegue/guia">Guía inicial y recuperación</a>
-    </section>
-    @if (_releases.Count > 1)
+    <EquipmentInstallerSection State="Setup!" OnRetry="RetrySetupAsync" />
+    <DeploymentInstallerSection State="Deployment!" OnRetry="RetryDeploymentAsync" />
+    @if (Setup is { Status: InstallerSectionStatus.Ready, Data: { } data })
     {
-        <details class="card setup-history">
-            <summary>Otras versiones y recuperación <span class="muted">@(_releases.Count - 1) disponibles</span></summary>
-            <p class="muted">Descarga una edición anterior o restáurala como versión activa si necesitas recuperar una instalación.</p>
-            @foreach (var release in _releases.Skip(1))
-            {
-                <div class="setup-history-release">
-                    <div class="setup-release-heading"><strong>Versión @release.Version</strong><span class="badge @(release.Version == _activeVersion ? "accent" : "")">@(release.Version == _activeVersion ? "Activa" : "Disponible")</span></div>
-                    <div class="setup-history-actions">
-                        @foreach (var edition in release.Editions.OrderBy(e => e.Edition == "online" ? 0 : 1))
-                        {
-                            <a class="btn button-link" href="@($"/panel/setup/download?version={release.Version}&edition={edition.Edition}")">@(edition.Edition == "online" ? "Online" : "Completo para USB") · @Size(edition.SizeBytes)</a>
-                        }
-                        @if (release.Version != _activeVersion)
-                        {
-                            <form method="post" action="/panel/setup/activate">
-                                <AntiforgeryToken /><input type="hidden" name="version" value="@release.Version" />
-                                <button class="btn" type="submit">Restaurar @release.Version</button>
-                            </form>
-                        }
-                    </div>
-                </div>
-            }
-        </details>
+        <InstallerHistory DisplayedVersion="data.Latest.Version" ActiveVersion="data.ActiveVersion" />
     }
 </div>
-
-@code {
-    private string? _activeVersion;
-    private KioskClinicaPC.Equipment.SetupRelease? _latest;
-    private List<KioskClinicaPC.Equipment.SetupRelease> _releases = [];
-    private static string Size(long bytes) => $"{bytes / 1024d / 1024:F1} MiB";
-    private (Kiosk.Deployment.DeploymentRelease Release, string Path)? _deployment;
-    protected override void OnInitialized() { _activeVersion = SetupReleases.ActiveVersion; _releases = SetupReleases.List(); _latest = _releases.FirstOrDefault(); _deployment = DeploymentReleases.Latest(); }
-}

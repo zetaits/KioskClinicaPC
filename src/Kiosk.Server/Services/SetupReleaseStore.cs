@@ -1,6 +1,8 @@
+using System.Collections.Immutable;
 using System.Security.Cryptography;
 using System.Text.Json;
 using KioskClinicaPC.Equipment;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Kiosk.Server.Services;
 
@@ -9,10 +11,12 @@ public sealed class SetupReleaseStore
 {
     private readonly string _root;
     private readonly SemaphoreSlim _gate = new(1, 1);
+    private readonly ILogger<SetupReleaseStore> _logger;
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
     private sealed record Pointer(string? Version, string? PreviousVersion);
-    public SetupReleaseStore(string root)
+    public SetupReleaseStore(string root, ILogger<SetupReleaseStore>? logger = null)
     {
+        _logger = logger ?? NullLogger<SetupReleaseStore>.Instance;
         _root = Path.Combine(Path.GetFullPath(root), "v3");
         SetupComponentCache.SafePath(_root);
         foreach (string directory in new[] { Path.Combine(_root, "releases"), Path.Combine(_root, "components", "worker"), Path.Combine(_root, "components", "kiosk") })
@@ -24,6 +28,12 @@ public sealed class SetupReleaseStore
         return Path.Combine(_root, "releases", version);
     }
     private string ComponentPath(SetupComponent component) => Path.Combine(_root, "components", component.Kind, component.Sha256);
+    private static SetupRelease RequireCompatible(SetupRelease? release, string version)
+    {
+        if (release is not { Compatible: true } || release.Version != version)
+            throw new InvalidDataException("Manifiesto de publicación incompatible.");
+        return release;
+    }
     private static bool ValidFile(string path, long size, string hash)
     {
         SetupComponentCache.SafePath(path);
@@ -46,9 +56,8 @@ public sealed class SetupReleaseStore
             string directory = ReleasePath(version), manifest = Path.Combine(directory, "manifest.json");
             SetupComponentCache.SafePath(manifest);
             if (!File.Exists(manifest)) return null;
-            var release = JsonSerializer.Deserialize<SetupRelease>(File.ReadAllText(manifest), Json);
-            if (release is not { Compatible: true } || release.Version != version ||
-                release.Editions.Any(e => !ValidFile(Path.Combine(directory, e.FileName), e.SizeBytes, e.Sha256)) ||
+            var release = RequireCompatible(JsonSerializer.Deserialize<SetupRelease>(File.ReadAllText(manifest), Json), version);
+            if (release.Editions.Any(e => !ValidFile(Path.Combine(directory, e.FileName), e.SizeBytes, e.Sha256)) ||
                 release.Components.Any(c => !ValidFile(ComponentPath(c), c.SizeBytes, c.Sha256))) return null;
             return ValidWorker(ComponentPath(release.Components.Single(c => c.Kind == "worker")), release) ? release : null;
         }
@@ -56,6 +65,70 @@ public sealed class SetupReleaseStore
     }
     public List<SetupRelease> List() => Directory.EnumerateDirectories(Path.Combine(_root, "releases"))
         .Select(p => Find(Path.GetFileName(p))).OfType<SetupRelease>().OrderByDescending(r => System.Version.Parse(r.Version)).ToList();
+
+    private List<string> MetadataVersions() => Directory.EnumerateDirectories(Path.Combine(_root, "releases"))
+        .Select(Path.GetFileName).OfType<string>()
+        .Where(v => System.Text.RegularExpressions.Regex.IsMatch(v, "^[0-9]+\\.[0-9]+\\.[0-9]+$") && System.Version.TryParse(v, out _))
+        .OrderByDescending(System.Version.Parse).ToList();
+
+    private async Task<InstallerReleaseSummary> ReadMetadataAsync(string version, CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        string directory = ReleasePath(version);
+        await using var manifest = InstallerMetadataFiles.OpenManifest(Path.Combine(directory, "manifest.json"));
+        var release = RequireCompatible(await JsonSerializer.DeserializeAsync<SetupRelease>(manifest, Json, ct), version);
+        foreach (var edition in release.Editions)
+            InstallerMetadataFiles.RequireAvailable(Path.Combine(directory, edition.FileName), edition.SizeBytes);
+        foreach (var component in release.Components)
+            InstallerMetadataFiles.RequireAvailable(ComponentPath(component), component.SizeBytes);
+        return new(release.Version, release.Editions.OrderBy(e => e.Edition == "online" ? 0 : 1)
+            .Select(e => new InstallerEditionSummary(e.Edition, e.SizeBytes)).ToImmutableArray());
+    }
+
+    public async Task<InstallerReleaseSummary?> LatestMetadataAsync(CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        var versions = MetadataVersions();
+        foreach (string version in versions)
+        {
+            try { return await ReadMetadataAsync(version, ct); }
+            catch (Exception ex) when (InstallerMetadataFiles.IsReadError(ex))
+            { _logger.LogWarning(ex, "Publicación {Version} omitida del catálogo del instalador", version); }
+        }
+        if (versions.Count > 0) throw new InvalidDataException("Ninguna publicación de equipos está disponible.");
+        return null;
+    }
+
+    public async Task<ImmutableArray<InstallerReleaseSummary>> HistoryMetadataAsync(string displayedVersion, CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        var versions = MetadataVersions().Where(v => v != displayedVersion).ToList();
+        var releases = ImmutableArray.CreateBuilder<InstallerReleaseSummary>();
+        foreach (string version in versions)
+        {
+            try { releases.Add(await ReadMetadataAsync(version, ct)); }
+            catch (Exception ex) when (InstallerMetadataFiles.IsReadError(ex))
+            { _logger.LogWarning(ex, "Publicación {Version} omitida del historial del instalador", version); }
+        }
+        if (versions.Count > 0 && releases.Count == 0) throw new InvalidDataException("Ninguna publicación del historial está disponible.");
+        return releases.ToImmutable();
+    }
+
+    public async Task<string?> ReadActiveVersionMetadataAsync(CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        Pointer? pointer;
+        try
+        {
+            await using var stream = InstallerMetadataFiles.OpenManifest(Path.Combine(_root, "active.json"));
+            pointer = await JsonSerializer.DeserializeAsync<Pointer>(stream, Json, ct);
+        }
+        catch (FileNotFoundException) { return null; }
+        if (pointer is null) throw new InvalidDataException("Puntero activo vacío.");
+        if (pointer.Version is { } version)
+            await ReadMetadataAsync(version, ct); // Detect dangling pointers without reading binary content.
+        return pointer.Version;
+    }
     private Pointer ReadPointer()
     {
         string path = Path.Combine(_root, "active.json"); SetupComponentCache.SafePath(path);

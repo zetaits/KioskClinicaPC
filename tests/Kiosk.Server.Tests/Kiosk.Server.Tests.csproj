@@ -9,11 +9,13 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="bunit" Version="2.11.3" />
     <PackageReference Include="YamlDotNet" Version="16.3.0" />
     <Compile Include="../../src/Kiosk.WinGetCore/ManifestPolicy.cs" Link="ManifestPolicy.cs" />
     <Compile Include="../../src/Kiosk.WinGetCore/ManifestClient.cs" Link="ManifestClient.cs" />
     <Compile Include="../../src/Kiosk.WinGetCore/WinGetPreparation.cs" Link="WinGetPreparation.cs" />
     <Compile Include="../../src/Kiosk.WinGetCore/SetupTimingLog.cs" Link="SetupTimingLog.cs" />
+    <Compile Include="../../src/Kiosk.WinGetCore/WinGetRebootStatus.cs" Link="WinGetRebootStatus.cs" />
     <Compile Include="../../src/Kiosk.WinGetCore/ExportDiagnostics.cs" Link="ExportDiagnostics.cs" />
     <Compile Include="../../src/Kiosk.WinGetCore/CatalogExportReader.cs" Link="CatalogExportReader.cs" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.9.0" />

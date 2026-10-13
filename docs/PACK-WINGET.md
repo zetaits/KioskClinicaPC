@@ -10,7 +10,8 @@ diagnóstico y publicación se explican en el [asistente de equipos](ASISTENTE-E
 2. Usar **Añadir aplicaciones al pack** para buscar en el índice oficial. Se puede
    añadir una aplicación elegible; aparece en la misma lista y queda seleccionada
    por defecto.
-3. Ajustar selección y orden. Los números menores se instalan primero.
+3. Ajustar selección y orden. Los números menores entran primero en la cola;
+   WinGet puede instalar antes una aplicación cuya descarga ya haya terminado.
    **Quitar del pack** no desinstala nada en los equipos.
 4. En el PC de destino, descargar el asistente desde `/instalador`, elegir
    componentes y revisar la selección antes de instalar.
@@ -28,8 +29,11 @@ disponibles pueden quedar pendientes mientras se instalan las comprobadas.
 
 El asistente usa `/api/setup/v3/catalog` con `X-Setup-Key` y exige
 `X-Setup-Catalog-Version: 3`. Al confirmar valida de nuevo la revisión y los IDs.
-La versión resuelta queda congelada después de la comprobación previa y se
-verifica antes de continuar con la siguiente instalación.
+La versión resuelta queda congelada después de la comprobación previa. WinGet
+solapa las descargas y mantiene una instalación activa; el asistente puede
+verificar la anterior mientras se instala otra. Un fallo de verificación posterior
+a un éxito nativo confirmado deja esa aplicación pendiente y permite continuar
+las restantes. El pack solo termina correctamente si todas quedan verificadas.
 
 Solo admite paquetes del origen oficial `winget` con instalador compatible,
 silencioso y para todo el equipo. Se rechazan instaladores por usuario,

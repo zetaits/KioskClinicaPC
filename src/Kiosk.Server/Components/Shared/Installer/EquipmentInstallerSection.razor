@@ -1,0 +1,86 @@
+<section class="card setup-hero" aria-busy="@(State.Status == InstallerSectionStatus.Loading ? "true" : "false")">
+    <div class="setup-hero-heading">
+        <div><h2>Preparar este equipo</h2><p class="muted">Elige cómo llevar el instalador al ordenador que vas a preparar.</p></div>
+        <span class="badge accent">Windows x64</span>
+    </div>
+    <p>Instala solo pack, solo Kiosk o ambos. Puedes elegir las aplicaciones durante la instalación y configurar la lista en <a href="/aplicaciones">Aplicaciones</a>. El equipo no necesita pertenecer a la flota.</p>
+    @if (State.Status == InstallerSectionStatus.Ready && State.Data is { } data)
+    {
+        <div class="setup-release-heading">
+            <strong>Versión @data.Latest.Version</strong>
+            <span class="badge @(data.Latest.Version == data.ActiveVersion ? "accent" : "warn")">@(data.Latest.Version == data.ActiveVersion ? "Activa" : "Pendiente de activación")</span>
+        </div>
+    }
+    else if (IsLoading)
+    {
+        <div class="setup-release-heading"><span class="installer-skeleton installer-skeleton-version" aria-hidden="true"></span></div>
+        <p class="installer-visually-hidden" role="status">Cargando instaladores de equipos…</p>
+    }
+    @if (IsLoading || State.Status == InstallerSectionStatus.Ready)
+    {
+        <div class="setup-editions">
+        @foreach (var edition in Editions)
+        {
+            <article class="setup-edition @(edition.Edition == "online" ? "setup-edition-online" : "")">
+                <div class="setup-edition-heading"><h3>@(edition.Edition == "online" ? "Online" : "Completo para USB")</h3><span class="setup-edition-size">@if (IsLoading) { <span class="installer-skeleton installer-skeleton-size" aria-hidden="true"></span> } else { @Size(edition.SizeBytes) }</span></div>
+                <p>@(edition.Edition == "online" ? "Descarga pequeña para preparar equipos con conexión a internet." : "Lleva el instalador y sus componentes en un USB para preparar varios equipos.")</p>
+                <ul class="setup-edition-features">
+                    @if (edition.Edition == "online")
+                    {
+                        <li>Descarga solo los componentes que elijas.</li>
+                        <li>Necesita internet para instalar el pack y Kiosk.</li>
+                    }
+                    else
+                    {
+                        <li>Incluye los componentes de Kiosk y del pack.</li>
+                        <li>Kiosk se puede instalar sin conexión; las aplicaciones del pack necesitan internet.</li>
+                    }
+                </ul>
+                <div class="setup-download-action">
+                    @if (IsLoading)
+                    {
+                        <span class="installer-skeleton installer-skeleton-button" aria-hidden="true"></span>
+                    }
+                    else
+                    {
+                        <a class="btn @(edition.Edition == "online" ? "primary" : "") button-link setup-download-button" href="@($"/panel/setup/download?version={State.Data!.Latest.Version}&edition={edition.Edition}")" data-setup-download>
+                            <span class="setup-spinner" aria-hidden="true"></span><span data-setup-download-label>Descargar @(edition.Edition == "online" ? "Online" : "Completo para USB")</span>
+                        </a>
+                        <p class="setup-download-status" data-setup-download-status hidden role="status"></p>
+                    }
+                </div>
+            </article>
+        }
+        </div>
+    }
+    @if (State.Status == InstallerSectionStatus.Ready && State.Data is { } ready)
+    {
+        @if (ready.Latest.Version != ready.ActiveVersion)
+        {
+            <div class="setup-activation">
+                <div><strong>Prueba esta versión antes de activarla</strong><p class="muted">Las dos descargas ya están disponibles para equipos piloto. Actívala cuando hayas comprobado la instalación.</p></div>
+                <form method="post" action="/panel/setup/activate">
+                    <AntiforgeryToken />
+                    <input type="hidden" name="version" value="@ready.Latest.Version" />
+                    <button class="btn" type="submit">Activar versión @ready.Latest.Version</button>
+                </form>
+            </div>
+        }
+    }
+    else if (State.Status == InstallerSectionStatus.Empty)
+    { <p class="alert" role="status">Todavía no se han publicado las ediciones Online y Completo para USB.</p> }
+    else if (State.Status == InstallerSectionStatus.Error)
+    {
+        <div class="alert" role="status"><p>@State.Message</p><button class="btn" type="button" @onclick="OnRetry">Reintentar</button></div>
+    }
+    <p class="muted setup-requirements">Windows 10 22H2 / Windows 11 x64 · Permisos de administrador. El progreso se muestra en el equipo que estás preparando. Nunca reinicia automáticamente.</p>
+</section>
+
+@code {
+    [Parameter, EditorRequired] public InstallerSectionState<SetupSectionData> State { get; set; } = InstallerSectionState<SetupSectionData>.Loading();
+    [Parameter] public EventCallback OnRetry { get; set; }
+    private bool IsLoading => State.Status == InstallerSectionStatus.Loading;
+    private static readonly InstallerEditionSummary[] PlaceholderEditions = [new("online", 0), new("complete", 0)];
+    private IEnumerable<InstallerEditionSummary> Editions => State.Data is { } data ? data.Latest.Editions : PlaceholderEditions;
+    private static string Size(long bytes) => $"{bytes / 1024d / 1024:F1} MiB";
+}

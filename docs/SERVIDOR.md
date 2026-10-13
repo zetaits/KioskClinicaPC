@@ -159,6 +159,7 @@ extraíble por diseño; la clave limitada del asistente del pack es independient
 | `GET /api/setup/sessions/{id}/packages/{packageId}/download` | clave + token de sesión | Descarga privada y reanudable para ese Setup antiguo. |
 | `POST /api/setup/sessions/{id}/packages/{packageId}/status` | clave + token de sesión | Resultado de un paquete de ese Setup antiguo. |
 | `GET /panel/setup/download` | cookie | Online de la versión activa; `edition=complete` para USB y `version=X.Y.Z` para candidatas. |
+| `GET /panel/deployment/download` | cookie | Instalación por red verificada; `version=X.Y.Z` fija la publicación mostrada en el panel. Sin `version`, sirve la última válida. |
 | `GET /api/releases/setup/kiosk-password` | `X-Release-Publish-Key` | Semilla PBKDF2 de la contraseña del panel para perfiles nuevos del asistente privado; no devuelve texto plano. |
 | `POST /api/releases/setup/v3` | `X-Release-Publish-Key` | Importa manifiesto esquema 3, ambos asistentes y componentes como candidata, sin activarla. |
 | `GET /api/setup/v3/components/{kind}/{sha256}` | `X-Setup-Key` | Componentes publicados, inmutables, con ETag y Range. |

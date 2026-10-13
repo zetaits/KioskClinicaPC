@@ -50,6 +50,20 @@ Al cancelar o cerrar durante una instalación, la ventana espera al trabajador.
 No mata instaladores nativos ni borra sus recursos mientras se usan. Un resultado
 ambiguo exige comprobar el equipo o reiniciar manualmente antes de reintentar.
 
+La pantalla final distingue visualmente preparación completa, reinicio pendiente,
+preparación parcial, detenida y sin completar. Si hay pack, resume cuántas
+aplicaciones están verificadas, pendientes o con error. Muestra primero las que
+requieren atención y deja el detalle completo en un desplegable. El código de
+salida no ocupa el resumen visible.
+
+El pack comprueba también si Windows tiene un reinicio pendiente, aunque WinGet
+no lo indique: operaciones de archivos aplazadas, mantenimiento de Windows o
+Windows Update. Conserva asimismo los códigos nativos 3010 y 1641. Un reinicio
+pendiente puede proceder de una instalación anterior; no se atribuye únicamente
+a la última aplicación. El aviso no detiene las otras aplicaciones ni convierte
+una versión verificada en fallo. Se muestra al finalizar y evita ofrecer la
+apertura automática de Kiosk. Nunca se reinicia automáticamente.
+
 ## Aplicaciones y reanudación
 
 La definición procede de `/api/setup/v3/catalog` con `X-Setup-Key` y el encabezado
@@ -69,8 +83,19 @@ catálogo y manifiesto permite como máximo una actualización adicional por
 ejecución. Un fallo de red no autoriza usar un catálogo desactualizado como si
 estuviera actualizado ni seleccionar silenciosamente una versión anterior.
 
-Se instala secuencialmente y se verifica el ámbito y la versión antes de pasar
-a la siguiente aplicación. La API COM usa `System/User`; los manifiestos YAML
+La cola admite hasta cinco aplicaciones en curso. WinGet solapa hasta tres
+descargas (según la capacidad del equipo) y ejecuta una sola instalación nativa.
+Una verificación independiente comprueba la versión y el ámbito mientras puede
+instalarse la siguiente aplicación. Las verificaciones se procesan de una en una;
+las que esperan siguen ocupando una plaza de la cola.
+
+El orden del panel prioriza la entrada en la cola. Entre las aplicaciones
+admitidas, WinGet puede instalar primero la que termine de descargarse. La lista
+de progreso conserva el orden del catálogo y muestra la fase de cada aplicación.
+El detalle muestra una sola frase por aplicación: conserva los bytes descargados y
+los errores sin repetir etiquetas como «Instalando: Instalando…».
+Este comportamiento se aplica al modo gráfico, al silencioso y al trabajador por
+red. La API COM usa `System/User`; los manifiestos YAML
 usan `machine/user`. Una versión igual o superior ya instalada para todo el
 equipo se omite. Una instalación por usuario, un ámbito desconocido o una
 versión no comparable requieren revisión.
@@ -92,9 +117,19 @@ agotado, o un `Retry-After` superior a un minuto, evita repetir esas esperas par
 las siguientes aplicaciones de esa ejecución. Los 404 e incompatibilidades son
 particulares de cada app. Una ejecución nueva vuelve a consultar el repositorio.
 
-Una instalación nativa tiene un límite de 60 minutos. WinGet puede cancelar una
-descarga, pero no garantiza detener un instalador ya activo. Una cancelación,
-timeout o resultado sin verificar detiene la cola y conserva el pack incompleto.
+Cada operación WinGet tiene un límite de 60 minutos desde su admisión, incluyendo
+la cola y la descarga. La verificación posterior tiene un límite total de dos
+minutos y hasta seis consultas, separadas por cinco segundos; no espera después
+de la última consulta fallida.
+
+Si WinGet confirma el éxito pero falla la verificación, esa aplicación queda
+pendiente y se continúan las restantes. No se reinstala automáticamente en esa
+ejecución y el pack permanece incompleto. La protección para reanudar se conserva.
+Una cancelación, timeout nativo o pérdida del resultado COM cierra la admisión y
+cancela las operaciones pendientes. Se espera al instalador que ya se sabe activo,
+sin matarlo, dentro del límite de tiempo. Si no se confirma su resultado, se guarda
+como incierto y no se reintenta hasta comprobarlo. Las respuestas tardías trabajan
+con copias y no cambian el resultado guardado.
 
 Si WinGet necesita preparación, se usa el módulo oficial `Microsoft.WinGet.Client`
 1.12.440 y `Repair-WinGetPackageManager` para WinGet 1.29.380. El módulo se reutiliza
@@ -123,11 +158,34 @@ Estado y logs del trabajador: `%ProgramData%\ClinicaPC\Setup\last-run.json`,
 `%LOCALAPPDATA%\KioskClinicaPC\Setup\logs\assistant-AAAAMMDD.log`. No se registran
 claves, verificador de contraseña ni mensajes de excepción que puedan contenerlos.
 
-Cada ejecución del pack tiene `timings.jsonl` con fecha, fase, aplicación,
-duración y resultado. Las fases son `Bootstrap`, `CatalogRefresh`, `Preflight`,
-`Install` y `Verification`; `Install` incluye la verificación, por lo que esas dos
-duraciones no deben sumarse. Los archivos `*.verification.jsonl` registran versión
+Después de cada resultado nativo de instalación, `*.log.native-result.jsonl`
+registra el estado WinGet, el código del instalador, HRESULT numérico, señal de
+reinicio de WinGet, señal de Windows y resultado combinado. La consulta al Registro
+es de solo lectura, utiliza la vista de 64 bits y no registra rutas de archivos
+pendientes. Si una consulta no está disponible, se deja un diagnóstico sin tratar
+ese fallo de lectura como un fallo de la instalación.
+
+Cada ejecución del pack tiene `timings.jsonl` con fecha de inicio y fin, fase,
+aplicación, duración y resultado. `Install` mide la operación WinGet, incluida su
+consulta inicial, cola y descarga, y excluye la verificación. `Queued`, `Download`,
+`NativeInstall` y `PostInstall` son intervalos observados mediante el progreso COM;
+WinGet puede omitir notificaciones y agrupar fases. `Verification` mide cada
+comprobación final. `PackExecution` mide el tiempo real de la cola completa después
+de autorizarla; `PackTotal` añade la comprobación previa y la espera del coordinador
+(incluida la instalación de Kiosk si se seleccionó). Bootstrap y actualización del
+catálogo conservan sus registros independientes. Las fases solapadas no se suman.
+Los archivos `*.verification.jsonl` registran versión
 requerida/instalada, ámbito COM, comparación nativa y decisión.
+
+El estado añade `phase` y `nativeInstallSucceeded` sin cambiar los valores de
+`state` ni los protocolos de catálogo/componentes. Los estados antiguos se leen
+con la política conservadora previa. El progreso de bytes se emite como máximo
+cada 250 ms por aplicación; las transiciones y los resultados se emiten y guardan
+inmediatamente. Las copias emitidas y guardadas no cambian con callbacks posteriores.
+
+Para comparaciones locales automatizadas, `PackExecutionOptions(MaxInFlight: 1)`
+desactiva el solapamiento. El valor normal es cinco; es una opción interna del
+motor, sin ajustes adicionales en el asistente.
 
 Estos comandos del trabajador son de solo lectura. Ejecutarlos desde su carpeta
 completa, conservando DLL nativa y WinMD junto al EXE:
@@ -199,6 +257,19 @@ otra versión o retirar explícitamente solo sus artefactos ficticios anteriores
 `-KioskVersion` permite fijar la versión del componente incluido; el contenido se
 compila desde el checkout, no se descarga una release histórica por ese número.
 
+Cada edición genera también un `.exe.sha256`. Para preparar archivos con la
+configuración real sin importarlos al panel, PowerShell 7 admite:
+
+```powershell
+& .\build-equipment-setup.ps1 -Version $assistantVersion -PrepareRelease
+```
+
+Exige las mismas variables de `production` que `-Publish`, comprueba el servidor
+y obtiene el aprovisionamiento de contraseña vigente. Genera ambas ediciones,
+componentes, hashes y manifiesto; no importa ni activa la candidata. No combinar
+`-PrepareRelease` y `-Publish`. Un build sin ninguno de esos modificadores sigue
+siendo ficticio y no debe distribuirse.
+
 ## Modo completamente silencioso
 
 Exige una consola ya elevada bajo un usuario interactivo, nunca SYSTEM. No abre
@@ -264,6 +335,36 @@ el pack a `pack-definition-v3.json` y mantiene `pack-applications.json` como pro
 con versiones concretas para `/api/setup/v2/catalog`. Esa proyección tiene revisión
 propia y no modifica la definición v3. Las publicaciones esquema 2 usan
 `/api/releases/setup` y pueden recuperarse con `version=legacy`.
+
+## Carga del apartado Instalador
+
+`/instalador` muestra primero la estructura de las tarjetas y completa por separado
+las secciones de equipos e instalación por red. Durante la consulta, versión,
+tamaño y botones se representan con un esqueleto; el mensaje de ausencia de
+publicaciones aparece únicamente cuando termina la consulta. Un error permite
+reintentar esa sección sin recargar las demás.
+
+El listado lee manifiestos y comprueba compatibilidad, rutas, existencia y tamaño
+de los archivos. Abrir la pantalla no calcula sus SHA-256 ni abre los EXE o ZIP.
+Las comprobaciones completas siguen ejecutándose al importar, activar y descargar.
+Por ello, un archivo alterado que conserve su tamaño puede aparecer en el listado,
+pero no supera la validación necesaria para activar o descargar esa publicación.
+
+**Otras versiones y recuperación** consulta sus datos al desplegarse por primera
+vez. El contador aparece tras cargar el historial; las siguientes aperturas
+reutilizan el resultado durante esa visita. Una visita nueva consulta de nuevo
+los manifiestos. Los resultados iniciales también se conservan al pasar del
+prerenderizado a la interacción de Blazor.
+
+El enlace de instalación por red fija la versión mostrada mediante
+`/panel/deployment/download?version=X.Y.Z`. Si esa publicación desaparece o no
+supera la verificación, la descarga se rechaza sin sustituirla por otra. El endpoint
+sin `version` conserva la selección de la última publicación válida.
+
+Los fallos de almacenamiento se registran como advertencias y el tiempo de las
+consultas como mensajes Debug de `Kiosk.Server.Services.InstallerPageQuery`.
+La recepción progresiva de la página debe comprobarse también a través del proxy
+al publicar el servidor.
 
 ## Verificación y aceptación
 
