@@ -7,7 +7,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 namespace Kiosk.Server.Services;
 
 /// <summary>Immutable candidates and components; only explicit panel activation changes the download pointer.</summary>
-public sealed class SetupReleaseStore
+public sealed partial class SetupReleaseStore
 {
     private readonly string _root;
     private readonly SemaphoreSlim _gate = new(1, 1);
@@ -159,6 +159,8 @@ public sealed class SetupReleaseStore
         string staging = Path.Combine(_root, ".stage-" + Guid.NewGuid().ToString("N"));
         try
         {
+            if (File.Exists(RetirementPath(release.Version)))
+                throw new InvalidDataException("Esta versión fue retirada por retención; publica una versión nueva.");
             string legacyRoot = Path.GetDirectoryName(_root)!;
             string legacyManifest = Path.Combine(legacyRoot, $"Setup-EquipoClinicaPC-{release.Version}.bundle.json");
             string legacyExe = Path.Combine(legacyRoot, $"Setup-EquipoClinicaPC-{release.Version}.exe");
@@ -191,6 +193,7 @@ public sealed class SetupReleaseStore
                 var existing = Find(release.Version);
                 if (existing == null || JsonSerializer.Serialize(existing, Json) != JsonSerializer.Serialize(release, Json))
                     throw new InvalidDataException("Esta versión ya existe con contenido diferente.");
+                TryPruneLocked();
                 return; // Identical verified retry is idempotent.
             }
             foreach (var component in release.Components)
@@ -206,6 +209,7 @@ public sealed class SetupReleaseStore
             }
             await File.WriteAllTextAsync(Path.Combine(staging, "manifest.json"), JsonSerializer.Serialize(release, Json), ct);
             Directory.Move(staging, target); // Release visibility is atomic; active pointer is untouched.
+            TryPruneLocked();
         }
         finally
         {
@@ -221,10 +225,11 @@ public sealed class SetupReleaseStore
         {
             if (version != null && Find(version) == null) throw new InvalidDataException("La candidata no supera la comprobación de todos sus archivos.");
             var current = ReadPointer();
-            if (current.Version == version) return;
+            if (current.Version == version) { TryPruneLocked(); return; }
             await File.WriteAllTextAsync(temporary, JsonSerializer.Serialize(new Pointer(version, current.Version), Json), ct);
             SetupComponentCache.SafePath(Path.Combine(_root, "active.json"));
             File.Move(temporary, Path.Combine(_root, "active.json"), true);
+            TryPruneLocked();
         }
         finally { File.Delete(temporary); _gate.Release(); }
     }

@@ -22,6 +22,11 @@ en `/aplicaciones`; son funciones independientes.
 
 ## Estado de las verificaciones
 
+La retención del historial del asistente conserva cinco versiones en total,
+con prioridad para la activa y la anterior de recuperación. Tiene un
+[informe local](historico/VERIFICACION-RETENCION-ASISTENTE-2026-10-13.md).
+Se aplica al desplegar el servidor actualizado; no modifica los EXE ya publicados.
+
 La carga progresiva de `/instalador` tiene un
 [informe local del 13 de octubre de 2026](historico/VERIFICACION-CARGA-INSTALADOR-2026-10-13.md).
 Incluye pruebas del catálogo, streaming e interacción de componentes, y un paquete

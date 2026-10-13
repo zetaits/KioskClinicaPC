@@ -107,6 +107,7 @@ builder.Services.AddSingleton(new InstallationJobStore(dataDir));
 builder.Services.AddSingleton(new InitialSetupSessionStore(dataDir));
 builder.Services.AddSingleton(new InitialSetupBundleStore(setupDir));
 builder.Services.AddSingleton(sp => new SetupReleaseStore(setupDir, sp.GetRequiredService<ILogger<SetupReleaseStore>>()));
+builder.Services.AddHostedService<SetupReleaseRetentionService>();
 builder.Services.AddSingleton(new PackCatalogStore(dataDir));
 builder.Services.AddSingleton(new DeploymentStore(dataDir));
 builder.Services.AddSingleton(sp => new DeploymentReleaseStore(setupDir, sp.GetRequiredService<ILogger<DeploymentReleaseStore>>()));

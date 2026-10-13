@@ -179,6 +179,28 @@ public sealed class SetupReleaseTests : IDisposable
         await Assert.ThrowsAsync<InvalidDataException>(() => Store.Activate(second.Version, default)); Assert.Equal(release.Version, Store.ActiveVersion);
     }
     [Fact]
+    public async Task Retention_removes_expired_downloads_and_components_but_keeps_the_active_release()
+    {
+        using var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Add("X-Release-Publish-Key", "publisher");
+        client.DefaultRequestHeaders.Add("X-Test-Admin", "1");
+        client.DefaultRequestHeaders.Add("X-Setup-Key", Key);
+        var active = Bundle("1.5.9"); await Publish(client, active.Release, active.Bytes);
+        await Store.Activate(active.Release.Version, default);
+        var expired = Bundle("1.5.10"); await Publish(client, expired.Release, expired.Bytes);
+        for (int version = 11; version <= 14; version++)
+        { var next = Bundle($"1.5.{version}"); await Publish(client, next.Release, next.Bytes); }
+        Assert.Equal(5, Store.List().Count);
+        Assert.Equal(active.Bytes["online"], await client.GetByteArrayAsync("/panel/setup/download"));
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/panel/setup/download?version=1.5.10")).StatusCode);
+        string expiredWorker = expired.Release.Components.Single(c => c.Kind == "worker").Sha256;
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync($"/api/setup/v3/components/worker/{expiredWorker}")).StatusCode);
+        string activeWorker = active.Release.Components.Single(c => c.Kind == "worker").Sha256;
+        Assert.Equal(active.Bytes["worker"], await client.GetByteArrayAsync($"/api/setup/v3/components/worker/{activeWorker}"));
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/health/ready")).StatusCode);
+    }
+
+    [Fact]
     public async Task Legacy_offer_survives_candidates_and_can_be_restored_without_deleting_versions()
     {
         using var client = _factory.CreateClient(); client.DefaultRequestHeaders.Add("X-Test-Admin", "1"); client.DefaultRequestHeaders.Add("X-Release-Publish-Key", "publisher");

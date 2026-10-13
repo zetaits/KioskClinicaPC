@@ -319,7 +319,29 @@ No se aceptan URLs, comandos, rutas ni argumentos del fabricante.
    a verificar EXE y componentes y se sustituye atómicamente `setups/v3/active.json`.
    La importación por sí sola no cambia la versión activa.
 6. Para recuperar, elegir otra publicación validada en **Otras versiones y
-   recuperación**. Conservar las publicaciones y los componentes referenciados.
+   recuperación**. El servidor conserva hasta cinco versiones en total, incluida
+   la que aparece en la tarjeta principal. La activa y la anterior de recuperación
+   tienen prioridad dentro de ese límite; las plazas restantes corresponden a las
+   versiones con numeración más reciente.
+
+La retención se aplica al arrancar el servidor y después de importar o activar
+una versión. También se reintenta cada hora. Retira las carpetas de las ediciones
+Online/Completo antiguas y después los componentes que ya no referencia ninguna
+publicación conservada. Los componentes compartidos se mantienen. Si un archivo
+está en uso o no se puede limpiar, se registra el fallo y se reintenta sin hacer
+fallar una publicación o activación que ya terminó correctamente.
+
+Una marca mínima en `setups/v3/retired/` impide reutilizar números de versión
+retirados. Las versiones eliminadas dejan de estar disponibles para descarga o
+recuperación; un EXE Online antiguo sin componentes en caché puede necesitar
+sustituirse por una versión conservada. El límite se aplica a las publicaciones
+v3 de equipos, conservando los almacenes de instalación por red y del formato
+anterior.
+
+Si el puntero activo no se puede leer, se conserva el almacén. Si no se pueden
+interpretar todos los manifiestos restantes, se conservan los componentes hasta
+que se pueda determinar qué referencias siguen vigentes. La limpieza rechaza
+enlaces y rutas redirigidas y utiliza el mismo bloqueo que publicación y activación.
 
 Un reintento con los mismos archivos y manifiesto es idempotente. Cambiar el
 contenido exige una versión nueva. **Equipment Setup** no crea una release pública

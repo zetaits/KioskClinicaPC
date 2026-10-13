@@ -5,6 +5,7 @@
     </summary>
     <div aria-busy="@(State.Status == InstallerSectionStatus.Loading ? "true" : "false")">
         <p class="muted">Descarga una edición anterior o restáurala como versión activa si necesitas recuperar una instalación.</p>
+        <p class="muted">Se conservan automáticamente hasta cinco versiones en total, incluida la de la tarjeta principal. La activa y la anterior de recuperación tienen prioridad.</p>
         @if (State.Status == InstallerSectionStatus.Loading)
         {
             <div class="setup-history-release" aria-hidden="true">

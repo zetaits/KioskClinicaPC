@@ -6,6 +6,7 @@ Para operar el sistema, usar el [índice de guías actuales](../README.md).
 
 | Documento | Alcance |
 | --- | --- |
+| [Retención del asistente](VERIFICACION-RETENCION-ASISTENTE-2026-10-13.md) | Cinco versiones en total, activa/anterior protegidas y componentes sin referencias retirados. Validación local; aplicación en la VPS pendiente de despliegue. |
 | [Preparación 1.5.11](VERIFICACION-ASISTENTE-1.5.11.md) | Aviso de reinicio corregido, auditoría real de solo lectura y 621 pruebas Release superadas. Online/Completo locales validados con configuración ficticia; publicación de producción pendiente. |
 | [Cola concurrente del pack](VERIFICACION-COLA-PACK-2026-10-13.md) | Pruebas, build y EXE local 1.5.10: cinco instalaciones y seis verificaciones correctas en unos 2 min 32 s tras reiniciar. Solapamiento real confirmado; aviso omitido corregido después en 1.5.11. Benchmark y publicación pendientes. |
 | [Carga de Instalador](VERIFICACION-CARGA-INSTALADOR-2026-10-13.md) | Catálogo ligero, streaming, historial diferido y pruebas locales del 13 de octubre de 2026. Publicación y revisión visual pendientes. |
