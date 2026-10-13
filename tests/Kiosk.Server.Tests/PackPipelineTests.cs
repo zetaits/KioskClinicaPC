@@ -116,7 +116,7 @@ public sealed class PackPipelineTests
         Assert.True(await PackExecution.Run(run, backend, ".", null, snapshots.Add, false, default));
         Assert.True(run.Complete); Assert.True(run.RebootRequired);
         Assert.All(run.Items, item => Assert.True(item.Verified));
-        Assert.Contains("reiniciar manualmente", run.Summary);
+        Assert.Contains("Windows tiene cambios pendientes de reinicio", run.Summary);
         Assert.Equal(3, backend.Calls.Count);
         var saved = JsonSerializer.Deserialize<PackRun>(JsonSerializer.Serialize(snapshots.Last()))!;
         Assert.True(saved.Complete); Assert.True(saved.RebootRequired);

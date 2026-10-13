@@ -79,10 +79,10 @@ public sealed class PackCatalogTests : IDisposable
     [InlineData(PackItemState.Failed, false)]
     [InlineData(PackItemState.VerificationPending, false)]
     [InlineData(PackItemState.Pending, false)]
-    public void Reboot_is_only_remaining_task_when_all_items_verified(PackItemState state, bool complete)
+    public void Reboot_notice_is_shown_when_all_items_verified(PackItemState state, bool complete)
     {
         var run = new PackRun { Items = [new() { Application = new("id", "Vendor.App", "App", "1"), State = state, RebootRequired = true }] };
-        Assert.Equal(complete, run.Complete); Assert.Equal(complete, run.Summary.Contains("Solo queda reiniciar"));
+        Assert.Equal(complete, run.Complete); Assert.Equal(complete, run.Summary.Contains("cambios pendientes de reinicio"));
     }
     public void Dispose() { if (Directory.Exists(_root)) Directory.Delete(_root, true); }
 }
