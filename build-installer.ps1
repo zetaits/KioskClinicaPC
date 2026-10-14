@@ -2,7 +2,7 @@
 # Uso:  .\build-installer.ps1                 (version leida del <Version> del .csproj)
 #       .\build-installer.ps1 -Version 1.1.0  (sobreescribe la version)
 #       .\build-installer.ps1 -ServerApiKey $env:KIOSK_SERVER_API_KEY (Setup provisionado)
-#       .\build-installer.ps1 -Publish        (ademas crea el GitHub Release vX.Y.Z)
+#       .\build-installer.ps1 -PrepareRelease (firma los artefactos para importar en la VPS)
 param(
     [string]$Version,
     [string]$ServerUrl = "https://panel.clinicapc.es",
@@ -10,8 +10,7 @@ param(
     [string]$SigningKeyId = $env:KIOSK_UPDATE_SIGNING_KEY_ID,
     [string]$SigningPublicKey = $env:KIOSK_UPDATE_SIGNING_PUBLIC_KEY,
     [string]$SigningPrivateKey = $env:KIOSK_UPDATE_SIGNING_PRIVATE_KEY,
-    [string]$ReleasePublishKey = $env:KIOSK_RELEASE_PUBLISH_KEY,
-    [switch]$Publish
+    [switch]$PrepareRelease
 )
 
 $ErrorActionPreference = "Stop"
@@ -58,8 +57,8 @@ if ($ServerApiKey -and $ServerApiKey -notmatch '^[0-9a-fA-F]{64}$') {
 if ([string]::IsNullOrWhiteSpace($ServerApiKey)) {
     Write-Warning "No se indicó ServerApiKey: el instalador no preconfigurará el servidor."
 }
-if ($Publish -and ([string]::IsNullOrWhiteSpace($ServerUrl) -or [string]::IsNullOrWhiteSpace($ServerApiKey))) {
-    throw "Para publicar una release que conecte los kioscos se requieren ServerUrl y KIOSK_SERVER_API_KEY."
+if ($PrepareRelease -and ([string]::IsNullOrWhiteSpace($ServerUrl) -or [string]::IsNullOrWhiteSpace($ServerApiKey))) {
+    throw "Para preparar una release que conecte los kioscos se requieren ServerUrl y KIOSK_SERVER_API_KEY."
 }
 
 # 1. Valida las rutas antes de limpiar salidas generadas.
@@ -72,8 +71,8 @@ if (Test-Path $agentPublishDir) { Remove-Item $agentPublishDir -Recurse -Force }
 if (Test-Path $maintenancePublishDir) { Remove-Item $maintenancePublishDir -Recurse -Force }
 if (Test-Path $updateRunnerPublishDir) { Remove-Item $updateRunnerPublishDir -Recurse -Force }
 
-# 2. Publish Release self-contained win-x64. Fija la version del assembly = $Version (la lee el
-#    auto-update en runtime para comparar con el ultimo release de GitHub).
+# 2. Publish Release self-contained win-x64. Fija la version del assembly = $Version
+#    para comparar con la version objetivo asignada por la VPS.
 Write-Host "==> dotnet publish..." -ForegroundColor Cyan
 & $dotnet publish $csproj -c Release -r win-x64 --self-contained true -p:Version=$Version -o $publishDir -nologo @dotnetBuildArgs
 if ($LASTEXITCODE -ne 0) { throw "dotnet publish fallo (exit $LASTEXITCODE)" }
@@ -98,18 +97,18 @@ if ($SigningKeyId -and $SigningPublicKey) {
     New-Item -ItemType Directory -Path $keyDir -Force | Out-Null
     [IO.File]::WriteAllText((Join-Path $keyDir "$SigningKeyId.pem"), $SigningPublicKey, [Text.UTF8Encoding]::new($false))
 }
-elseif ($Publish) { throw "Para publicar se requieren KIOSK_UPDATE_SIGNING_KEY_ID y KIOSK_UPDATE_SIGNING_PUBLIC_KEY." }
+elseif ($PrepareRelease) { throw "Para preparar una release se requieren KIOSK_UPDATE_SIGNING_KEY_ID y KIOSK_UPDATE_SIGNING_PUBLIC_KEY." }
 
-# 3. Compila el Setup público Kiosk-only. Con API key, la incluye para aprovisionar
-#    perfiles antiguos sin servidor; cualquiera que descargue el Setup puede extraerla.
-Write-Host "==> Compilando instalador público Kiosk-only..." -ForegroundColor Cyan
-$publicArgs = @("/DMyAppVersion=$Version")
+# 3. Compila el componente Kiosk-only. Con API key, aprovisiona perfiles antiguos
+#    sin servidor; la clave se puede extraer de cualquier copia del componente.
+Write-Host "==> Compilando componente Kiosk-only..." -ForegroundColor Cyan
+$setupArgs = @("/DMyAppVersion=$Version")
 if ($ServerUrl -and $ServerApiKey) {
-    $publicArgs += "/DDefaultServerUrl=$ServerUrl"
-    $publicArgs += "/DDefaultServerApiKey=$ServerApiKey"
+    $setupArgs += "/DDefaultServerUrl=$ServerUrl"
+    $setupArgs += "/DDefaultServerApiKey=$ServerApiKey"
 }
-$publicArgs += $iss
-& $iscc @publicArgs
+$setupArgs += $iss
+& $iscc @setupArgs
 if ($LASTEXITCODE -ne 0) { throw "ISCC fallo (exit $LASTEXITCODE)" }
 
 # 4. Localiza el Setup y genera su checksum SHA256 (lo verifica el auto-update antes de instalar).
@@ -121,20 +120,17 @@ $hash = (Get-FileHash $setup -Algorithm SHA256).Hash.ToLower()
 "$hash *$(Split-Path $setup -Leaf)" | Out-File -FilePath $shaFile -Encoding ascii -NoNewline
 Write-Host "==> SHA256: $hash" -ForegroundColor Green
 
-# 5. Opcional: publica el GitHub Release con el Setup + su .sha256 como assets.
-if ($Publish) {
+# 5. Opcional: firma el instalador para la importación privada en la VPS.
+if ($PrepareRelease) {
     if (-not $SigningPrivateKey) { throw "KIOSK_UPDATE_SIGNING_PRIVATE_KEY es obligatoria para publicar." }
-    if (-not $ReleasePublishKey) { throw "KIOSK_RELEASE_PUBLISH_KEY es obligatoria para importar la release en la VPS." }
-    Write-Host "==> Publicando release v$Version en GitHub..." -ForegroundColor Cyan
-    $githubRepository = if ($env:GITHUB_REPOSITORY) { $env:GITHUB_REPOSITORY } else { "zetaits/KioskClinicaPC" }
-    $fallbackUrl = "https://github.com/$githubRepository/releases/download/v$Version/$(Split-Path $setup -Leaf)"
+    Write-Host "==> Firmando release v$Version para la VPS..." -ForegroundColor Cyan
     $manifestPath = Join-Path $outputDir "kiosk-release-$Version.json"
     $signaturePath = "$manifestPath.sig"
     $manifest = [ordered]@{
         schemaVersion = 1; version = $Version; fileName = (Split-Path $setup -Leaf)
         sizeBytes = (Get-Item $setup).Length; sha256 = $hash
         publishedAtUtc = [DateTime]::UtcNow.ToString("o"); keyId = $SigningKeyId
-        minimumUpdaterVersion = "1.2.0"; releaseNotes = "Version $Version"; githubFallbackUrl = $fallbackUrl
+        minimumUpdaterVersion = "1.2.0"; releaseNotes = "Version $Version"
     }
     [IO.File]::WriteAllText($manifestPath, ($manifest | ConvertTo-Json -Compress), [Text.UTF8Encoding]::new($false))
     $previousPrivateKey = $env:KIOSK_UPDATE_SIGNING_PRIVATE_KEY
@@ -149,16 +145,7 @@ if ($Publish) {
         $env:KIOSK_UPDATE_SIGNING_PRIVATE_KEY = $previousPrivateKey
         $env:KIOSK_UPDATE_SIGNING_PUBLIC_KEY = $previousPublicKey
     }
-    & gh release view "v$Version" --json tagName *> $null
-    if ($LASTEXITCODE -eq 0) {
-        throw "La release v$Version ya existe. No se sobrescribe porque sus binarios y manifiesto son inmutables."
-    }
-    & gh release create "v$Version" $setup $shaFile $manifestPath $signaturePath --title "v$Version" --notes "Version $Version"
-    if ($LASTEXITCODE -ne 0) { throw "gh release create fallo (exit $LASTEXITCODE)" }
-    $headers = @{ "X-Release-Publish-Key" = $ReleasePublishKey }
-    $form = @{ manifest = Get-Item $manifestPath; signature = Get-Content $signaturePath -Raw; setup = Get-Item $setup }
-    Invoke-RestMethod -Method Post -Uri "$($ServerUrl.TrimEnd('/'))/api/releases" -Headers $headers -Form $form | Out-Null
-    Write-Host "Release v$Version publicado." -ForegroundColor Green
+    Write-Host "Release v$Version firmada. Importa estos artefactos desde el workflow protegido." -ForegroundColor Green
 }
 
 Write-Host "`nListo. Instalador en: installer\Output\" -ForegroundColor Green

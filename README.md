@@ -139,8 +139,9 @@ restart or shut down the machine. Shop-wide restart and shutdown controls are av
 ### Managed kiosk updates
 GitHub Actions builds the Windows installer and signs an immutable release manifest. The VPS keeps the
 approved target version, stages the update across the fleet during a configurable maintenance window and
-shows download, installation and post-reboot confirmation per machine. GitHub Releases remains the fallback
-artifact source, and an older signed release can be selected for an explicit rollback.
+shows download, installation and post-reboot confirmation per machine. The installer is imported into the
+VPS and is not published as a standalone GitHub Release. An older signed release can be selected for an
+explicit rollback.
 
 ### Security
 Change the panel password, check the server's current state and review recent successful, failed or
@@ -157,7 +158,7 @@ throttled login attempts.
 
 None of this is needed to use it, but in case you're curious:
 
-- **Installation components.** `Kiosk.InstallerCore` verifies and executes private fleet installers. `Kiosk.WinGetCore` handles pack preparation and verification; `Kiosk.EquipmentCore` connects these resources to the equipment assistant and network deployment. The private assistant offers Online and Completo editions and can install Kiosk, the server-defined pack, or both. The public update installer installs Kiosk. The solution includes the client, server, shared contracts, installer helpers, network deployment projects and three test projects.
+- **Installation components.** `Kiosk.InstallerCore` verifies and executes private fleet installers. `Kiosk.WinGetCore` handles pack preparation and verification; `Kiosk.EquipmentCore` connects these resources to the equipment assistant and network deployment. The private assistant offers Online and Completo editions and can install Kiosk, the server-defined pack, or both. Managed updates use the same internal Kiosk installer. The solution includes the client, server, shared contracts, installer helpers, network deployment projects and three test projects.
 - **WPF + .NET 10**, home-grown MVVM, no external frameworks. A single window; 4 "screens" that swap in and out.
 - **Client ↔ server, without a single point of failure.** The client merges the server's *shared* content over its own *local* content (`SharedContent` draws the line: shop/slides/texts from the server, price/specs per-machine). If the server can't be reached it uses the last cached copy. Live updates come over **SignalR**: the panel pushes a "content changed" ping the moment you save, with slow version-polling as a backstop.
 - **The attract loop is clock-synced.** The server keeps a master clock; each kiosk computes the same slide index from it (correcting clock drift), so a row of screens stays in step without the server pushing every slide change.

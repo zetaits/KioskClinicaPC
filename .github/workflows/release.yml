@@ -5,7 +5,7 @@ on:
     tags: ['v*.*.*']
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: kiosk-production-release
@@ -26,14 +26,12 @@ jobs:
       - name: Test
         shell: pwsh
         run: dotnet test -c Release
-      - name: Build, sign, publish and import
+      - name: Build and sign
         shell: pwsh
         env:
-          GH_TOKEN: ${{ github.token }}
           KIOSK_UPDATE_SIGNING_KEY_ID: ${{ vars.KIOSK_UPDATE_SIGNING_KEY_ID }}
           KIOSK_UPDATE_SIGNING_PUBLIC_KEY: ${{ secrets.KIOSK_UPDATE_SIGNING_PUBLIC_KEY }}
           KIOSK_UPDATE_SIGNING_PRIVATE_KEY: ${{ secrets.KIOSK_UPDATE_SIGNING_PRIVATE_KEY }}
-          KIOSK_RELEASE_PUBLISH_KEY: ${{ secrets.KIOSK_RELEASE_PUBLISH_KEY }}
           KIOSK_SERVER_API_KEY: ${{ secrets.KIOSK_SERVER_API_KEY }}
           KIOSK_SERVER_URL: https://panel.clinicapc.es
           RELEASE_TAG: ${{ github.ref_name }}
@@ -41,4 +39,38 @@ jobs:
           $tag = $env:RELEASE_TAG
           if ($tag -notmatch '^v\d+\.\d+\.\d+$') { throw "El tag debe tener formato vX.Y.Z." }
           $version = $tag.TrimStart('v')
-          .\build-installer.ps1 -Version $version -ServerUrl $env:KIOSK_SERVER_URL -Publish
+          .\build-installer.ps1 -Version $version -ServerUrl $env:KIOSK_SERVER_URL -PrepareRelease
+      - name: Store signed release for VPS import retries
+        shell: pwsh
+        env:
+          KIOSK_RELEASE_PUBLISH_KEY: ${{ secrets.KIOSK_RELEASE_PUBLISH_KEY }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          $version = $env:RELEASE_TAG.TrimStart('v')
+          dotnet run --project tools/Kiosk.ReleaseTool -c Release -- protect $version installer/Output kiosk-release.enc
+          if ($LASTEXITCODE -ne 0) { throw 'No se pudo cifrar el artefacto de recuperación.' }
+      - name: Upload encrypted recovery artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: kiosk-release-${{ github.ref_name }}
+          path: kiosk-release.enc
+          if-no-files-found: error
+          retention-days: 90
+      - name: Import into VPS
+        shell: pwsh
+        env:
+          KIOSK_RELEASE_PUBLISH_KEY: ${{ secrets.KIOSK_RELEASE_PUBLISH_KEY }}
+          KIOSK_SERVER_URL: https://panel.clinicapc.es
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          $version = $env:RELEASE_TAG.TrimStart('v')
+          $manifestPath = "installer/Output/kiosk-release-$version.json"
+          $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
+          $setupPath = Join-Path 'installer/Output' $manifest.fileName
+          $form = @{
+            manifest = Get-Item -LiteralPath $manifestPath
+            signature = Get-Content -LiteralPath "$manifestPath.sig" -Raw
+            setup = Get-Item -LiteralPath $setupPath
+          }
+          Invoke-RestMethod -Method Post -Uri "$($env:KIOSK_SERVER_URL.TrimEnd('/'))/api/releases" `
+            -Headers @{ 'X-Release-Publish-Key' = $env:KIOSK_RELEASE_PUBLISH_KEY } -Form $form | Out-Null

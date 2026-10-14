@@ -1,8 +1,6 @@
 using System.Net;
 using System.Security.Claims;
-using System.Security.Cryptography;
 using System.Text.Encodings.Web;
-using Kiosk.Server.Services;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -10,7 +8,6 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Newtonsoft.Json;
 using Xunit;
 
 namespace Kiosk.Server.Tests;
@@ -42,41 +39,27 @@ public sealed class SetupDownloadIntegrationTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Download_signals_start_only_after_bundle_validation_and_supports_ranges()
+    public async Task Legacy_bundle_is_not_downloadable_even_when_its_files_remain_on_disk()
     {
         string setups = Path.Combine(_root, "setups");
         string name = "Setup-EquipoClinicaPC-1.2.0.exe";
         byte[] bytes = [1, 2, 3, 4, 5, 6];
         File.WriteAllBytes(Path.Combine(setups, name), bytes);
-        var manifest = new InitialSetupBundleManifest
-        {
-            SchemaVersion = 2, InstallerKind = "equipment-wpf", CatalogApiVersion = 2, SourceCommit = new string('a', 40),
-            AssistantVersion = "1.2.0", WorkerVersion = "1.3.0", KioskVersion = "1.2.0",
-            Version = "1.2.0", FileName = name, SizeBytes = bytes.Length,
-            Sha256 = Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant(),
-            ServerUrl = "https://panel.clinicapc.es"
-        };
-        File.WriteAllText(Path.Combine(setups, "Setup-EquipoClinicaPC-1.2.0.bundle.json"),
-            JsonConvert.SerializeObject(manifest));
 
         HttpClient client = _factory.CreateClient();
         string downloadId = Guid.NewGuid().ToString("N");
-        using var request = new HttpRequestMessage(HttpMethod.Get, $"/panel/setup/download?downloadId={downloadId}");
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"/panel/setup/download?version=legacy&downloadId={downloadId}");
         request.Headers.Range = new System.Net.Http.Headers.RangeHeaderValue(0, 1);
         HttpResponseMessage response = await client.SendAsync(request);
 
-        Assert.Equal(HttpStatusCode.PartialContent, response.StatusCode);
-        Assert.Equal([1, 2], await response.Content.ReadAsByteArrayAsync());
-        Assert.Contains(response.Headers.GetValues("Set-Cookie"), x =>
-            x.StartsWith($"kioskSetupDownload={downloadId};", StringComparison.Ordinal));
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.False(response.Headers.Contains("Set-Cookie"));
 
         HttpResponseMessage plain = await client.GetAsync("/panel/setup/download");
-        Assert.Equal(HttpStatusCode.OK, plain.StatusCode);
-        Assert.Equal(bytes, await plain.Content.ReadAsByteArrayAsync());
+        Assert.Equal(HttpStatusCode.NotFound, plain.StatusCode);
         Assert.False(plain.Headers.Contains("Set-Cookie"));
 
-        File.WriteAllBytes(Path.Combine(setups, name), [7, 8, 9, 10, 11, 12]);
-        HttpResponseMessage invalid = await client.GetAsync($"/panel/setup/download?downloadId={downloadId}");
+        HttpResponseMessage invalid = await client.GetAsync($"/panel/setup/download?version=legacy&downloadId={downloadId}");
         Assert.Equal(HttpStatusCode.NotFound, invalid.StatusCode);
         Assert.False(invalid.Headers.Contains("Set-Cookie"));
     }

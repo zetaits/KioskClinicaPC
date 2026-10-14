@@ -43,6 +43,13 @@ desconocidos. No se infieren argumentos ejecutando EXE arbitrarios.
 Una versión igual o superior ya instalada para todo el equipo se omite. Un fallo
 de red no autoriza descender silenciosamente a versiones antiguas. La instalación
 parcial no permite continuar con un instalador activo o de resultado incierto.
+Si la URL sin versión del MSI empresarial de Chrome se adelanta al manifiesto y WinGet
+detecta un hash distinto, el asistente usa la descarga oficial firmada y comprueba
+identidad y versión antes de instalar. Las demás aplicaciones siguen la política
+de hash del manifiesto WinGet.
+Para cualquier aplicación, un fallo de descarga confirmado antes de ejecutar su
+instalador admite un reintento, excepto el hash distinto de un paquete sin vía
+específica. Un segundo fallo queda pendiente de revisión con su código.
 Los límites, preparación de WinGet y reanudación están en la
 [política del asistente](ASISTENTE-EQUIPOS.md#aplicaciones-y-reanudación).
 

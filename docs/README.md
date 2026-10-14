@@ -22,6 +22,11 @@ en `/aplicaciones`; son funciones independientes.
 
 ## Estado de las verificaciones
 
+El desfase entre la URL sin versión de Chrome Enterprise y su manifiesto WinGet tiene
+una [corrección local documentada](historico/VERIFICACION-CHROME-PACK-2026-10-14.md).
+La instalación integral y publicación de un nuevo asistente están pendientes;
+el EXE 1.5.12 no incorpora esta corrección.
+
 La retención del historial del asistente conserva cinco versiones en total,
 con prioridad para la activa y la anterior de recuperación. Tiene un
 [informe local](historico/VERIFICACION-RETENCION-ASISTENTE-2026-10-13.md).
@@ -44,8 +49,9 @@ El aviso de reinicio omitido por el resumen quedó corregido en la
 Release superadas, ambos EXE locales diagnosticados y auditoría real de solo
 lectura con seis verificadas y reinicio pendiente detectado. Los EXE locales son
 de validación ficticia; el workflow genera los de producción con sus credenciales.
-El benchmark en Windows 10/11 y la publicación siguen pendientes. El cambio no
-está publicado ni activado.
+La candidata de producción 1.5.11 se importó al panel el 13 de octubre con Kiosk
+1.2.2. La prueba de instalación limpia y la activación siguen sin confirmar;
+el benchmark en Windows 10/11 está pendiente.
 
 La verificación de la candidata
 [1.5.9](historico/VERIFICACION-ASISTENTE-1.5.9.md) recoge builds ficticios, pruebas

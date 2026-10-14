@@ -6,7 +6,7 @@ using KioskClinicaPC.Core.Sync;
 
 namespace Kiosk.SetupHelper;
 
-internal sealed class WinGetEngine : IPackBackend
+internal sealed class WinGetEngine : IPackBackend, IPackDeferredBackend
 {
     private readonly PackageManager _manager;
     private readonly Action<string>? _phase, _info;
@@ -233,7 +233,11 @@ internal sealed class WinGetEngine : IPackBackend
             async () => result = await ExecuteNativeCore(item, log, progress, ct), () => result?.Disposition.ToString() ?? "Uncertain");
         return result!;
     }
-    private async Task<PackNativeResult> ExecuteNativeCore(PackItemResult item, string log, Action<PackProgress> progress, CancellationToken ct)
+    public Task<PackNativeResult> ExecuteDeferred(PackItemResult item, string log, Action<PackProgress> progress, CancellationToken ct)
+        => item.Application.WingetId.Equals("Google.Chrome", StringComparison.OrdinalIgnoreCase)
+            ? ChromeEnterpriseFallback.Install(item, log, progress, ct)
+            : Task.FromResult(new PackNativeResult(PackNativeDisposition.Failed, "No hay instalador alternativo para esta aplicación."));
+    private async Task<PackNativeResult> ExecuteNativeCore(PackItemResult item, string log, Action<PackProgress> progress, CancellationToken ct, int attempt = 1)
     {
         CatalogPackage package;
         InstallOptions options;
@@ -300,6 +304,8 @@ internal sealed class WinGetEngine : IPackBackend
             InstallResultStatus.InternalError => PackNativeDisposition.Uncertain,
             _ => PackNativeDisposition.Failed
         };
+        if (result.Status == InstallResultStatus.DownloadError && Volatile.Read(ref nativeStarted) != 0)
+            disposition = PackNativeDisposition.Uncertain;
         if (ct.IsCancellationRequested && disposition != PackNativeDisposition.Succeeded)
             disposition = PackNativeDisposition.Uncertain;
         bool systemRebootPending = WinGetRebootStatus.ReadSystemPending(_info);
@@ -311,7 +317,7 @@ internal sealed class WinGetEngine : IPackBackend
                 // Numeric/native evidence only: no exception text or request data.
                 File.AppendAllText(log + ".native-result.jsonl", JsonSerializer.Serialize(new
                 {
-                    atUtc = DateTime.UtcNow, wingetId = item.Application.WingetId, status = result.Status.ToString(),
+                    atUtc = DateTime.UtcNow, wingetId = item.Application.WingetId, attempt, status = result.Status.ToString(),
                     installerCode = result.InstallerErrorCode, extendedHResult = result.ExtendedErrorCode?.HResult,
                     winGetRebootRequired = result.RebootRequired, systemRebootPending, rebootRequired
                 }) + Environment.NewLine);
@@ -319,9 +325,28 @@ internal sealed class WinGetEngine : IPackBackend
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             { _info?.Invoke($"Native diagnostic could not be written: {ex.GetType().Name}; HRESULT {ex.HResult:X8}"); }
         }
+        if (disposition == PackNativeDisposition.Failed &&
+            ChromeEnterpriseFallback.Applies(item.Application.WingetId, result.Status, result.ExtendedErrorCode?.HResult))
+        {
+            phases?.Complete("Deferred");
+            return new(PackNativeDisposition.Deferred,
+                "El MSI de Chrome cambió antes que el catálogo WinGet; se usará el instalador oficial al terminar la cola.", rebootRequired);
+        }
+        if (result.Status == InstallResultStatus.DownloadError && disposition == PackNativeDisposition.Failed &&
+            result.ExtendedErrorCode?.HResult != ChromeEnterpriseFallback.HashMismatch &&
+            attempt == 1 && !ct.IsCancellationRequested)
+        {
+            phases?.Complete("Retry");
+            progress(new(PackItemPhase.Downloading, "Reintentando descarga de WinGet…"));
+            try { await Task.Delay(TimeSpan.FromSeconds(2), ct); }
+            catch (OperationCanceledException)
+            { return new(PackNativeDisposition.Failed, "Descarga cancelada antes del reintento.", rebootRequired); }
+            return await ExecuteNativeCore(item, log, progress, ct, attempt: 2);
+        }
         phases?.Complete(disposition.ToString());
+        string extendedCode = result.ExtendedErrorCode is { } error ? $"0x{error.HResult:X8}" : "no disponible";
         return new(disposition, disposition == PackNativeDisposition.Succeeded ? "WinGet terminó correctamente."
-            : $"WinGet {result.Status}; instalador {result.InstallerErrorCode}; {result.ExtendedErrorCode?.Message}", rebootRequired);
+            : $"WinGet {result.Status}; HRESULT {extendedCode}; instalador {result.InstallerErrorCode}.", rebootRequired);
     }
     public async Task<PackVerificationResult> Verify(PackItemResult item, string log, CancellationToken ct)
     {

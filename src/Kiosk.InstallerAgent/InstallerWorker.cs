@@ -250,18 +250,8 @@ public sealed class InstallerWorker : BackgroundService
                 throw new InvalidDataException($"El agente {Version} no cumple la versión mínima {manifest.MinimumUpdaterVersion}.");
 
             string setupPath = Path.Combine(folder, manifest.FileName);
-            try
-            {
-                await PackageInstallation.DownloadResumable(http, $"api/updates/{assignment.JobId}/download", setupPath,
-                    manifest.SizeBytes, p => ReportUpdate(http, assignment, KioskUpdateState.Downloading, p, null, null, ct), ct);
-            }
-            catch when (!string.IsNullOrWhiteSpace(manifest.GitHubFallbackUrl))
-            {
-                _log.LogWarning("La descarga desde la VPS falló; usando el respaldo firmado de GitHub para {Version}.", manifest.Version);
-                using var fallback = new HttpClient { Timeout = TimeSpan.FromMinutes(20) };
-                await PackageInstallation.DownloadResumable(fallback, manifest.GitHubFallbackUrl!, setupPath,
-                    manifest.SizeBytes, _ => Task.CompletedTask, ct);
-            }
+            await PackageInstallation.DownloadResumable(http, $"api/updates/{assignment.JobId}/download", setupPath,
+                manifest.SizeBytes, p => ReportUpdate(http, assignment, KioskUpdateState.Downloading, p, null, null, ct), ct);
             if (!KioskReleaseSecurity.Sha256(setupPath).Equals(manifest.Sha256, StringComparison.OrdinalIgnoreCase))
                 throw new CryptographicException("El SHA-256 del instalador descargado no coincide.");
 

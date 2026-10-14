@@ -171,6 +171,16 @@ public sealed class SetupReleaseTests : IDisposable
         Assert.Equal(release.Version, Store.ActiveVersion);
         Assert.Equal(bytes["online"], await client.GetByteArrayAsync("/panel/setup/download"));
         Assert.Equal(bytes["complete"], await client.GetByteArrayAsync("/panel/setup/download?edition=complete"));
+        string downloadId = Guid.NewGuid().ToString("N");
+        using (var request = new HttpRequestMessage(HttpMethod.Get, $"/panel/setup/download?downloadId={downloadId}"))
+        {
+            request.Headers.Range = new System.Net.Http.Headers.RangeHeaderValue(0, 1);
+            using var response = await client.SendAsync(request);
+            Assert.Equal(HttpStatusCode.PartialContent, response.StatusCode);
+            Assert.Equal(bytes["online"][..2], await response.Content.ReadAsByteArrayAsync());
+            Assert.Contains(response.Headers.GetValues("Set-Cookie"), x =>
+                x.StartsWith($"kioskSetupDownload={downloadId};", StringComparison.Ordinal));
+        }
         var fresh = new SetupReleaseStore(Path.Combine(_root, "Setup")); Assert.Equal(release.Version, fresh.ActiveVersion);
         var (second, secondBytes) = Bundle("1.6.0"); await Publish(client, second, secondBytes); Assert.Equal(release.Version, Store.ActiveVersion);
         await Store.Activate(second.Version, default); Assert.Equal(release.Version, Store.PreviousVersion);
@@ -201,14 +211,13 @@ public sealed class SetupReleaseTests : IDisposable
     }
 
     [Fact]
-    public async Task Legacy_offer_survives_candidates_and_can_be_restored_without_deleting_versions()
+    public async Task Legacy_files_are_not_downloadable_or_activatable()
     {
         using var client = _factory.CreateClient(); client.DefaultRequestHeaders.Add("X-Test-Admin", "1"); client.DefaultRequestHeaders.Add("X-Release-Publish-Key", "publisher");
         byte[] oldBytes = [10, 11, 12];
-        var legacy = new InitialSetupBundleManifest { SchemaVersion = 2, InstallerKind = "equipment-wpf", CatalogApiVersion = 3,
-            Version = "1.4.0", AssistantVersion = "1.4.0", WorkerVersion = "1.4.0", KioskVersion = "1.2.0", SourceCommit = new string('a', 40),
-            ServerUrl = "https://panel.invalid", FileName = "Setup-EquipoClinicaPC-1.4.0.exe", SizeBytes = oldBytes.Length, Sha256 = Hash(oldBytes) };
-        using (var stream = new MemoryStream(oldBytes)) await _factory.Services.GetRequiredService<InitialSetupBundleStore>().ImportAsync(legacy, legacy.FileName, stream, default);
+        string legacyRoot = Path.Combine(_root, "Setup");
+        Directory.CreateDirectory(legacyRoot);
+        File.WriteAllBytes(Path.Combine(legacyRoot, "Setup-EquipoClinicaPC-1.4.0.exe"), oldBytes);
         var (conflicting, conflictingBytes) = Bundle("1.4.0");
         using (var form = Form(conflicting, conflictingBytes)) Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsync("/api/releases/setup/v3", form)).StatusCode);
         var (release, bytes) = Bundle(); await Publish(client, release, bytes);
@@ -220,15 +229,12 @@ public sealed class SetupReleaseTests : IDisposable
         Assert.DoesNotContain("1.4.0", html);
         Assert.DoesNotContain("version=legacy", html);
         Assert.Null(Store.ActiveVersion);
-        var legacyConflict = new InitialSetupBundleManifest { SchemaVersion = 2, InstallerKind = "equipment-wpf", CatalogApiVersion = 3,
-            Version = release.Version, AssistantVersion = release.Version, WorkerVersion = release.Version, KioskVersion = "1.2.0", SourceCommit = new string('a', 40),
-            ServerUrl = "https://panel.invalid", FileName = $"Setup-EquipoClinicaPC-{release.Version}.exe", SizeBytes = oldBytes.Length, Sha256 = Hash(oldBytes) };
-        using (var stream = new MemoryStream(oldBytes))
-            await Assert.ThrowsAsync<InvalidDataException>(() => _factory.Services.GetRequiredService<InitialSetupBundleStore>().ImportAsync(legacyConflict, legacyConflict.FileName, stream, default));
-        Assert.Equal(oldBytes, await client.GetByteArrayAsync("/panel/setup/download"));
+        File.WriteAllBytes(Path.Combine(legacyRoot, $"Setup-EquipoClinicaPC-{release.Version}.exe"), oldBytes);
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/panel/setup/download")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/panel/setup/download?version=legacy")).StatusCode);
         Assert.Equal(bytes["complete"], await client.GetByteArrayAsync($"/panel/setup/download?version={release.Version}&edition=complete"));
         await Store.Activate(release.Version, default); Assert.Equal(bytes["online"], await client.GetByteArrayAsync("/panel/setup/download"));
-        await Store.Activate(null, default); Assert.Equal(oldBytes, await client.GetByteArrayAsync("/panel/setup/download")); Assert.Single(Store.List());
+        Assert.Single(Store.List());
         var (latest, latestBytes) = Bundle("1.6.0"); await Publish(client, latest, latestBytes);
         await Store.Activate(release.Version, default);
         html = WebUtility.HtmlDecode(await client.GetStringAsync("/instalador"));

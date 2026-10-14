@@ -7,8 +7,13 @@ on:
         description: Existing immutable release version (X.Y.Z)
         required: true
         type: string
+      run_id:
+        description: Run ID of the Release Kiosk workflow that built this version
+        required: true
+        type: string
 
 permissions:
+  actions: read
   contents: read
 
 jobs:
@@ -16,20 +21,28 @@ jobs:
     runs-on: windows-latest
     environment: production
     steps:
-      - name: Download the exact signed GitHub assets and import them
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Download the exact signed workflow artifact and import it
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
           KIOSK_RELEASE_PUBLISH_KEY: ${{ secrets.KIOSK_RELEASE_PUBLISH_KEY }}
           KIOSK_SERVER_URL: https://panel.clinicapc.es
           RELEASE_VERSION: ${{ inputs.version }}
+          RELEASE_RUN_ID: ${{ inputs.run_id }}
         run: |
           $version = $env:RELEASE_VERSION
           if ($version -notmatch '^\d+\.\d+\.\d+$') { throw "La versión debe tener formato X.Y.Z." }
+          if ($env:RELEASE_RUN_ID -notmatch '^\d+$') { throw "El run ID debe ser numérico." }
           New-Item -ItemType Directory -Path release-import | Out-Null
-          gh release download "v$version" --repo $env:GITHUB_REPOSITORY --dir release-import
-          if ($LASTEXITCODE -ne 0) { throw "No se pudo descargar la release v$version." }
+          gh run download $env:RELEASE_RUN_ID --repo $env:GITHUB_REPOSITORY --name "kiosk-release-v$version" --dir release-import
+          if ($LASTEXITCODE -ne 0) { throw "No se pudo descargar el artefacto firmado del run $env:RELEASE_RUN_ID." }
 
+          dotnet run --project tools/Kiosk.ReleaseTool -c Release -- unprotect $version (Join-Path release-import 'kiosk-release.enc') release-import
+          if ($LASTEXITCODE -ne 0) { throw 'No se pudo descifrar el artefacto de recuperación.' }
           $manifestPath = Join-Path release-import "kiosk-release-$version.json"
           $signaturePath = "$manifestPath.sig"
           if (-not (Test-Path -LiteralPath $manifestPath) -or -not (Test-Path -LiteralPath $signaturePath)) {

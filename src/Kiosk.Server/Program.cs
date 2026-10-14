@@ -105,7 +105,6 @@ builder.Services.AddSingleton(new FleetRegistry(dataDir, storeTz));
 builder.Services.AddSingleton(new InstallerCatalog(dataDir, installersDir, maxInstallerBytes));
 builder.Services.AddSingleton(new InstallationJobStore(dataDir));
 builder.Services.AddSingleton(new InitialSetupSessionStore(dataDir));
-builder.Services.AddSingleton(new InitialSetupBundleStore(setupDir));
 builder.Services.AddSingleton(sp => new SetupReleaseStore(setupDir, sp.GetRequiredService<ILogger<SetupReleaseStore>>()));
 builder.Services.AddHostedService<SetupReleaseRetentionService>();
 builder.Services.AddSingleton(new PackCatalogStore(dataDir));
@@ -414,27 +413,6 @@ app.MapPost("/api/releases/setup/v3", async (HttpContext ctx, SetupReleaseStore 
     finally { foreach (var stream in streams) await stream.DisposeAsync(); }
 }).DisableAntiforgery();
 
-app.MapPost("/api/releases/setup", async (HttpContext ctx, InitialSetupBundleStore bundles) =>
-{
-    if (!SecretEquals(releasePublishKey, ctx.Request.Headers["X-Release-Publish-Key"].FirstOrDefault()))
-        return string.IsNullOrWhiteSpace(releasePublishKey) ? Results.StatusCode(503) : Results.Unauthorized();
-    try
-    {
-        var form = await ctx.Request.ReadFormAsync(ctx.RequestAborted);
-        var manifest = form.Files.GetFile("manifest") ?? throw new InvalidDataException("Falta el manifiesto.");
-        var setup = form.Files.GetFile("setup") ?? throw new InvalidDataException("Falta el Setup.");
-        if (manifest.Length is <= 0 or > 128 * 1024) throw new InvalidDataException("Manifiesto demasiado grande.");
-        using var reader = new StreamReader(manifest.OpenReadStream());
-        var parsed = Newtonsoft.Json.JsonConvert.DeserializeObject<InitialSetupBundleManifest>(await reader.ReadToEndAsync(ctx.RequestAborted))
-            ?? throw new InvalidDataException("Manifiesto vacío.");
-        await using var stream = setup.OpenReadStream();
-        await bundles.ImportAsync(parsed, setup.FileName, stream, ctx.RequestAborted);
-        return Results.Ok(new { parsed.Version });
-    }
-    catch (Exception ex) when (ex is InvalidDataException or IOException or Newtonsoft.Json.JsonException)
-    { return Results.BadRequest(new { error = ex.Message }); }
-}).DisableAntiforgery();
-
 app.MapPost("/api/releases", async (HttpContext ctx, KioskUpdateStore updates) =>
 {
     if (!SecretEquals(releasePublishKey, ctx.Request.Headers["X-Release-Publish-Key"].FirstOrDefault()))
@@ -668,33 +646,30 @@ app.MapGet("/panel/assets/{category}/{file}", (string category, string file, Ass
     return Results.File(full, mime);
 }).RequireAuthorization();
 
-app.MapPost("/panel/setup/activate", async (HttpContext ctx, SetupReleaseStore releases, InitialSetupBundleStore legacy, IAntiforgery antiforgery) =>
+app.MapPost("/panel/setup/activate", async (HttpContext ctx, SetupReleaseStore releases, IAntiforgery antiforgery) =>
 {
     try
     {
         await antiforgery.ValidateRequestAsync(ctx);
         var form = await ctx.Request.ReadFormAsync(ctx.RequestAborted);
         string version = form["version"].ToString();
-        if (version == "legacy" && legacy.Latest(out _) == null) return Results.BadRequest("No hay asistente anterior válido.");
-        await releases.Activate(version == "legacy" ? null : version, ctx.RequestAborted);
+        await releases.Activate(version, ctx.RequestAborted);
         return Results.Redirect("/instalador");
     }
     catch (Exception ex) when (ex is AntiforgeryValidationException or InvalidDataException or IOException)
     { return Results.BadRequest("No se pudo activar la versión. Comprueba los archivos y vuelve a cargar el panel."); }
 }).RequireAuthorization();
 
-app.MapGet("/panel/setup/download", (HttpContext ctx, InitialSetupBundleStore bundles, SetupReleaseStore releases) =>
+app.MapGet("/panel/setup/download", (HttpContext ctx, SetupReleaseStore releases) =>
 {
     if (!releases.Ready()) return Results.StatusCode(503);
     string edition = ctx.Request.Query["edition"].FirstOrDefault() ?? "online";
     if (edition is not ("online" or "complete")) return Results.BadRequest();
     string? version = ctx.Request.Query["version"].FirstOrDefault();
-    var release = version is null ? releases.Active() : version == "legacy" ? null : releases.Find(version);
-    if (release == null && (version is not (null or "legacy") || version == null && releases.ActiveVersion != null)) return Results.NotFound();
-    var bundle = release == null ? bundles.Latest(out _) : null;
-    if (release == null && bundle == null) return Results.NotFound();
-    string path = release != null ? releases.EditionPath(release, edition) : bundle!.FullPath;
-    string name = release != null ? release.Editions.Single(e => e.Edition == edition).FileName : bundle!.Manifest.FileName;
+    var release = version is null ? releases.Active() : releases.Find(version);
+    if (release == null) return Results.NotFound();
+    string path = releases.EditionPath(release, edition);
+    string name = release.Editions.Single(e => e.Edition == edition).FileName;
     ctx.Response.Headers.CacheControl = "private, no-store";
 
     // La página usa este marcador para retirar el indicador cuando empieza la respuesta.

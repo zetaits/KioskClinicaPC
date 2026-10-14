@@ -10,6 +10,11 @@ public interface IPackBackend
     Task<PackVerificationResult> Verify(PackItemResult item, string log, CancellationToken ct);
 }
 
+public interface IPackDeferredBackend
+{
+    Task<PackNativeResult> ExecuteDeferred(PackItemResult item, string log, Action<PackProgress> progress, CancellationToken ct);
+}
+
 /// <summary>Checks the entire immutable selection before installing. Never retries an ambiguous native install.</summary>
 public static class PackExecution
 {
@@ -95,6 +100,7 @@ public static class PackExecution
         int inFlight = 0;
         var lastProgress = new Dictionary<int, long>();
         var tasks = new List<Task>();
+        var deferred = new List<int>();
         void Publish(bool persist)
         {
             // Consumers may dispatch asynchronously or retain snapshots. Never expose the mutable run.
@@ -209,6 +215,9 @@ public static class PackExecution
                             stop.Cancel(); inFlight--; break;
                         case PackNativeDisposition.NotStarted:
                             item.State = PackItemState.Pending; item.RequiresRebootBeforeRetry = false; inFlight--; break;
+                        case PackNativeDisposition.Deferred:
+                            item.State = PackItemState.Pending; item.RequiresRebootBeforeRetry = false;
+                            deferred.Add(update.Index); inFlight--; break;
                         default:
                             item.State = PackItemState.Failed; item.RequiresRebootBeforeRetry = false; inFlight--; break;
                     }
@@ -225,6 +234,65 @@ public static class PackExecution
                 StartVerification(); Fill();
             }
             await Task.WhenAll(tasks);
+            if (!stop.IsCancellationRequested && engine is IPackDeferredBackend fallback)
+            {
+                foreach (int index in deferred)
+                {
+                    if (stop.IsCancellationRequested) break;
+                    var item = run.Items[index];
+                    item.State = PackItemState.Installing; item.Phase = PackItemPhase.Downloading;
+                    item.Message = "Descargando instalador oficial…"; Publish(true);
+                    PackNativeResult result;
+                    try
+                    {
+                        result = await fallback.ExecuteDeferred(item.Copy(), Path.Combine(logs, item.Application.Id + ".log"),
+                            progress => { item.Phase = progress.Phase; item.Message = progress.Message; Publish(true); }, ct);
+                    }
+                    catch (Exception ex)
+                    {
+                        result = new(PackNativeDisposition.Failed,
+                            ex is OperationCanceledException ? "Descarga cancelada." : "No se pudo preparar el instalador oficial.");
+                    }
+                    item.RebootRequired |= result.RebootRequired;
+                    item.Message = result.Message; item.Phase = null;
+                    if (result.Disposition == PackNativeDisposition.Succeeded)
+                    {
+                        item.NativeInstallSucceeded = true; item.State = PackItemState.VerificationPending;
+                        item.Phase = PackItemPhase.Verifying; item.Message = "Verificando versión y ámbito…"; Publish(true);
+                        using var verifyTimeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                        verifyTimeout.CancelAfter(options.VerificationTimeout ?? TimeSpan.FromMinutes(2));
+                        try
+                        {
+                            var verified = await engine.Verify(item.Copy(), Path.Combine(logs, item.Application.Id + ".log"), verifyTimeout.Token)
+                                .WaitAsync(verifyTimeout.Token);
+                            item.State = verified.Verified ? PackItemState.Succeeded : PackItemState.VerificationPending;
+                            item.InstalledVersion = verified.InstalledVersion; item.Message = verified.Message;
+                            item.RequiresRebootBeforeRetry = !verified.Verified;
+                        }
+                        catch (Exception)
+                        {
+                            item.State = PackItemState.VerificationPending;
+                            item.Message = "El instalador terminó, pero no se pudo verificar Chrome. Revisa antes de reintentar.";
+                            item.RequiresRebootBeforeRetry = true;
+                        }
+                    }
+                    else if (result.Disposition == PackNativeDisposition.Uncertain)
+                    {
+                        item.State = PackItemState.VerificationPending; item.RequiresRebootBeforeRetry = true;
+                        stop.Cancel();
+                    }
+                    else { item.State = PackItemState.Failed; item.RequiresRebootBeforeRetry = false; }
+                    item.Phase = null; Publish(true);
+                }
+            }
+            else foreach (int index in deferred)
+            {
+                run.Items[index].State = stop.IsCancellationRequested ? PackItemState.Pending : PackItemState.Failed;
+                run.Items[index].Message = stop.IsCancellationRequested
+                    ? "Cancelado antes de iniciar el instalador alternativo."
+                    : "No hay instalador alternativo disponible.";
+                Publish(true);
+            }
             return !ct.IsCancellationRequested && run.Complete;
         }
         finally

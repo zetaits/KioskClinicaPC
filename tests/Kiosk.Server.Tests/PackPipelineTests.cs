@@ -107,6 +107,52 @@ public sealed class PackPipelineTests
             => verify?.Invoke(item, ct) ?? Task.FromResult(new PackVerificationResult(true, "Verificada", "1"));
     }
 
+    private sealed class DeferredBackend : IPackBackend, IPackDeferredBackend
+    {
+        public bool OtherInstalledBeforeFallback { get; private set; }
+        public int FallbackCalls { get; private set; }
+        public PackNativeDisposition FallbackDisposition { get; set; } = PackNativeDisposition.Succeeded;
+        public Task Preflight(PackItemResult item, string log, CancellationToken ct)
+        { item.State = PackItemState.Pending; return Task.CompletedTask; }
+        public Task<PackNativeResult> ExecuteNative(PackItemResult item, string log, Action<PackProgress> progress, CancellationToken ct)
+            => Task.FromResult(item.Application.Id == "0"
+                ? new PackNativeResult(PackNativeDisposition.Deferred, "Hash cambiado")
+                : new PackNativeResult(PackNativeDisposition.Succeeded, "Instalada"));
+        public Task<PackNativeResult> ExecuteDeferred(PackItemResult item, string log, Action<PackProgress> progress, CancellationToken ct)
+        {
+            FallbackCalls++;
+            OtherInstalledBeforeFallback = _verifiedOther;
+            return Task.FromResult(new PackNativeResult(FallbackDisposition, "Resultado del instalador oficial"));
+        }
+        private bool _verifiedOther;
+        public Task<PackVerificationResult> Verify(PackItemResult item, string log, CancellationToken ct)
+        {
+            if (item.Application.Id == "1") _verifiedOther = true;
+            return Task.FromResult(new PackVerificationResult(true, "Verificada", "1"));
+        }
+    }
+
+    [Fact]
+    public async Task Hash_mismatch_fallback_waits_for_other_native_work_and_is_verified()
+    {
+        var run = Run(2); var backend = new DeferredBackend();
+        Assert.True(await PackExecution.Run(run, backend, ".", null, _ => { }, false, default));
+        Assert.True(backend.OtherInstalledBeforeFallback);
+        Assert.Equal(1, backend.FallbackCalls);
+        Assert.All(run.Items, item => Assert.True(item.Verified));
+        Assert.False(run.Items[0].RequiresRebootBeforeRetry);
+    }
+
+    [Fact]
+    public async Task Uncertain_deferred_installer_requires_review_before_retry()
+    {
+        var run = Run(2); var backend = new DeferredBackend { FallbackDisposition = PackNativeDisposition.Uncertain };
+        Assert.False(await PackExecution.Run(run, backend, ".", null, _ => { }, false, default));
+        Assert.True(run.Items[0].RequiresRebootBeforeRetry);
+        Assert.Equal(PackItemState.VerificationPending, run.Items[0].State);
+        Assert.True(run.Items[1].Verified);
+    }
+
     [Fact]
     public async Task Reboot_notice_survives_verification_persistence_and_does_not_stop_other_apps()
     {

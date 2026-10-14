@@ -86,7 +86,7 @@ public sealed class KioskUpdateStoreTests : IDisposable
         {
             Version = version, FileName = $"Setup-KioskClinicaPC-{version}.exe", SizeBytes = setup.Length,
             Sha256 = Convert.ToHexString(SHA256.HashData(setup)).ToLowerInvariant(), PublishedAtUtc = DateTime.UtcNow,
-            KeyId = "test", MinimumUpdaterVersion = "1.2.0", GitHubFallbackUrl = "https://github.com/example/release.exe"
+            KeyId = "test", MinimumUpdaterVersion = "1.2.0"
         };
         byte[] bytes = JsonSerializer.SerializeToUtf8Bytes(manifest, new JsonSerializerOptions(JsonSerializerDefaults.Web));
         string signature = Convert.ToBase64String(_signer.SignData(bytes, HashAlgorithmName.SHA256));

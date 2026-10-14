@@ -81,6 +81,21 @@ public sealed class WizardTests
         Assert.Equal("Preparación completa", window.ResultTitle.Text); Assert.Equal(0, registration);
         Assert.Equal("COMPLETADO", window.ResultStateBadge.Text);
         Assert.Equal(Visibility.Collapsed, window.ResultStats.Visibility);
+        Assert.Equal(Visibility.Collapsed, window.RestartNowButton.Visibility);
+        window.Close();
+    });
+    [Fact]
+    public Task Incomplete_run_does_not_offer_immediate_restart() => Sta(async () =>
+    {
+        int restarts = 0;
+        var window = new MainWindow(_ => Task.FromResult(Catalog), (_, _, _) =>
+            Task.FromResult(new EquipmentEvent("result", "Preparación incompleta", ExitCode: 2, RebootRequired: true)),
+            () => Task.CompletedTask, restart: () => restarts++);
+        window.ShowStep(1); await window.LoadCatalog(); window.Confirm(); await window.Install();
+        Assert.Equal(Visibility.Collapsed, window.RestartNowButton.Visibility);
+        Assert.Contains("instaladores activos", window.ResultLabel.Text);
+        window.RestartNow(true);
+        Assert.Equal(0, restarts);
         window.Close();
     });
     [Fact]

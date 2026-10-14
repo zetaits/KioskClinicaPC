@@ -247,7 +247,8 @@ public partial class MainWindow : Window
         ResultTitle.Text = rebootPending && result.KioskRebootRequired ? "Reinicio pendiente" : result.ExitCode == 0 ? "Preparación completa" : stopped ? "Preparación detenida" :
             hasVerified ? "Preparación parcial" : hasPending ? "Preparación pendiente" : "No se pudo completar";
         ResultLabel.Text = result.Message + (result.RebootRequired
-            ? result.KioskRebootRequired ? "\nReinicia Windows antes de abrir Kiosk."
+            ? result.ExitCode != 0 ? "\nComprueba que no quedan instaladores activos antes de reiniciar Windows manualmente."
+                : result.KioskRebootRequired ? "\nReinicia Windows antes de abrir Kiosk."
                 : request.Kiosk && result.KioskVerified && result.ExitCode == 0 ? "\nPuedes reiniciar Windows ahora o más tarde; Kiosk ya puede abrirse."
                 : "\nPuedes reiniciar Windows ahora o más tarde para aplicar los cambios pendientes."
             : "");
@@ -275,7 +276,7 @@ public partial class MainWindow : Window
         // run also waits for the pack session and its final callbacks before offering launch.
         _canLaunch = request.Kiosk && result.KioskVerified && result.ExitCode == 0 && !result.KioskRebootRequired &&
             !_cancel.IsCancellationRequested && !_closeRequested;
-        RestartNowButton.Visibility = result.RebootRequired ? Visibility.Visible : Visibility.Collapsed;
+        RestartNowButton.Visibility = rebootPending ? Visibility.Visible : Visibility.Collapsed;
         RestartNowButton.IsEnabled = true;
         LaunchCheck.Visibility = _canLaunch ? Visibility.Visible : Visibility.Collapsed;
         LaunchCheck.IsChecked = _canLaunch;

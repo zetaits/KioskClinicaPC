@@ -67,31 +67,12 @@ public sealed class PackApiTests : IDisposable
         Assert.Single(_factory.Services.GetRequiredService<PackCatalogStore>().Search("Vendor"));
     }
     [Fact]
-    public async Task Private_setup_import_checks_hash_and_is_immutable()
+    public async Task Retired_setup_import_is_unavailable()
     {
         using var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add("X-Release-Publish-Key", "publish-key");
-        byte[] bytes = [1, 2, 3, 4];
-        var manifest = new InitialSetupBundleManifest
-        {
-            SchemaVersion = 2, InstallerKind = "equipment-wpf", CatalogApiVersion = 2, SourceCommit = new string('a', 40),
-            AssistantVersion = "9.0.0", WorkerVersion = "1.3.0", KioskVersion = "1.2.0",
-            Version = "9.0.0", FileName = "Setup-EquipoClinicaPC-9.0.0.exe", SizeBytes = bytes.Length,
-            Sha256 = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(bytes)), ServerUrl = "https://panel.clinicapc.es"
-        };
-        MultipartFormDataContent Form(byte[] content)
-        {
-            var form = new MultipartFormDataContent();
-            form.Add(new StringContent(Newtonsoft.Json.JsonConvert.SerializeObject(manifest)), "manifest", "setup.bundle.json");
-            form.Add(new ByteArrayContent(content), "setup", manifest.FileName); return form;
-        }
-        using (var bad = Form([4, 3, 2, 1])) Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsync("/api/releases/setup", bad)).StatusCode);
-        Assert.Null(_factory.Services.GetRequiredService<InitialSetupBundleStore>().Latest(out _));
-        using (var good = Form(bytes)) Assert.Equal(HttpStatusCode.OK, (await client.PostAsync("/api/releases/setup", good)).StatusCode);
-        using (var duplicate = Form(bytes)) Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsync("/api/releases/setup", duplicate)).StatusCode);
-        Assert.Equal("9.0.0", _factory.Services.GetRequiredService<InitialSetupBundleStore>().Latest(out _)!.Manifest.Version);
-        using var anonymous = _factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
-        Assert.NotEqual(HttpStatusCode.OK, (await anonymous.GetAsync("/panel/setup/download")).StatusCode);
+        using var form = new MultipartFormDataContent();
+        Assert.Equal(HttpStatusCode.NotFound, (await client.PostAsync("/api/releases/setup", form)).StatusCode);
     }
     public void Dispose() { _factory.Dispose(); if (Directory.Exists(_root)) Directory.Delete(_root, true); }
 }

@@ -21,7 +21,7 @@ public enum PackItemState { Pending, Checking, Installing, Succeeded, AlreadyIns
 // Activity is additive: persisted state values remain compatible with older panels/workers.
 public enum PackItemPhase { Queued, Downloading, Installing, PostInstall, WaitingVerification, Verifying }
 public sealed record PackProgress(PackItemPhase Phase, string Message, ulong? BytesDownloaded = null, ulong? BytesRequired = null);
-public enum PackNativeDisposition { Succeeded, AlreadyInstalled, Failed, Uncertain, NotStarted }
+public enum PackNativeDisposition { Succeeded, AlreadyInstalled, Failed, Uncertain, NotStarted, Deferred }
 public sealed record PackNativeResult(PackNativeDisposition Disposition, string Message,
     bool RebootRequired = false, string? InstalledVersion = null);
 public sealed record PackVerificationResult(bool Verified, string Message, string? InstalledVersion = null);

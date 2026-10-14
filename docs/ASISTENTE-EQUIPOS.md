@@ -17,8 +17,10 @@ con .NET incorporado, para Windows 10 22H2 y Windows 11 x64.
 
 El pack necesita internet en ambas ediciones. Estos EXE contienen
 aprovisionamiento limitado y se descargan desde el panel autenticado; se publican
-como candidatos privados. Las actualizaciones públicas de Kiosk se generan por
-separado y siguen siendo Kiosk-only.
+como candidatos privados. La instalación inicial de Kiosk se ofrece únicamente
+desde estas ediciones del asistente en `/instalador`. El instalador interno de
+Kiosk también se usa para las actualizaciones administradas; no se distribuye
+como descarga independiente.
 
 ## Uso
 
@@ -35,7 +37,9 @@ separado y siguen siendo Kiosk-only.
 5. Revisar el resultado. **Finalizar y abrir Kiosk** se ofrece cuando los
    componentes elegidos están verificados, el trabajador ha terminado y Kiosk
    no ha pedido reinicio. Se puede desmarcar la apertura. Si Windows indica un
-   reinicio pendiente, **Reiniciar ahora** lo solicita solo tras confirmarlo.
+   reinicio pendiente tras una preparación completada, **Reiniciar ahora** lo
+   solicita solo tras confirmarlo. Si la preparación queda incompleta, revisa el
+   diagnóstico y cualquier instalador activo antes de reiniciar manualmente.
 
 Solo Kiosk omite el catálogo de aplicaciones y WinGet. El autostart se registra
 para el usuario original, incluso si UAC utiliza otra cuenta administradora.
@@ -80,6 +84,22 @@ aplicable, silencioso, para todo el equipo y sin autenticación interactiva.
 Comprueba el manifiesto oficial, conserva los hashes obligatorios y deja que
 WinGet resuelva las dependencias. La versión observada en el índice del panel
 es orientativa.
+
+Chrome Enterprise tiene una excepción acotada: su URL oficial sirve siempre el MSI
+más reciente y puede cambiar antes de que WinGet publique el nuevo hash. Si WinGet
+devuelve exactamente un error de hash para `Google.Chrome`, el trabajador termina
+primero las demás aplicaciones y descarga el MSI x64 desde `dl.google.com`. Exige
+HTTPS en ese dominio, firma Authenticode válida de Google LLC, identidad MSI
+`Google Chrome` y versión igual o superior a la resuelta. Después lo instala en
+silencio para todo el equipo y verifica versión y ámbito como el resto del pack.
+Un fallo de cualquiera de esas comprobaciones deja Chrome con error; no se activa
+la opción de WinGet que ignora los hashes.
+
+Para cualquier aplicación, un `DownloadError` definitivo antes de iniciar el
+instalador permite un solo reintento de WinGet, salvo si el hash no coincide.
+Un hash distinto indica que repetir la misma descarga no resolverá el desfase;
+en ese caso se muestra el HRESULT numérico para el diagnóstico. Una instalación
+que ya haya empezado no se reintenta automáticamente.
 
 La versión resuelta queda congelada antes de instalar. Una discrepancia entre
 catálogo y manifiesto permite como máximo una actualización adicional por
@@ -149,7 +169,7 @@ puede validarlo sin conexión. Las contraseñas locales existentes se conservan.
 Cambiar la contraseña del panel después no actualiza perfiles ni EXE anteriores.
 
 El verificador se obtiene en el build desde `GET /api/releases/setup/kiosk-password`
-con `X-Release-Publish-Key`. No se incluye en el instalador público de Kiosk ni en
+con `X-Release-Publish-Key`. No se incluye en el componente interno de Kiosk ni en
 el manifiesto. El pack solo no instala ese archivo. Sin aprovisionamiento válido,
 Kiosk mantiene el diálogo de contraseña local. El diagnóstico muestra únicamente
 `panelPasswordProvisioned`.
@@ -347,19 +367,19 @@ que se pueda determinar qué referencias siguen vigentes. La limpieza rechaza
 enlaces y rutas redirigidas y utiliza el mismo bloqueo que publicación y activación.
 
 Un reintento con los mismos archivos y manifiesto es idempotente. Cambiar el
-contenido exige una versión nueva. **Equipment Setup** no crea una release pública
-de Kiosk ni activa actualizaciones de la flota.
+contenido exige una versión nueva. **Equipment Setup** no crea una release de
+actualización de Kiosk ni activa actualizaciones de la flota.
 
 `GET /panel/setup/download` sirve Online de la versión activa; `edition=complete`
 sirve USB y `version=X.Y.Z` permite descargar una candidata concreta. Los componentes
 inmutables se obtienen con `X-Setup-Key` desde
 `GET /api/setup/v3/components/{kind}/{sha256}`, con ETag y Range.
 
-Las API de Setup anteriores se conservan para compatibilidad. El servidor migra
-el pack a `pack-definition-v3.json` y mantiene `pack-applications.json` como proyección
-con versiones concretas para `/api/setup/v2/catalog`. Esa proyección tiene revisión
-propia y no modifica la definición v3. Las publicaciones esquema 2 usan
-`/api/releases/setup` y pueden recuperarse con `version=legacy`.
+Los archivos de publicaciones antiguas se conservan en disco para el historial
+y para evitar reutilizar sus números de versión. Ya no se pueden publicar por
+`/api/releases/setup`, activar ni descargar con `version=legacy`. El servidor
+mantiene temporalmente el catálogo v2 para asistentes antiguos ya descargados;
+no es una vía para obtener el instalador de Kiosk.
 
 ## Carga del apartado Instalador
 

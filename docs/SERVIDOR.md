@@ -114,7 +114,8 @@ Se guardan en `KioskSettings.json` del cliente. Con `ServerUrl` **vacío**, el k
 Al configurar servidor, el cliente pasa el contenido compartido a **solo lectura** (el modo edición libre y el
 editor de slides de Ajustes se desactivan; el precio y las specs siguen editándose por-máquina).
 
-Para generar un instalador ya provisionado, sin pedir estos datos al encargado de la tienda:
+El workflow del asistente genera el componente Kiosk ya provisionado, sin pedir
+estos datos al encargado de la tienda. Para generar un componente local de prueba:
 
 ```powershell
 $env:KIOSK_SERVER_API_KEY = '<clave de 64 caracteres>'
@@ -122,11 +123,11 @@ $env:KIOSK_SERVER_API_KEY = '<clave de 64 caracteres>'
 Remove-Item Env:KIOSK_SERVER_API_KEY
 ```
 
-La clave se pasa solo durante la compilación y no se guarda en el repositorio. El Setup deja la provisión junto
+La clave se pasa solo durante la compilación y no se guarda en el repositorio. El componente deja la provisión junto
 al ejecutable y verifica URL + API key contra `/api/config/version`. Al abrirse bajo el usuario correcto, el
 kiosko la copia a su `KioskSettings.json` si **tanto `ServerUrl` como `ServerApiKey` están vacíos**, también
 en perfiles existentes. Una actualización conserva la contraseña, identidad y demás ajustes, incluso si
-el UAC se aprobó con otra cuenta administradora. La clave queda incluida en el instalador público y es
+el UAC se aprobó con otra cuenta administradora. La clave queda incluida en el componente de Kiosk y es
 extraíble por diseño; la clave limitada del asistente del pack es independiente.
 
 ---
@@ -142,7 +143,7 @@ extraíble por diseño; la clave limitada del asistente del pack es independient
 | `GET /api/config/version` | `X-Api-Key` | Hash conjunto de contenido e imágenes; el cliente lo sondea para detectar cambios. |
 | `GET /api/assets/manifest` | `X-Api-Key` | Inventario versionado con tamaño, dimensiones y SHA-256 de cada imagen. |
 | `GET /api/assets/{ruta}` | `X-Api-Key` | Imágenes de la biblioteca (con guardia anti-traversal). |
-| `POST /api/releases` | `X-Release-Publish-Key` | Importa desde CI un instalador y su manifiesto firmado; no lo activa. |
+| `POST /api/releases` | `X-Release-Publish-Key` | Importa desde CI un paquete de actualización de Kiosk y su manifiesto firmado; no lo activa. |
 | `GET /api/updates/assignment` | `X-Api-Key` | Devuelve al kiosco su versión objetivo, ventana y token de trabajo. |
 | `GET /api/updates/{id}/manifest` | API key + token de actualización | Manifiesto firmado ligado al trabajo. |
 | `GET /api/updates/{id}/download` | API key + token de actualización | Descarga reanudable del instalador desde la VPS. |
@@ -163,7 +164,7 @@ extraíble por diseño; la clave limitada del asistente del pack es independient
 | `GET /api/releases/setup/kiosk-password` | `X-Release-Publish-Key` | Semilla PBKDF2 de la contraseña del panel para perfiles nuevos del asistente privado; no devuelve texto plano. |
 | `POST /api/releases/setup/v3` | `X-Release-Publish-Key` | Importa manifiesto esquema 3, ambos asistentes y componentes como candidata, sin activarla. |
 | `GET /api/setup/v3/components/{kind}/{sha256}` | `X-Setup-Key` | Componentes publicados, inmutables, con ETag y Range. |
-| `POST /panel/setup/activate` | cookie + antiforgery | Verifica y activa/restaura una candidata; `version=legacy` restaura el asistente anterior. |
+| `POST /panel/setup/activate` | cookie + antiforgery | Verifica y activa/restaura una candidata v3. |
 | `POST /api/maintenance/{id}/status` | API key + token de mantenimiento | Resultado verificado de una autodesinstalación de Kiosk. |
 | `POST /panel/installers/upload` | cookie + antiforgery | Añade un instalador compatible al catálogo privado de la flota. |
 | `POST /login` · `POST /logout` | cookie | Sesión del panel (con antiforgery + throttle). |
@@ -211,7 +212,7 @@ comprobar ambas ediciones y componentes. Antes de activar v3 se ofrece el asiste
 compatible anterior. La publicación no activa descargas. Publicación y validación:
 [Asistente de equipos](ASISTENTE-EQUIPOS.md).
 
-Bajo `UpdatesDir` (`updates/` por defecto): instaladores públicos inmutables importados por CI. Incluye esta
+Bajo `UpdatesDir` (`updates/` por defecto): paquetes de actualización inmutables importados por CI. Incluye esta
 carpeta en las copias de seguridad junto con `data/`, `assets/` e `installers/`.
 
 Son ficheros JSON planos, sin base de datos. Para una copia de seguridad guarda `data/`, `assets/`,
@@ -221,6 +222,16 @@ cualquier versión activa o todavía en instalación).
 <!-- SHOT (opcional): el panel con la carpeta de datos al lado, o un diagrama de despliegue VPS + kioscos -->
 
 ---
+
+## Organización del panel
+
+El menú agrupa **Resumen** y **Ordenadores** en Operación; **Instalador**,
+**Aplicaciones** e **Instalación de sistemas** en Preparación; **Contenido**,
+**Imágenes y marcas** y **Eventos** en Contenido; y **Actualizaciones** y
+**Seguridad** en Sistema. **Instaladores de la flota** se abre desde Ordenadores:
+sus paquetes privados y trabajos se dirigen a kioscos registrados, mientras que
+Aplicaciones configura el pack WinGet para preparar equipos. Instalador reúne
+las descargas del asistente de equipos y de la instalación por red.
 
 ## Flota e instalación de aplicaciones
 
@@ -271,19 +282,24 @@ candidatas; la activación se realiza desde el panel siguiendo el
 Actualizar la VPS no reconstruye ni activa el asistente. Rotar la clave de Setup invalida las consultas
 al catálogo y las descargas de componentes de asistentes que llevan la clave anterior.
 
-El instalador público `Setup-KioskClinicaPC-*` se construye por separado para Kiosk y sus actualizaciones.
-Su provisión de servidor se explica en [Apuntar los kioscos al servidor](#apuntar-los-kioscos-al-servidor).
+`Setup-KioskClinicaPC-*` sigue siendo el componente interno del asistente y el
+ejecutable de las actualizaciones administradas. La instalación inicial se
+descarga únicamente como asistente desde `/instalador`. La provisión se explica
+en [Apuntar los kioscos al servidor](#apuntar-los-kioscos-al-servidor).
 
 ### Actualizaciones de Kiosk
 
-GitHub Actions compila y firma un manifiesto, publica la release como respaldo y la importa en la VPS. La
+GitHub Actions compila y firma un manifiesto, guarda los archivos firmados en
+un artefacto cifrado del workflow durante 90 días y los importa en la VPS. El
+cifrado usa la clave de publicación ya configurada; no se sube el EXE en claro. La
 release aparece en **Actualizaciones** y no afecta a la flota hasta pulsar **Activar en toda la flota**. Por
 defecto se instala entre las 04:00 y las 05:00, con hasta diez minutos de dispersión por equipo.
 
-Las releases son inmutables: el pipeline nunca sobrescribe assets de una versión existente. Si GitHub llega
-a publicar correctamente pero la VPS estaba temporalmente caída, ejecuta manualmente la acción
-**Retry VPS release import** indicando `X.Y.Z`; descargará esos mismos assets firmados y reintentará solo la
-importación, sin recompilar ni cambiar hashes.
+Las releases son inmutables: el pipeline nunca sobrescribe los archivos de una
+versión existente. Si la VPS estaba temporalmente caída después de guardar el
+artefacto del workflow, ejecuta **Retry VPS release import** indicando `X.Y.Z`
+y el ID del run original de **Release Kiosk**. Descifrará ese mismo artefacto
+firmado y reintentará solo la importación, sin recompilar ni cambiar hashes.
 
 La firma usa ECDSA P-256. Genera el par una sola vez en una máquina segura:
 
@@ -309,14 +325,15 @@ git tag "v$kioskVersion"
 git push origin "v$kioskVersion"
 ```
 
-Los kioscos antiguos con el actualizador de GitHub descargan
-el instalador público y lo aplican con su tarea programada. Al arrancar, la versión actual rellena
+Los kioscos antiguos con el actualizador de GitHub requieren una migración
+manual o mediante una release puente anterior. Al arrancar, la versión actual rellena
 `ServerUrl` y `ServerApiKey` **solo si ambos estaban vacíos**; conserva contraseña, identidad y
 ajustes locales. Los perfiles que aún usan la política de contraseña antigua deben renovarla
 en el primer arranque; el kiosco se registra después de completar ese paso. Comprueba en
 **Ordenadores** que aparecen antes de gestionar sus siguientes
-actualizaciones desde **Actualizaciones**. Un equipo sin el actualizador antiguo o sin acceso a
-GitHub necesita instalar la versión nueva encima manualmente, sin desinstalar la anterior.
+actualizaciones desde **Actualizaciones**. Un equipo sin actualización administrada
+puede instalar la versión nueva encima desde el asistente de `/instalador`, sin
+desinstalar la anterior.
 
 ---
 

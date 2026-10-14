@@ -14,7 +14,6 @@ public sealed class KioskReleaseRecord
     public string KeyId { get; set; } = "";
     public DateTime PublishedAtUtc { get; set; }
     public string? ReleaseNotes { get; set; }
-    public string? GitHubFallbackUrl { get; set; }
     public string ManifestBase64 { get; set; } = "";
     public string SignatureBase64 { get; set; } = "";
     public string StoredFileName { get; set; } = "";
@@ -132,7 +131,6 @@ public sealed class KioskUpdateStore
                     Version = manifest.Version, FileName = manifest.FileName, SizeBytes = manifest.SizeBytes,
                     Sha256 = manifest.Sha256.ToLowerInvariant(), KeyId = manifest.KeyId,
                     PublishedAtUtc = manifest.PublishedAtUtc, ReleaseNotes = manifest.ReleaseNotes,
-                    GitHubFallbackUrl = manifest.GitHubFallbackUrl,
                     ManifestBase64 = Convert.ToBase64String(manifestBytes), SignatureBase64 = signatureBase64.Trim(),
                     StoredFileName = Path.GetRelativePath(_updatesDir, destination), State = KioskReleaseState.Available
                 };

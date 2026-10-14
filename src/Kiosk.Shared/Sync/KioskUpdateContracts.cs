@@ -29,7 +29,6 @@ public sealed class KioskReleaseManifest
     public string KeyId { get; set; } = "";
     public string MinimumUpdaterVersion { get; set; } = "1.2.0";
     public string? ReleaseNotes { get; set; }
-    public string? GitHubFallbackUrl { get; set; }
 }
 
 public sealed class KioskUpdateAssignment
@@ -102,9 +101,6 @@ public static class KioskReleaseSecurity
         if (Path.GetFileName(manifest.FileName) != manifest.FileName ||
             !manifest.FileName.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
             throw new InvalidDataException("Nombre de instalador no válido.");
-        if (manifest.GitHubFallbackUrl is { Length: > 0 } fallback &&
-            (!Uri.TryCreate(fallback, UriKind.Absolute, out var uri) || uri.Scheme != Uri.UriSchemeHttps))
-            throw new InvalidDataException("URL de respaldo no válida.");
     }
 
     public static bool TryParseVersion(string? value, out Version version)

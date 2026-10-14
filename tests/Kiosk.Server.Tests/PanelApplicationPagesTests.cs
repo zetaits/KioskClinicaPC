@@ -45,18 +45,11 @@ public sealed class PanelApplicationPagesTests : IDisposable
         return client;
     }
 
-    private async Task ImportInternalSetup()
+    private void AddLegacySetupFile()
     {
-        byte[] bytes = [0x4d, 0x5a, 1, 2];
-        var manifest = new InitialSetupBundleManifest
-        {
-            SchemaVersion = 2, InstallerKind = "equipment-wpf", CatalogApiVersion = 2, SourceCommit = new string('a', 40),
-            AssistantVersion = "1.2.0", WorkerVersion = "1.3.0", KioskVersion = "1.2.0",
-            Version = "1.2.0", FileName = "Setup-EquipoClinicaPC-1.2.0.exe", SizeBytes = bytes.Length,
-            Sha256 = Convert.ToHexString(SHA256.HashData(bytes)), ServerUrl = "https://panel.clinicapc.es"
-        };
-        using var input = new MemoryStream(bytes);
-        await _factory.Services.GetRequiredService<InitialSetupBundleStore>().ImportAsync(manifest, manifest.FileName, input, CancellationToken.None);
+        string setup = Path.Combine(_root, "Setup", "Setup-EquipoClinicaPC-1.2.0.exe");
+        Directory.CreateDirectory(Path.GetDirectoryName(setup)!);
+        File.WriteAllBytes(setup, [0x4d, 0x5a, 1, 2]);
     }
 
     [Fact]
@@ -192,7 +185,7 @@ public sealed class PanelApplicationPagesTests : IDisposable
     public async Task Installer_shows_pending_editions_and_applications_link_when_only_legacy_exists()
     {
         using var client = PanelClient();
-        await ImportInternalSetup();
+        AddLegacySetupFile();
 
         string html = WebUtility.HtmlDecode(await client.GetStringAsync("/instalador"));
         Assert.Contains("Instalador de equipos", html);
@@ -218,15 +211,14 @@ public sealed class PanelApplicationPagesTests : IDisposable
             var manifest = new KioskReleaseManifest
             {
                 Version = version, FileName = $"Setup-KioskClinicaPC-{version}.exe", SizeBytes = setup.Length,
-                Sha256 = Convert.ToHexString(SHA256.HashData(setup)), PublishedAtUtc = DateTime.UtcNow, KeyId = "test",
-                GitHubFallbackUrl = $"https://github.com/zetaits/KioskClinicaPC/releases/download/v{version}/Setup-KioskClinicaPC-{version}.exe"
+                Sha256 = Convert.ToHexString(SHA256.HashData(setup)), PublishedAtUtc = DateTime.UtcNow, KeyId = "test"
             };
             byte[] bytes = JsonSerializer.SerializeToUtf8Bytes(manifest, new JsonSerializerOptions(JsonSerializerDefaults.Web));
             using var input = new MemoryStream(setup);
             await updates.ImportAsync(bytes, Convert.ToBase64String(_signer.SignData(bytes, HashAlgorithmName.SHA256)), manifest.FileName, input);
         }
         await Import("1.2.0"); await Import("2.0.0"); updates.Withdraw("2.0.0");
-        await ImportInternalSetup();
+        AddLegacySetupFile();
 
         string html = await client.GetStringAsync("/instalador");
         Assert.DoesNotContain("href=\"/panel/setup/download", html);

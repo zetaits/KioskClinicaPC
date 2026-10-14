@@ -1,7 +1,9 @@
 # Preparación del asistente 1.5.11
 
-Fecha: 13 de octubre de 2026. Estado: corrección implementada y validada;
-ediciones locales de validación generadas. No publicado ni activado.
+Fecha: 13 de octubre de 2026. Estado de la preparación local: corrección
+implementada y validada; ediciones locales de validación generadas.
+Actualización del 14 de octubre: candidata de producción publicada en el panel;
+activación y prueba de instalación limpia aún sin confirmar.
 
 Esta versión prepara la cola concurrente probada en
 [la ejecución real del pack](VERIFICACION-COLA-PACK-2026-10-13.md) y corrige el aviso
@@ -94,14 +96,23 @@ El builder y **Equipment Setup** quedan preparados con 1.5.11 como versión
 predeterminada. El builder genera los `.sha256` de ambas ediciones y admite
 `-PrepareRelease` para generar archivos con aprovisionamiento real sin importación.
 Se comprobó que las credenciales necesarias y la variable de clave pública están
-configuradas en GitHub `production`; no se leyeron sus valores. La última ejecución
-del workflow consultada publicó 1.5.9 correctamente. No se lanzó otro workflow.
+configuradas en GitHub `production`; no se leyeron sus valores. En el momento de
+la preparación local, la última ejecución consultada había publicado 1.5.9.
 
-Para publicar, ejecutar **Equipment Setup** desde el commit que contiene estos
-cambios con `version=1.5.11` y `kiosk_version=1.2.2`.
-El workflow utiliza la configuración de `production`, diagnostica ambos EXE e
-importa una candidata privada en el panel. La activación posterior es independiente.
+El workflow **Equipment Setup** se ejecutó desde `a65264c` con
+`version=1.5.11` y Kiosk 1.2.2. La [ejecución 38459039467](https://github.com/zetaits/KioskClinicaPC/actions/runs/38459039467)
+terminó correctamente el 13 de octubre a las 20:03 UTC: generó ambas ediciones,
+las diagnosticó e importó una candidata privada en el panel. El build de producción
+exige un verificador válido de la contraseña del panel y comprueba que los EXE lo
+incluyan. Esta evidencia no confirma que la candidata esté activa ni sustituye la
+prueba de primer arranque en un perfil limpio.
 Procedimiento: [publicación del asistente](../ASISTENTE-EQUIPOS.md#publicación-activación-y-recuperación).
+
+El 14 de octubre se repitieron las pruebas Release del árbol de trabajo: 191 del
+cliente, 355 del servidor y 79 del asistente, 625 en total. Las seis pruebas del
+asistente que usan tuberías y procesos hijos fallaron dentro del aislamiento del
+entorno; al repetir la batería del asistente fuera de él, pasaron las 79. Esta
+verificación no instala Kiosk ni prueba el aprovisionamiento en un perfil limpio.
 
 La preparación local no prueba una instalación limpia de ambas ediciones en
 Windows 10/11 ni aporta un porcentaje de aceleración frente a una ejecución
