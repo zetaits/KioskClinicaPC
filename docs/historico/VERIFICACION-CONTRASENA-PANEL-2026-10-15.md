@@ -17,9 +17,10 @@ local queda oculta en los perfiles conectados.
 - Pruebas del asistente: 76/82 correctas. Las seis variantes de `WorkerPipeTests`
   fallaron también al ejecutarse aisladas en este entorno Windows: los procesos
   auxiliares no conectaron a la tubería o agotaron el tiempo de espera. Los
-  archivos del canal del asistente no forman parte de este cambio. Queda
-  pendiente comprobar esas pruebas en CI o en un entorno Windows sin esa
-  restricción.
+  archivos del canal del asistente no forman parte de este cambio.
+- CI de GitHub para `269f606`: la primera ejecución tuvo un único timeout en
+  `WorkerPipeTests`; la repetición terminó con compilación y pruebas completas
+  correctas. El resultado final de CI es verde.
 - Interfaz WPF: no se abrió manualmente; su arranque activa la protección de
   kiosko incluso en Debug.
 
