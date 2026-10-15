@@ -19,7 +19,7 @@ namespace KioskClinicaPC.Windows
         private void CancelBtn_Click(object sender, RoutedEventArgs e) { _result = KioskDialogResult.Cancel; Close(); }
 
         /// <summary>Diálogo temático genérico. Devuelve qué botón se pulsó.</summary>
-        public static KioskDialogResult Show(Window owner, string title, string message,
+        public static KioskDialogResult Show(Window? owner, string title, string message,
             string primaryText = "Aceptar", string? secondaryText = null, string? cancelText = null, bool danger = false)
         {
             var dlg = new KioskDialog
@@ -55,11 +55,11 @@ namespace KioskClinicaPC.Windows
         }
 
         /// <summary>Aviso de un solo botón.</summary>
-        public static void Alert(Window owner, string title, string message, bool danger = false)
+        public static void Alert(Window? owner, string title, string message, bool danger = false)
             => Show(owner, title, message, "Aceptar", danger: danger);
 
         /// <summary>Confirmación Aceptar/Cancelar. Devuelve true si se aceptó.</summary>
-        public static bool Confirm(Window owner, string title, string message, string primaryText = "Aceptar", bool danger = false)
+        public static bool Confirm(Window? owner, string title, string message, string primaryText = "Aceptar", bool danger = false)
             => Show(owner, title, message, primaryText, cancelText: "Cancelar", danger: danger) == KioskDialogResult.Primary;
     }
 }

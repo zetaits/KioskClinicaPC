@@ -170,6 +170,8 @@ namespace KioskClinicaPC.Windows
         {
             if (!_serverManaged) return;
 
+            LocalPasswordSection.Visibility = Visibility.Collapsed;
+
             UsedSlidesPanel.Visibility = Visibility.Collapsed;
             NewSlidesPanel.Visibility = Visibility.Collapsed;
             SlidesServerNote.Visibility = Visibility.Visible;
@@ -249,7 +251,7 @@ namespace KioskClinicaPC.Windows
             // reiniciar la app (el agente de flota lee la identidad en el arranque).
             _settings.DeviceName = Blank(DeviceNameTextBox.Text) ?? Environment.MachineName;
 
-            if (!string.IsNullOrEmpty(NewPasswordBox.Password))
+            if (string.IsNullOrWhiteSpace(_settings.ServerUrl) && !string.IsNullOrEmpty(NewPasswordBox.Password))
             {
                 if (!_settings.TrySetPassword(CurrentPasswordBox.Password, NewPasswordBox.Password,
                         ConfirmPasswordBox.Password, out string passwordError))

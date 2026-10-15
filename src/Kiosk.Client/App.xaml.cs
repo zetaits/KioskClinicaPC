@@ -104,29 +104,24 @@ namespace KioskClinicaPC
             KioskManager.Protect();
             _protected = true;
 
-            // Carga el perfil y aplica el aprovisionamiento del instalador antes de pedir la contraseña.
-            // El asistente privado puede inicializar perfiles nuevos con el verificador del panel.
-            // Sin aprovisionamiento válido se pide una clave local; cancelar libera el escritorio.
+            // El asistente privado puede inicializar la caché de la contraseña del panel.
             var settings = KioskSettings.Load(SettingsFilePath);
             bool seeded = settings.ApplyProvisioningIfMissingServer(ProvisioningFilePath);
-            seeded |= settings.ApplyPanelPasswordIfMissing(Path.Combine(AppContext.BaseDirectory,
+            seeded |= settings.ApplyPanelPasswordSeed(Path.Combine(AppContext.BaseDirectory,
                 KioskClinicaPC.Equipment.PanelPasswordProvisioning.FileName));
-            if (settings.RequiresPasswordSetup())
+            if (!KioskClinicaPC.Core.PasswordService.IsValidHash(settings.PasswordHash))
             {
-                var passwordSetup = new PasswordSetupWindow(settings);
-                if (passwordSetup.ShowDialog() != true)
-                {
-                    Log.Warning("Configuración de contraseña cancelada; el kiosko no se iniciará.");
-                    Shutdown();
-                    return;
-                }
-                seeded = true;
+                Log.Warning("El perfil no tiene verificador de contraseña válido; el kiosko no se iniciará.");
+                KioskDialog.Alert(null, "Configuración necesaria",
+                    "Este kiosko no tiene contraseña inicial. Instálalo desde el asistente del panel o configura una contraseña local antes de iniciarlo.", danger: true);
+                Shutdown();
+                return;
             }
             seeded |= settings.EnsureDeviceIdentitySeeded();
             if (seeded)
             {
                 settings.Save(SettingsFilePath);
-                Log.Information("KioskSettings actualizado (aprovisionamiento / política de contraseña / identidad de flota).");
+                Log.Information("KioskSettings actualizado (aprovisionamiento / identidad de flota).");
             }
 
             if (!File.Exists(ConfigFilePath))

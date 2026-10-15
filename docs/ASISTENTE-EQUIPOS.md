@@ -165,13 +165,22 @@ se espera a que termine el proceso nativo.
 Los asistentes publicados con aprovisionamiento válido y Kiosk 1.2.1 o posterior
 incluyen un verificador PBKDF2 de la contraseña del panel vigente al generar el
 EXE. Un perfil sin contraseña local lo recibe como `KioskPanelPassword.json` y
-puede validarlo sin conexión. Las contraseñas locales existentes se conservan.
-Cambiar la contraseña del panel después no actualiza perfiles ni EXE anteriores.
+puede validarlo sin conexión. También sustituye el verificador de perfiles
+conectados que aún tengan la política antigua. Los perfiles locales sin servidor
+conservan su contraseña.
+
+Al abrir Ajustes, el kiosko conectado valida la contraseña vigente con el panel.
+Tras un acceso correcto guarda el nuevo verificador para futuros accesos sin
+conexión. Si se cambia la contraseña en el panel, la anterior deja de funcionar
+cuando el equipo tiene conexión; sin conexión sigue disponible la última
+contraseña validada en ese equipo hasta el siguiente acceso conectado.
 
 El verificador se obtiene en el build desde `GET /api/releases/setup/kiosk-password`
 con `X-Release-Publish-Key`. No se incluye en el componente interno de Kiosk ni en
-el manifiesto. El pack solo no instala ese archivo. Sin aprovisionamiento válido,
-Kiosk mantiene el diálogo de contraseña local. El diagnóstico muestra únicamente
+el manifiesto. El pack solo no instala ese archivo. El kiosko ya no abre una
+ventana de creación o renovación de contraseña durante el arranque. Un perfil
+sin verificador inicial válido no arranca, para evitar dejar el equipo bloqueado
+si pierde la conexión. El diagnóstico muestra únicamente
 `panelPasswordProvisioned`.
 
 ## Estado y diagnósticos

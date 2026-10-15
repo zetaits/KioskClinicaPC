@@ -22,6 +22,10 @@ en `/aplicaciones`; son funciones independientes.
 
 ## Estado de las verificaciones
 
+La sustitución de la ventana de renovación por la contraseña vigente del panel
+tiene una [verificación local del 15 de octubre de 2026](historico/VERIFICACION-CONTRASENA-PANEL-2026-10-15.md).
+El servidor y los kioskos siguen pendientes de publicación.
+
 El desfase entre la URL sin versión de Chrome Enterprise y su manifiesto WinGet tiene
 una [corrección local documentada](historico/VERIFICACION-CHROME-PACK-2026-10-14.md).
 La instalación integral y publicación de un nuevo asistente están pendientes;

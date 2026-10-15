@@ -322,6 +322,25 @@ app.MapGet("/api/config", (ContentResolver content) =>
 app.MapGet("/api/config/version", (ContentResolver content, AssetLibrary assets) =>
     Results.Ok(new { version = content.Version() + "-" + assets.Version() }));
 
+// El kiosko verifica la clave vigente del panel. El verificador solo vuelve tras
+// acertar, para actualizar la caché local usada cuando no hay conexión.
+app.MapPost("/api/kiosk/password/verify", (PanelPasswordAttempt attempt, HttpContext ctx,
+    PanelAuthStore auth, LoginThrottle throttle) =>
+{
+    ctx.Response.Headers.CacheControl = "no-store";
+    ctx.Response.Headers.Pragma = "no-cache";
+    string client = "kiosk:" + (ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown");
+    if (throttle.IsLocked(client)) return Results.StatusCode(StatusCodes.Status429TooManyRequests);
+    if (string.IsNullOrEmpty(attempt.Password) || attempt.Password.Length > 1024 || !auth.Verify(attempt.Password))
+    {
+        throttle.RecordFailure(client);
+        return Results.StatusCode(StatusCodes.Status403Forbidden);
+    }
+    throttle.RecordSuccess(client);
+    var verifier = auth.ExportKioskPassword();
+    return verifier is null ? Results.StatusCode(StatusCodes.Status503ServiceUnavailable) : Results.Json(verifier);
+});
+
 app.MapGet("/api/assets/manifest", (AssetLibrary assets) => Results.Ok(assets.Manifest()));
 
 static string? UpdateToken(HttpContext ctx) => ctx.Request.Headers["X-Update-Token"].FirstOrDefault();
@@ -734,3 +753,5 @@ app.Run();
 
 // Expuesto para las pruebas de integración (WebApplicationFactory<Program>).
 public partial class Program { }
+
+public sealed record PanelPasswordAttempt(string Password);

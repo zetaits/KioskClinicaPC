@@ -398,7 +398,7 @@
                 </Border>
 
                 <!-- Seguridad -->
-                <Border Style="{StaticResource SectionCard}">
+                <Border x:Name="LocalPasswordSection" Style="{StaticResource SectionCard}">
                     <StackPanel>
                         <TextBlock Style="{StaticResource SectionTitle}" Text="Seguridad · Cambiar contraseña"/>
                         <TextBlock Style="{StaticResource SectionHint}" Text="Deja los campos en blanco para mantenerla. La nueva contraseña debe tener al menos 12 caracteres."/>

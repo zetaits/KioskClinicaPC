@@ -1,6 +1,9 @@
 ﻿using System.Windows;
 using System.Windows.Input;
+using System.Net.Http;
+using System.Threading.Tasks;
 using KioskClinicaPC.Core;
+using KioskClinicaPC.Services;
 using KioskClinicaPC.Windows;
 
 namespace KioskClinicaPC
@@ -17,32 +20,41 @@ namespace KioskClinicaPC
 #endif
         }
 
-        private void OkButton_Click(object sender, RoutedEventArgs e)
+        private async void OkButton_Click(object sender, RoutedEventArgs e)
         {
-            CheckPassword();
+            await CheckPasswordAsync();
         }
 
-        private void PasswordInput_KeyDown(object sender, KeyEventArgs e)
+        private async void PasswordInput_KeyDown(object sender, KeyEventArgs e)
         {
             if (e.Key == Key.Enter)
             {
-                CheckPassword();
+                e.Handled = true;
+                await CheckPasswordAsync();
             }
         }
 
-        private void CheckPassword()
+        private async Task CheckPasswordAsync()
         {
+            if (!OkButton.IsEnabled) return;
+            OkButton.IsEnabled = false;
+            CancelButton.IsEnabled = false;
             var settings = KioskSettings.Load(App.SettingsFilePath);
-            if (PasswordService.Verify(PasswordInput.Password, settings.PasswordHash))
+            using var http = new HttpClient { Timeout = System.TimeSpan.FromSeconds(5) };
+            var (allowed, error) = await new PanelPasswordAuthenticator(http)
+                .VerifyAsync(settings, PasswordInput.Password, App.SettingsFilePath);
+            if (allowed)
             {
                 this.DialogResult = true;
                 this.Close();
             }
             else
             {
-                KioskDialog.Alert(this, "Acceso restringido", "Contraseña incorrecta.", danger: true);
+                KioskDialog.Alert(this, "Acceso restringido", error, danger: true);
                 PasswordInput.Clear();
                 PasswordInput.Focus();
+                OkButton.IsEnabled = true;
+                CancelButton.IsEnabled = true;
             }
         }
     }

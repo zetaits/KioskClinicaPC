@@ -13,8 +13,7 @@ namespace KioskClinicaPC.Core.Config
         public const int MinimumPasswordLength = 12;
 
         public string? PasswordHash { get; set; }
-        /// <summary>Versión de la política de contraseña aceptada por el encargado. Los perfiles
-        /// anteriores a la política actual deben renovar su clave una sola vez.</summary>
+        /// <summary>Versión del verificador local, usado como caché cuando el panel no responde.</summary>
         public int PasswordPolicyVersion { get; set; }
         public int InactivitySeconds { get; set; } = 90;
         public int AutoScanSeconds { get; set; } = 18;
@@ -103,22 +102,23 @@ namespace KioskClinicaPC.Core.Config
             public string? ServerApiKey { get; set; }
         }
 
-        public bool ApplyPanelPasswordIfMissing(string provisioningPath)
+        /// <summary>Aplica la semilla del instalador a perfiles nuevos o con política antigua.</summary>
+        public bool ApplyPanelPasswordSeed(string provisioningPath)
         {
-            // A local password (including an older profile) always belongs to its owner.
-            if (!string.IsNullOrWhiteSpace(PasswordHash) || !File.Exists(provisioningPath)) return false;
+            if (!File.Exists(provisioningPath) ||
+                (!string.IsNullOrWhiteSpace(PasswordHash) &&
+                 (string.IsNullOrWhiteSpace(ServerUrl) || PasswordPolicyVersion >= CurrentPasswordPolicyVersion)))
+                return false;
             try
             {
                 if (new FileInfo(provisioningPath).Length > 4096) return false;
                 var seed = JsonConvert.DeserializeObject<PanelPasswordProvisioning>(File.ReadAllText(provisioningPath));
                 if (seed?.IsCompatible() != true)
                 {
-                    Log.Warning("El aprovisionamiento de contraseña no es compatible; se solicitará una contraseña local.");
+                    Log.Warning("El aprovisionamiento de contraseña no es compatible; se omite.");
                     return false;
                 }
-                PasswordHash = seed.PasswordHash;
-                PasswordPolicyVersion = seed.PasswordPolicyVersion;
-                return true;
+                return ApplyVerifiedPanelPassword(seed);
             }
             catch (Exception ex)
             {
@@ -140,13 +140,19 @@ namespace KioskClinicaPC.Core.Config
             }
         }
 
-        /// <summary>Indica si el primer arranque o una actualización debe pedir una contraseña segura.</summary>
-        public bool RequiresPasswordSetup()
-            => string.IsNullOrWhiteSpace(PasswordHash) || PasswordPolicyVersion < CurrentPasswordPolicyVersion;
+        /// <summary>Guarda el verificador confirmado por el servidor para el acceso sin conexión.</summary>
+        public bool ApplyVerifiedPanelPassword(PanelPasswordProvisioning verifier)
+        {
+            if (!verifier.IsCompatible() ||
+                (PasswordHash == verifier.PasswordHash && PasswordPolicyVersion == verifier.PasswordPolicyVersion))
+                return false;
+            PasswordHash = verifier.PasswordHash;
+            PasswordPolicyVersion = verifier.PasswordPolicyVersion;
+            return true;
+        }
 
         /// <summary>
-        /// Establece o renueva la contraseña. Si ya existe un hash exige la clave actual, de modo que una
-        /// actualización no permita a otra persona apropiarse de los ajustes del kiosko.
+        /// Cambia la contraseña de un perfil local. Si ya existe un hash exige la clave actual.
         /// </summary>
         public bool TrySetPassword(string? currentPassword, string? newPassword, string? confirmation,
             out string error)

@@ -1,7 +1,11 @@
 using System.IO;
+using System.Net;
+using System.Net.Http;
+using System.Threading;
+using System.Threading.Tasks;
 using KioskClinicaPC.Core;
-using KioskClinicaPC.Core.Config;
 using KioskClinicaPC.Equipment;
+using KioskClinicaPC.Services;
 using Newtonsoft.Json;
 using Xunit;
 
@@ -10,118 +14,109 @@ namespace KioskClinicaPC.Tests;
 public sealed class KioskPasswordPolicyTests
 {
     [Fact]
-    public void Private_panel_default_skips_setup_and_can_be_changed_without_affecting_the_panel()
+    public void Installer_verifier_migrates_old_policy_without_requesting_password_renewal()
     {
-        string directory = Path.Combine(Path.GetTempPath(), "kiosk-panel-password-" + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(directory);
+        string path = Path.GetTempFileName();
         try
         {
-            const string panelPassword = "clave-del-panel-para-pruebas";
-            var seed = new PanelPasswordProvisioning(1, PasswordService.Hash(panelPassword), KioskSettings.CurrentPasswordPolicyVersion);
-            string path = Path.Combine(directory, PanelPasswordProvisioning.FileName);
+            var seed = new PanelPasswordProvisioning(1, PasswordService.Hash("clave-vigente-del-panel"), 1);
             File.WriteAllText(path, JsonConvert.SerializeObject(seed));
-            var settings = new KioskSettings { ServerUrl = "https://existing.test", DeviceId = "original-device", InactivitySeconds = 123 };
-            Assert.True(settings.ApplyPanelPasswordIfMissing(path));
-            Assert.False(settings.RequiresPasswordSetup());
-            Assert.True(PasswordService.Verify(panelPassword, settings.PasswordHash));
-            string settingsPath = Path.Combine(directory, "settings.json"); settings.Save(settingsPath);
-            var reopened = KioskSettings.Load(settingsPath);
-            Assert.False(reopened.RequiresPasswordSetup());
-            Assert.True(PasswordService.Verify(panelPassword, reopened.PasswordHash));
-            Assert.False(reopened.TrySetPassword("incorrecta", "nueva-clave-del-equipo", "nueva-clave-del-equipo", out _));
-            Assert.True(reopened.TrySetPassword(panelPassword, "nueva-clave-del-equipo", "nueva-clave-del-equipo", out _));
-            Assert.True(PasswordService.Verify("nueva-clave-del-equipo", reopened.PasswordHash));
-            Assert.False(reopened.ApplyPanelPasswordIfMissing(path));
-            Assert.True(PasswordService.Verify("nueva-clave-del-equipo", reopened.PasswordHash));
-            Assert.True(PasswordService.Verify(panelPassword, seed.PasswordHash));
-            Assert.Equal("https://existing.test", reopened.ServerUrl); Assert.Equal("original-device", reopened.DeviceId); Assert.Equal(123, reopened.InactivitySeconds);
-            Assert.DoesNotContain(panelPassword, File.ReadAllText(settingsPath));
-            Assert.DoesNotContain(seed.PasswordHash, seed.ToString());
+            var settings = new KioskSettings
+            {
+                ServerUrl = "https://panel.test",
+                PasswordHash = PasswordService.Hash("antigua-clave-local"),
+                PasswordPolicyVersion = 0,
+                DeviceId = "equipo-1"
+            };
+            Assert.True(settings.ApplyPanelPasswordSeed(path));
+            Assert.True(PasswordService.Verify("clave-vigente-del-panel", settings.PasswordHash));
+            Assert.Equal("equipo-1", settings.DeviceId);
+            Assert.False(settings.ApplyPanelPasswordSeed(path));
         }
-        finally { Directory.Delete(directory, true); }
+        finally { File.Delete(path); }
     }
-    [Theory]
-    [InlineData(0)]
-    [InlineData(1)]
-    public void Existing_password_is_preserved_even_for_an_older_policy(int policy)
+
+    [Fact]
+    public void Local_password_is_preserved_when_no_server_is_configured()
     {
-        var settings = new KioskSettings { PasswordHash = PasswordService.Hash("clave-local-existente"), PasswordPolicyVersion = policy };
-        string hash = settings.PasswordHash;
-        string file = Path.Combine(Path.GetTempPath(), "kiosk-existing-password-" + Guid.NewGuid().ToString("N") + ".json");
+        string path = Path.GetTempFileName();
         try
         {
-            var seed = new PanelPasswordProvisioning(1, PasswordService.Hash("otra-clave-del-panel"), 1);
-            File.WriteAllText(file, JsonConvert.SerializeObject(seed));
-            Assert.False(settings.ApplyPanelPasswordIfMissing(file));
-            Assert.Equal(hash, settings.PasswordHash); Assert.Equal(policy, settings.PasswordPolicyVersion);
+            var seed = new PanelPasswordProvisioning(1, PasswordService.Hash("clave-del-panel-test"), 1);
+            File.WriteAllText(path, JsonConvert.SerializeObject(seed));
+            var settings = new KioskSettings
+            {
+                PasswordHash = PasswordService.Hash("clave-local-anterior"),
+                PasswordPolicyVersion = 0
+            };
+            Assert.False(settings.ApplyPanelPasswordSeed(path));
+            Assert.True(PasswordService.Verify("clave-local-anterior", settings.PasswordHash));
         }
-        finally { File.Delete(file); }
+        finally { File.Delete(path); }
     }
-    [Theory]
-    [InlineData("{}")]
-    [InlineData("not-json")]
-    [InlineData("{\"schemaVersion\":1,\"passwordHash\":\"invalid\",\"passwordPolicyVersion\":1}")]
-    public void Invalid_default_keeps_the_manual_setup_available(string content)
+
+    [Fact]
+    public async Task Server_validates_current_password_and_updates_offline_cache()
     {
-        string file = Path.Combine(Path.GetTempPath(), "kiosk-password-invalid-" + Guid.NewGuid().ToString("N") + ".json");
+        string path = Path.GetTempFileName();
         try
         {
-            File.WriteAllText(file, content); var settings = new KioskSettings();
-            Assert.False(settings.ApplyPanelPasswordIfMissing(file));
-            Assert.True(settings.RequiresPasswordSetup()); Assert.Null(settings.PasswordHash);
+            var verifier = new PanelPasswordProvisioning(1, PasswordService.Hash("nueva-clave-del-panel"), 1);
+            var settings = new KioskSettings
+            {
+                ServerUrl = "https://panel.test",
+                ServerApiKey = "api-test",
+                PasswordHash = PasswordService.Hash("clave-anterior-del-panel")
+            };
+            using var http = new HttpClient(new Handler(request =>
+            {
+                Assert.Equal("https://panel.test/api/kiosk/password/verify", request.RequestUri!.ToString());
+                Assert.Equal("api-test", request.Headers.GetValues("X-Api-Key").Single());
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent(JsonConvert.SerializeObject(verifier))
+                };
+            }));
+            var result = await new PanelPasswordAuthenticator(http)
+                .VerifyAsync(settings, "nueva-clave-del-panel", path);
+            Assert.True(result.Allowed);
+            Assert.True(PasswordService.Verify("nueva-clave-del-panel", KioskSettings.Load(path).PasswordHash));
+            Assert.False(PasswordService.Verify("clave-anterior-del-panel", settings.PasswordHash));
         }
-        finally { File.Delete(file); }
-    }
-    [Fact]
-    public void New_profile_requires_password_setup_and_has_no_shared_default()
-    {
-        var settings = new KioskSettings();
-
-        Assert.True(settings.RequiresPasswordSetup());
-        Assert.Null(settings.PasswordHash);
+        finally { File.Delete(path); }
     }
 
     [Fact]
-    public void New_profile_accepts_a_strong_confirmed_password()
-    {
-        var settings = new KioskSettings();
-
-        Assert.True(settings.TrySetPassword(null, "una-clave-local-segura", "una-clave-local-segura", out string error), error);
-        Assert.False(settings.RequiresPasswordSetup());
-        Assert.Equal(KioskSettings.CurrentPasswordPolicyVersion, settings.PasswordPolicyVersion);
-        Assert.True(PasswordService.Verify("una-clave-local-segura", settings.PasswordHash));
-    }
-
-    [Fact]
-    public void Existing_profile_requires_current_password_for_one_time_renewal()
+    public async Task Server_rejection_never_falls_back_to_old_cached_password()
     {
         var settings = new KioskSettings
         {
-            PasswordHash = PasswordService.Hash("clave-anterior-segura"),
-            PasswordPolicyVersion = 0,
-            ServerUrl = "https://server.test",
-            DeviceId = "device-1"
+            ServerUrl = "https://panel.test",
+            PasswordHash = PasswordService.Hash("clave-anterior-del-panel")
         };
-
-        Assert.True(settings.RequiresPasswordSetup());
-        Assert.False(settings.TrySetPassword("incorrecta", "una-clave-nueva-segura", "una-clave-nueva-segura", out _));
-        Assert.True(settings.TrySetPassword("clave-anterior-segura", "una-clave-nueva-segura", "una-clave-nueva-segura", out string error), error);
-
-        Assert.False(settings.RequiresPasswordSetup());
-        Assert.Equal("https://server.test", settings.ServerUrl);
-        Assert.Equal("device-1", settings.DeviceId);
+        using var http = new HttpClient(new Handler(_ => new HttpResponseMessage(HttpStatusCode.Forbidden)));
+        var result = await new PanelPasswordAuthenticator(http)
+            .VerifyAsync(settings, "clave-anterior-del-panel", "unused.json");
+        Assert.False(result.Allowed);
     }
 
-    [Theory]
-    [InlineData("corta", "corta")]
-    [InlineData("", "")]
-    [InlineData("una-clave-nueva-segura", "no-coincide")]
-    public void Invalid_new_password_is_rejected(string password, string confirmation)
+    [Fact]
+    public async Task Offline_access_uses_last_verified_password()
     {
-        var settings = new KioskSettings();
+        var settings = new KioskSettings
+        {
+            ServerUrl = "https://panel.test",
+            PasswordHash = PasswordService.Hash("clave-validada-anterior")
+        };
+        using var http = new HttpClient(new Handler(_ => throw new HttpRequestException("offline")));
+        var authenticator = new PanelPasswordAuthenticator(http);
+        Assert.True((await authenticator.VerifyAsync(settings, "clave-validada-anterior", "unused.json")).Allowed);
+        Assert.False((await authenticator.VerifyAsync(settings, "otra-clave", "unused.json")).Allowed);
+    }
 
-        Assert.False(settings.TrySetPassword(null, password, confirmation, out string error));
-        Assert.NotEmpty(error);
-        Assert.True(settings.RequiresPasswordSetup());
+    private sealed class Handler(Func<HttpRequestMessage, HttpResponseMessage> send) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+            => Task.FromResult(send(request));
     }
 }

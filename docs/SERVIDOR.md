@@ -162,6 +162,8 @@ extraíble por diseño; la clave limitada del asistente del pack es independient
 | `GET /panel/setup/download` | cookie | Online de la versión activa; `edition=complete` para USB y `version=X.Y.Z` para candidatas. |
 | `GET /panel/deployment/download` | cookie | Instalación por red verificada; `version=X.Y.Z` fija la publicación mostrada en el panel. Sin `version`, sirve la última válida. |
 | `GET /api/releases/setup/kiosk-password` | `X-Release-Publish-Key` | Semilla PBKDF2 de la contraseña del panel para perfiles nuevos del asistente privado; no devuelve texto plano. |
+| `POST /api/kiosk/password/verify` | `X-Api-Key` | Valida la contraseña del panel al abrir Ajustes; devuelve el verificador solo tras acertar, para la caché sin conexión. Limita los intentos fallidos. |
+
 | `POST /api/releases/setup/v3` | `X-Release-Publish-Key` | Importa manifiesto esquema 3, ambos asistentes y componentes como candidata, sin activarla. |
 | `GET /api/setup/v3/components/{kind}/{sha256}` | `X-Setup-Key` | Componentes publicados, inmutables, con ETag y Range. |
 | `POST /panel/setup/activate` | cookie + antiforgery | Verifica y activa/restaura una candidata v3. |
@@ -171,6 +173,10 @@ extraíble por diseño; la clave limitada del asistente del pack es independient
 | `GET /panel/assets/{cat}/{fichero}` | cookie | Vista previa de imágenes dentro del panel. |
 | `/hub/sync` (SignalR) | — | Reloj maestro del attract (`SyncState`) + aviso `ContentChanged`. Sin datos sensibles. |
 | `/` y páginas del panel | cookie | Panel Blazor Server; sin sesión redirige a `/login`. |
+
+Publica el servidor con la ruta de verificación antes de distribuir el Kiosk que
+la utiliza. Una respuesta de contraseña incorrecta no permite recurrir a la
+caché local; la caché se usa cuando el servidor no responde o devuelve un error temporal.
 
 El protocolo de estaciones de instalación por red usa credenciales propias y se describe en
 [Instalación por red](INSTALACION-POR-RED.md).
@@ -327,9 +333,10 @@ git push origin "v$kioskVersion"
 
 Los kioscos antiguos con el actualizador de GitHub requieren una migración
 manual o mediante una release puente anterior. Al arrancar, la versión actual rellena
-`ServerUrl` y `ServerApiKey` **solo si ambos estaban vacíos**; conserva contraseña, identidad y
-ajustes locales. Los perfiles que aún usan la política de contraseña antigua deben renovarla
-en el primer arranque; el kiosco se registra después de completar ese paso. Comprueba en
+`ServerUrl` y `ServerApiKey` **solo si ambos estaban vacíos**; conserva identidad y
+ajustes locales. La ventana de renovación de contraseña se ha eliminado: el acceso
+a Ajustes de kioskos conectados valida la clave vigente del panel y guarda el
+verificador tras acertar para el uso sin conexión. Comprueba en
 **Ordenadores** que aparecen antes de gestionar sus siguientes
 actualizaciones desde **Actualizaciones**. Un equipo sin actualización administrada
 puede instalar la versión nueva encima desde el asistente de `/instalador`, sin

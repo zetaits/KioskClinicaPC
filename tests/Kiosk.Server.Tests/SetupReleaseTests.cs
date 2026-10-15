@@ -1,5 +1,6 @@
 using System.IO.Compression;
 using System.Net;
+using System.Net.Http.Json;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text.Encodings.Web;
@@ -115,6 +116,42 @@ public sealed class SetupReleaseTests : IDisposable
         var changed = JsonSerializer.Deserialize<PanelPasswordProvisioning>(await client.GetStringAsync(route), Json)!;
         Assert.True(KioskClinicaPC.Core.PasswordService.Verify("changed-panel-test-password", changed.PasswordHash));
         Assert.False(KioskClinicaPC.Core.PasswordService.Verify("test-password", changed.PasswordHash));
+    }
+    [Fact]
+    public async Task Kiosk_password_verification_returns_current_verifier_only_after_success()
+    {
+        using var client = _factory.CreateClient();
+        const string route = "/api/kiosk/password/verify";
+        using var denied = await client.PostAsJsonAsync(route, new { password = "wrong-password" });
+        Assert.Equal(HttpStatusCode.Forbidden, denied.StatusCode);
+        Assert.DoesNotContain("passwordHash", await denied.Content.ReadAsStringAsync(), StringComparison.OrdinalIgnoreCase);
+
+        using var accepted = await client.PostAsJsonAsync(route, new { password = "test-password" });
+        Assert.Equal(HttpStatusCode.OK, accepted.StatusCode);
+        Assert.True(accepted.Headers.CacheControl!.NoStore);
+        var verifier = JsonSerializer.Deserialize<PanelPasswordProvisioning>(
+            await accepted.Content.ReadAsStringAsync(), Json)!;
+        Assert.True(verifier.IsCompatible());
+        Assert.True(KioskClinicaPC.Core.PasswordService.Verify("test-password", verifier.PasswordHash));
+
+        _factory.Services.GetRequiredService<PanelAuthStore>().SetPassword("changed-panel-test-password");
+        Assert.Equal(HttpStatusCode.Forbidden,
+            (await client.PostAsJsonAsync(route, new { password = "test-password" })).StatusCode);
+        using var changed = await client.PostAsJsonAsync(route, new { password = "changed-panel-test-password" });
+        Assert.Equal(HttpStatusCode.OK, changed.StatusCode);
+    }
+    [Fact]
+    public async Task Kiosk_password_verification_requires_the_kiosk_api_key_when_configured()
+    {
+        using var securedFactory = _factory.WithWebHostBuilder(builder =>
+            builder.UseSetting("Kiosk:ApiKey", "kiosk-api-test"));
+        using var client = securedFactory.CreateClient();
+        const string route = "/api/kiosk/password/verify";
+        using var missing = await client.PostAsJsonAsync(route, new { password = "test-password" });
+        Assert.Equal(HttpStatusCode.Unauthorized, missing.StatusCode);
+        client.DefaultRequestHeaders.Add("X-Api-Key", "kiosk-api-test");
+        using var accepted = await client.PostAsJsonAsync(route, new { password = "test-password" });
+        Assert.Equal(HttpStatusCode.OK, accepted.StatusCode);
     }
     [Fact]
     public async Task Import_requires_distinct_key_is_atomic_idempotent_and_does_not_activate()

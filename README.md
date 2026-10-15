@@ -80,9 +80,10 @@ email, phone and WhatsApp, clickable to message or call on the spot.
 | Exit the kiosk | Settings → "Exit kiosk" |
 | Free edit mode (local mode) | Settings → "Enable free edit mode" |
 
-On first launch, the kiosk requires a local password of at least 12 characters. The private equipment
-assistant can initialize a new profile with the panel's password hash; existing profiles keep their password.
-Profiles with the old password policy request a one-time renewal. Details: [equipment assistant](docs/ASISTENTE-EQUIPOS.md#contraseña-inicial-de-kiosk).
+Kiosks connected to the server use the panel administrator password for Settings. The private equipment
+assistant seeds an offline verifier; a successful online login refreshes it after a panel password change.
+There is no password setup or renewal window at startup. Every profile needs a valid password verifier
+before launch, supplied by the assistant for connected kiosks. Details: [equipment assistant](docs/ASISTENTE-EQUIPOS.md#contraseña-inicial-de-kiosk).
 
 ---
 
